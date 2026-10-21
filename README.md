@@ -7,9 +7,9 @@
 
 **With Clawdline Cloud, see Claude Code and Codex Sessions across your machines in one phone list, then open one to reply or leave a to-do.**
 
-One continuous console recording with sample data:
+One continuous recording of the real console with sample data:
 
-<img src="docs/assets/cloud-sessions-demo-en.gif" width="390" alt="A phone recording of Clawdline Cloud: pixel-marked Sessions grouped under Studio Mac and Build Linux, one waiting for you; open it to see a to-do and a map webpage screenshot sent by the Agent, then enlarge the image.">
+<img src="docs/assets/cloud-sessions-demo-en.gif" width="390" alt="A continuous phone recording of the real console: open a dashboard review from the multi-machine Session list, see a small design image sent by Codex, expand the to-dos and send Make the New project button larger, then see its sent receipt.">
 
 [Herdr](https://github.com/herdrdev/herdr/blob/master/docs/versions/0.9.1/website/src/content/docs/connecting-machines.mdx) also lists agents across SSH machines in one TUI; [T3 Code](https://github.com/pingdotgg/t3code/blob/main/docs/user/remote-access.md) connects to multiple environments. Clawdline Cloud groups them in a phone browser list and opens their conversations, to-dos, and images there.
 
@@ -60,7 +60,7 @@ The installer verifies the release, starts a per-user service, and opens the con
 
 ## Guides
 
-[User guide](docs/user/README.md) · [Agent guide](docs/agent-contract.md) · [Build from source](docs/user/install.md) · [Troubleshooting](docs/user/troubleshooting.md) · [Developer docs](docs/README.md)
+[User guide](docs/user/README.md) · [Agent guide](docs/agent-contract.md) · [Build from source](docs/user/install.md) · [Troubleshooting](docs/user/troubleshooting.md) · [Developer docs](docs/README.md) · [UI motion catalog](docs/ui-motion-catalog.md) · [Static HTML reports](docs/html-artifacts.md)
 
 ## License
 

@@ -197,6 +197,10 @@ func (f *File) set(current Values, changes map[string]any) (Values, error) {
 		next[k] = v
 	}
 	for k, v := range changes {
+		if v == Remove {
+			delete(next, k)
+			continue
+		}
 		encoded, err := json.Marshal(v)
 		if err != nil {
 			return Values{}, fmt.Errorf("%s: %w", k, err)
@@ -496,10 +500,12 @@ var Settables = []Settable{
 	{Name: "voice_settle_seconds", Kind: "number", Min: 0, Max: 30},
 	{Name: "voice_stop_seconds", Kind: "number", Min: 0, Max: 300},
 	{Name: "remote", Kind: "bool"},
-	{Name: "remote_tunnel", Kind: "string", Choices: []string{"off", "quick", "named"},
-		Refusal: "invalid_tunnel", Because: "off, quick or named"},
-	{Name: "remote_hostname", Kind: "string", Check: ValidHostname, Refusal: "invalid_hostname",
-		Because: "a hostname, or empty"},
+	// The address Tailscale Serve answers on for this machine
+	// (docs/user/remote-access.md). The built-in Cloudflare tunnel's keys
+	// are RetiredCloudflareKeys, which no route writes.
+	{Name: "tailscale_hostname", Kind: "string", Check: ValidTailscaleHostname,
+		Refusal: "invalid_tailscale_hostname",
+		Because: "a full Tailscale name such as machine.tailnet.ts.net, or empty"},
 	{Name: "push_on_delivery", Kind: "bool"},
 	{Name: "push_on_fanout", Kind: "bool"},
 	{Name: "smart_notifications", Kind: "bool"},
@@ -514,6 +520,13 @@ var Settables = []Settable{
 	{Name: "push_on_cloud_release_success", Kind: "bool"},
 	{Name: "push_on_release_failure", Kind: "bool"},
 	{Name: "orchestrator_agent_notify", Kind: "bool"},
+	// Opt-in for the connection-health uploader (cmd/clawdline/health.go);
+	// absent is off.
+	{Name: "cloud_health_upload", Kind: "bool"},
+	// Separate opt-in for owner-sealed diagnostic retention
+	// (internal/adapters/healthsealed); cloud_health_upload alone never
+	// permits it, and absent is off.
+	{Name: "cloud_health_owner_retention", Kind: "bool"},
 	// Whether the daemon polls iTerm2 over Apple Events; absent is on
 	// (docs/interface.md "Turning iTerm2 scanning off").
 	{Name: "iterm_scan", Kind: "bool"},
@@ -570,6 +583,48 @@ func DefaultReasoningEffort(values Values) string {
 		return effort
 	}
 	return ""
+}
+
+// Remove, as the value of a change, takes the key out of the file instead of
+// writing it.
+var Remove any = removal{}
+
+type removal struct{}
+
+// RetiredCloudflareKeys are the built-in Cloudflare tunnel's settings, removed
+// on 2026-10-20 (`quick` on 2026-10-19). Nothing reads them any more and no
+// route writes them; a file that still holds them starts nothing, and the
+// settings page explains once (CloudflareTunnelRetired) before they are
+// taken out of the file.
+var RetiredCloudflareKeys = []string{"remote_tunnel", "remote_tunnel_name", "remote_hostname", "cloudflared_path"}
+
+// CloudflareTunnelRetired is whether the file still holds a Cloudflare tunnel
+// configuration: any retired key with a value other than empty, `off`, false
+// or null. Such a file once opened a tunnel, or was ready to, and the person
+// is owed the explanation of why it no longer does.
+func CloudflareTunnelRetired(v Values) bool {
+	for _, key := range RetiredCloudflareKeys {
+		raw, ok := v.Raw[key]
+		if !ok {
+			continue
+		}
+		switch strings.TrimSpace(string(raw)) {
+		case "", `""`, `"off"`, "null", "false":
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// RetiredCloudflareKey is whether name is one of RetiredCloudflareKeys.
+func RetiredCloudflareKey(name string) bool {
+	for _, key := range RetiredCloudflareKeys {
+		if key == name {
+			return true
+		}
+	}
+	return false
 }
 
 // SettableByName finds one key, or false for a name this file does not set.
@@ -649,6 +704,19 @@ func ValidFont(s string) bool {
 }
 
 // ValidHostname reports whether s is a hostname, or empty for none.
+// ValidTailscaleHostname is a machine's full MagicDNS name as Tailscale Serve
+// answers on it: lowercase, `<machine>.<tailnet>.ts.net`, no scheme, port or
+// path. Empty is valid and means none.
+func ValidTailscaleHostname(s string) bool {
+	if s == "" {
+		return true
+	}
+	if s != strings.ToLower(s) || !ValidHostname(s) || !strings.HasSuffix(s, ".ts.net") {
+		return false
+	}
+	return len(strings.Split(s, ".")) >= 4
+}
+
 func ValidHostname(s string) bool {
 	if s == "" {
 		return true

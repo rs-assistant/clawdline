@@ -81,13 +81,15 @@ export interface Report {
 /* ---- what counts as words, and what counts as saying them properly -------- */
 
 /**
- * The one place a refusal becomes words (`core/failure-text.js`), and the two
+ * The one place a refusal becomes words (`core/failure-text.js`), and the
  * wrappers that are it: `toastFailure` hands it a toast, `sentenceFor` is
- * `voice-bridge.ts`'s local alias. A catch-all that reaches any of these has
+ * `voice-bridge.ts`'s local alias, `failureParts` hands back the sentence and
+ * its tag apart for a screen that folds the tag. A catch-all that reaches any of these has
  * kept the code; a catch-all that does not has thrown it away.
  */
 const FORMATTERS = new Set([
   "failureSentence",
+  "failureParts",
   "describeFailure",
   "renderFailure",
   "toastFailure",

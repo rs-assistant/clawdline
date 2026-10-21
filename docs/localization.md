@@ -56,7 +56,7 @@ separate language list; a voice language does not imply an interface translation
 
 | Preference | Stored where | Default | Changes |
 | --- | --- | --- | --- |
-| `ui_language` | This browser origin | `auto` | This browser's fixed console copy and document language |
+| `ui_language` | This browser origin | `auto` | This browser's fixed console copy and document language; in the macOS App's local console, its native menus, status and alerts too |
 | `language` | Daemon settings | Existing behavior | New agent response and Board authoring instruction; voice `auto` fallback |
 | `voice_language` | Daemon settings | Existing behavior | Dictation language |
 | `product_language` | Daemon settings | `en` | Daemon notifications and human-readable CLI output |
@@ -66,6 +66,15 @@ origin does not silently change a local console, another browser, an agent, or
 dictation. The settings UI must identify the browser-local control and preserve
 an unsupported pre-existing daemon `language` value, with a visible explanation
 and a way to choose a shipped interface language.
+
+The macOS App's native shell mirrors the catalog actually displayed by its
+local console, including its separate settings window. Both local WebViews
+reload after a language change so their browser copy stays in sync. A validated
+main-frame message from the App's loopback console selects native copy; the
+Cloud tab has no language bridge and its hosted-origin `ui_language` remains
+independent. The shell keeps a local mirror for its launch menus before the
+console loads. This mirror does not change daemon `product_language`, agent
+authoring language, or dictation.
 
 For the console, an explicit shipped `ui_language` wins. `auto` uses
 `navigator.languages` in order, followed by `navigator.language`, then `en`.
@@ -92,6 +101,13 @@ must be fetched before the first visible render. Cloud uses the same resolver
 and bundle catalog as the local console. Both set `lang` and `dir` to the
 catalog actually displayed; neither guesses the document language from an
 unfulfilled preference.
+
+The standalone Cloud operations page uses the same browser preference and
+validated catalog as the console. It keeps its boot cover until the selected
+catalog is active, including when no machine is paired. Operations, Workflow,
+notifications, dispatch rules, and transcript plan headings use catalog keys;
+their English and Traditional Chinese source tables are checked against the
+public catalogs. User-edited Workflow messages and dispatch rules remain data.
 
 `GET /v1/strings` without `lang` returns English. With a supported tag it
 returns that catalog, which may omit new keys after the initial complete
@@ -154,6 +170,36 @@ the one `en.json` serves; `--write` adds what is missing and resynchronises
 English. It runs inside `npm run check`. The other seven languages keep falling
 back to English by design and are not checked by it.
 
+## Bundled role and Skill display metadata
+
+Bundled role names and summaries and bundled Skill names and purposes are product copy.
+`src/builtin-display-source.json` records their English and Traditional Chinese source values.
+`tools/check-builtin-display.mjs`, called by the source-catalog check, compares that manifest and
+the primary catalogs with the role Markdown frontmatter and the domain Skill table.
+
+`src/builtin-display.ts` translates only recognized built-in identifiers whose complete English
+name and summary/purpose pair matches the recorded source. Unknown identifiers and edited
+metadata keep their wire values. The display helper does not rewrite wire objects, instruction
+bodies, handbooks, immutable versions or source files. Custom and historical authored content
+remains data. The helper may display an unchanged built-in metadata pair in the active language
+without changing its stored snapshot.
+
+## Browser acceptance beyond catalog coverage
+
+A complete key set does not prove that a control uses the catalog, that a translation still
+matches the current flow, or that an expanded child control fits. Bind the redemption form only
+after locale boot; exercise cold navigation as well as in-app arrival. Review the actual labels,
+long tab names, menus, dialogs, empty/error states and recovery actions at phone and desktop
+widths. A document without horizontal overflow can still contain overlapping or clipped controls.
+
+The opt-in browser harness is documented in `web/console/localization-review.md`. It builds the
+actual App and hosted entry points with explicit synthetic dependencies and captures independent
+screenshots, rendered text, errors and geometry for each cell. Fixture contract failures are
+reported separately from product defects. A successful capture is not language approval.
+Synthetic origins do not establish production Cloud acceptance; authenticated relay, account,
+pairing and billing boundaries require their own evidence. Keep the candidate commit and catalog
+hashes with every review, and recheck only the affected states after a correction.
+
 ## Delivery checks
 
 The Console and daemon/CLI inventories must each enumerate the source of every
@@ -168,3 +214,16 @@ complete frozen baseline and requires full English and Traditional Chinese
 parity. Subsequent deployments retain those requirements, validate every
 present translation, and report the remaining languages'
 coverage without blocking on new untranslated keys.
+
+## English documentation
+
+English READMEs, user pages, design notes and Agent guides use English interface labels and
+English examples. Look up the label in the shipped English catalog for that control; a Chinese
+label can map to different English words in different contexts. Do not insert a Chinese label
+followed by an English gloss, or leave a Chinese update note inside English prose.
+
+Keep non-English text when the document needs its exact bytes: a language-switch link, an
+explicitly labeled translated prompt or catalog field, a multilingual trigger phrase, a Unicode
+test, a link target, or quoted UI evidence in a localization incident. Explain those examples in
+English. Historical documents identified as Chinese in the document index are separate from the
+English guide.

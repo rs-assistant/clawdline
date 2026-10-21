@@ -220,7 +220,6 @@
   "http.306e1ff5baba8f00": "persona는 다음 중 하나여야 합니다: architect, backend, frontend, minimal-change, code-reviewer, reality-checker, security, technical-writer, seo, content-writer, ai-search, social-media, instagram, email, growth, pr, product-manager, sprint-prioritizer, feedback-synthesizer, trend-researcher, ux-researcher, test-automation, accessibility, performance, api-tester, evidence-collector, sre, devops, incident-commander, finops, secrets, ui-designer, ux-architect, brand-guardian, ui-finish-gate, image-prompt, pricing, customer-success, support, analytics, devrel, privacy, zero-review-lead",
   "http.30c507fd89347154": "Session은 자기 자신을 기다리지 않습니다.",
   "http.314803a5b2bfc3b0": "이미지는 GET으로 읽어야 합니다.",
-  "http.3173e3f0ec56a918": "터널은 GET으로 조회하고 설정에서 켜거나 꺼야 합니다.",
   "http.3204a7d685b1b418": "참조 이미지는 POST로 추가해야 합니다.",
   "http.320c2f5b0da7bc3d": "claims는 필수입니다. 이 작업이 쓸 수 있는 project_dir 아래 상대 경로를 지정합니다. 파일을 알고 있으면 파일을, 모르면 디렉터리를 지정하거나, 아무것도 쓰지 않는 작업이라면 \"claims\": []를 보내세요. 격리된 작업도 같은 목록을 선언합니다. 전용 체크아웃에서는 임대가 해제되지만 경로는 반영 시 쓰기 범위로 유지됩니다. 단계적으로 제한하는 줄 수처럼 저장소 보호 장치가 대신 다시 쓰는 항목은 제외하세요. 이는 변경을 반영하는 담당자의 몫이지 이 작업의 임대 범위가 아닙니다.",
   "http.321ad5182d86b760": "그 이름의 Session이 없습니다.",

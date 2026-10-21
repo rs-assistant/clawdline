@@ -30,11 +30,13 @@ package cloud
 // fingerprints.
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -457,6 +459,354 @@ func (p *Pairing) appOrigin() string {
 }
 
 func (p *Pairing) logf(format string, args ...any) {
+	if p.Log != nil {
+		p.Log(format, args...)
+	}
+}
+
+// MARK: identity pairing
+
+// Identity pairing is the second handover (`internal/adapters/cloud`
+// MachineIdentityPairing): the one that gives a browser the master secret
+// with a content-key epoch Cloud recorded, which is what owner-sealed
+// diagnostics need. The legacy invitation above stays as it is; this one runs
+// beside it and never touches its pins.
+//
+// The order a person sees:
+//
+//  1. Begin: this machine starts a pairing and the local page shows a
+//     `#pairid=` link and QR.
+//  2. The browser opens it, shows a six-digit code and the machine
+//     fingerprint, and sends its offer once its person confirms.
+//  3. This machine opens the offer and shows the same code locally. Nothing
+//     is handed over until the person here answers Decide(approve=true);
+//     there is no automatic approval and no route a Cloud viewer can reach.
+//  4. The grant, the browser's activate and this machine's attested confirm
+//     follow without further input.
+
+// Identity pairing phases, as the local route names them.
+const (
+	IdentityPairingIdle    = "idle"
+	IdentityPairingWaiting = "waiting_viewer"
+	IdentityPairingConfirm = "confirm_code"
+	IdentityPairingHanding = "handing_over"
+	IdentityPairingPaired  = "paired"
+	IdentityPairingDenied  = "denied"
+	IdentityPairingFailed  = "failed"
+	IdentityPairingStopped = "cancelled"
+)
+
+// IdentityPairingLifetimeLimit bounds one run: Cloud's pairing row lives at most
+// 600 s, and the minute past it lets the last poll answer `expired` rather
+// than the context cutting it short.
+const IdentityPairingLifetimeLimit = 11 * time.Minute
+
+// IdentityPairingBeginTimeout bounds how long Begin waits for Cloud's start
+// answer before it reports the run as not started.
+const IdentityPairingBeginTimeout = 20 * time.Second
+
+// Identity pairing refusals a route branches on.
+var (
+	ErrIdentityPairingUnknown    = errors.New("no identity pairing with that id is waiting for a decision")
+	ErrIdentityPairingNotWaiting = errors.New("the identity pairing is not waiting for a code decision")
+)
+
+// IdentityPairingState is what the local page is shown. Like PairingState it
+// carries no secret apart from the link's fragment, which is a one-time QR
+// only this machine's own token can read.
+type IdentityPairingState struct {
+	Phase              string `json:"phase"`
+	PairingID          string `json:"pairing_id,omitempty"`
+	Link               string `json:"link,omitempty"`
+	ExpiresAt          int64  `json:"expires_at,omitempty"`
+	MachineFingerprint string `json:"machine_fingerprint,omitempty"`
+	// Code and ViewerFingerprint are present only while Phase is
+	// confirm_code: the person compares them with the browser's screen.
+	Code              string `json:"code,omitempty"`
+	ViewerFingerprint string `json:"viewer_fingerprint,omitempty"`
+	ViewerDeviceID    string `json:"viewer_device_id,omitempty"`
+	ContentKeyEpoch   int64  `json:"content_key_epoch,omitempty"`
+	PairedAt          int64  `json:"paired_at,omitempty"`
+	// Error is a stable code (identityErrorCode), never Cloud's message.
+	Error   string `json:"error,omitempty"`
+	ErrorAt int64  `json:"error_at,omitempty"`
+}
+
+// IdentityPairing drives one identity pairing at a time, for the same reason
+// Pairing does: two live codes and one person is how the wrong one is used.
+type IdentityPairing struct {
+	AccountID string
+	AppOrigin string
+	Client    *adaptercloud.IdentityClient
+	Keys      PairingKeys
+	Epochs    adaptercloud.ContentEpochStore
+	Now       func() time.Time
+	Log       func(format string, args ...any)
+	// Run replaces the adapter's run in tests; nil runs MachineIdentityPairing.
+	Run func(ctx context.Context, m *adaptercloud.MachineIdentityPairing, accountID string) (adaptercloud.IdentityPairingResult, error)
+
+	mu     sync.Mutex
+	state  IdentityPairingState
+	gen    uint64
+	cancel context.CancelFunc
+	decide chan bool
+}
+
+// State is the current identity pairing.
+func (p *IdentityPairing) State() IdentityPairingState {
+	if p == nil {
+		return IdentityPairingState{Phase: IdentityPairingIdle}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	state := p.state
+	if state.Phase == "" {
+		state.Phase = IdentityPairingIdle
+	}
+	if (state.Phase == IdentityPairingWaiting || state.Phase == IdentityPairingConfirm) &&
+		state.ExpiresAt > 0 && p.now().Unix() > state.ExpiresAt {
+		state = IdentityPairingState{Phase: IdentityPairingFailed, PairingID: state.PairingID,
+			Error: "expired", ErrorAt: state.ExpiresAt}
+	}
+	return state
+}
+
+// Begin starts a fresh identity pairing, replacing one in flight, and
+// answers once Cloud has issued the QR (or refused).
+func (p *IdentityPairing) Begin(ctx context.Context) (IdentityPairingState, error) {
+	if p == nil || p.Client == nil || p.Keys == nil || p.AccountID == "" {
+		return IdentityPairingState{}, ErrPairingUnavailable
+	}
+	key, _, err := p.Keys()
+	if err != nil {
+		return IdentityPairingState{}, err
+	}
+	if !key.Valid() {
+		return IdentityPairingState{}, ErrPairingUnavailable
+	}
+
+	p.mu.Lock()
+	if p.cancel != nil {
+		p.cancel()
+	}
+	p.gen++
+	gen := p.gen
+	run, cancel := context.WithTimeout(context.WithoutCancel(ctx), IdentityPairingLifetimeLimit)
+	p.cancel = cancel
+	decide := make(chan bool, 1)
+	p.decide = decide
+	p.state = IdentityPairingState{Phase: IdentityPairingWaiting, MachineFingerprint: key.Fingerprint()}
+	p.mu.Unlock()
+
+	shown := make(chan struct{})
+	finished := make(chan error, 1)
+	m := &adaptercloud.MachineIdentityPairing{
+		Client:     p.Client,
+		MachineKey: key,
+		Master: func() ([]byte, bool, error) {
+			_, secret, err := p.Keys()
+			if err != nil {
+				return nil, false, err
+			}
+			if !secret.Valid() {
+				return nil, false, nil
+			}
+			return bytes.Clone(secret.Bytes()), true, nil
+		},
+		Epochs: p.Epochs,
+		Now:    p.Now,
+		Show: func(fragment string) {
+			p.shown(gen, fragment)
+			close(shown)
+		},
+		Approve: func(ctx context.Context, viewerFingerprint, code string) (bool, error) {
+			return p.awaitDecision(ctx, gen, decide, viewerFingerprint, code)
+		},
+	}
+	go func() {
+		defer cancel()
+		runner := p.Run
+		if runner == nil {
+			runner = func(ctx context.Context, m *adaptercloud.MachineIdentityPairing, accountID string) (adaptercloud.IdentityPairingResult, error) {
+				return m.Run(ctx, accountID)
+			}
+		}
+		result, err := runner(run, m, p.AccountID)
+		p.finish(gen, result, err)
+		finished <- err
+	}()
+
+	wait := time.NewTimer(IdentityPairingBeginTimeout)
+	defer wait.Stop()
+	select {
+	case <-shown:
+		return p.State(), nil
+	case err := <-finished:
+		if err == nil {
+			return p.State(), nil
+		}
+		return p.State(), err
+	case <-wait.C:
+		cancel()
+		return p.State(), context.DeadlineExceeded
+	case <-ctx.Done():
+		// The request went away; the run keeps going so a reload still
+		// finds the link through State.
+		return p.State(), nil
+	}
+}
+
+// Decide answers the code comparison for the named pairing. Only the local
+// route calls it, and only the person's click on the local page reaches it.
+func (p *IdentityPairing) Decide(pairingID string, approve bool) (IdentityPairingState, error) {
+	if p == nil {
+		return IdentityPairingState{}, ErrPairingUnavailable
+	}
+	p.mu.Lock()
+	if p.state.PairingID == "" || p.state.PairingID != pairingID {
+		p.mu.Unlock()
+		return p.State(), ErrIdentityPairingUnknown
+	}
+	if p.state.Phase != IdentityPairingConfirm || p.decide == nil {
+		p.mu.Unlock()
+		return p.State(), ErrIdentityPairingNotWaiting
+	}
+	decide := p.decide
+	p.decide = nil
+	if approve {
+		p.state.Phase = IdentityPairingHanding
+	}
+	p.mu.Unlock()
+	decide <- approve
+	return p.State(), nil
+}
+
+// Cancel stops the run in flight. Cloud's row is left to expire, as with the
+// legacy invitation: there is no withdraw route to call.
+func (p *IdentityPairing) Cancel() IdentityPairingState {
+	if p == nil {
+		return IdentityPairingState{Phase: IdentityPairingIdle}
+	}
+	p.mu.Lock()
+	if p.cancel != nil {
+		p.cancel()
+		p.cancel = nil
+	}
+	p.gen++
+	p.decide = nil
+	switch p.state.Phase {
+	case IdentityPairingWaiting, IdentityPairingConfirm, IdentityPairingHanding:
+		p.state = IdentityPairingState{Phase: IdentityPairingStopped, PairingID: p.state.PairingID, ErrorAt: p.now().Unix()}
+	}
+	p.mu.Unlock()
+	return p.State()
+}
+
+func (p *IdentityPairing) shown(gen uint64, fragment string) {
+	link := strings.TrimRight(p.appOrigin(), "/") + "/#" + domaincloud.IdentityPairingFragmentName + "=" + fragment
+	var pairingID string
+	var expires int64
+	if raw, err := domaincloud.DecodeCanonicalBase64URL(fragment); err == nil {
+		if q, err := domaincloud.DecodeIdentityPairingQR(raw, p.now().UnixMilli()); err == nil {
+			pairingID, expires = q.PairingID, q.ExpiresAt/1000
+		}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if gen != p.gen {
+		return
+	}
+	p.state.PairingID = pairingID
+	p.state.Link = link
+	p.state.ExpiresAt = expires
+	p.logf("cloud: identity pairing %s is waiting for a viewer", pairingID)
+}
+
+func (p *IdentityPairing) awaitDecision(ctx context.Context, gen uint64, decide chan bool, viewerFingerprint, code string) (bool, error) {
+	p.mu.Lock()
+	if gen != p.gen {
+		p.mu.Unlock()
+		return false, context.Canceled
+	}
+	p.state.Phase = IdentityPairingConfirm
+	p.state.Code = code
+	p.state.ViewerFingerprint = viewerFingerprint
+	p.mu.Unlock()
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	case approved := <-decide:
+		return approved, nil
+	}
+}
+
+func (p *IdentityPairing) finish(gen uint64, result adaptercloud.IdentityPairingResult, err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if gen != p.gen {
+		return
+	}
+	p.cancel = nil
+	p.decide = nil
+	now := p.now().Unix()
+	switch {
+	case err == nil:
+		p.state = IdentityPairingState{Phase: IdentityPairingPaired, PairingID: result.PairingID,
+			MachineFingerprint: p.state.MachineFingerprint, ViewerDeviceID: result.ViewerDeviceID,
+			ViewerFingerprint: result.ViewerFingerprint, ContentKeyEpoch: result.ContentKeyEpoch, PairedAt: now}
+		p.logf("cloud: identity pairing %s handed content-key epoch %d to viewer %s",
+			result.PairingID, result.ContentKeyEpoch, result.ViewerDeviceID)
+	case errors.Is(err, domaincloud.ErrPairingNotApproved):
+		p.state = IdentityPairingState{Phase: IdentityPairingDenied, PairingID: p.state.PairingID, ErrorAt: now}
+		p.logf("cloud: identity pairing %s was not approved on this machine", p.state.PairingID)
+	default:
+		code := identityErrorCode(err)
+		p.state = IdentityPairingState{Phase: IdentityPairingFailed, PairingID: p.state.PairingID,
+			MachineFingerprint: p.state.MachineFingerprint, Error: code, ErrorAt: now}
+		p.logf("cloud: identity pairing %s did not complete: %s", p.state.PairingID, code)
+	}
+}
+
+// identityErrorCode is the stable word the page and the log show. Cloud's
+// own code is kept (it is a fixed vocabulary); its message is not.
+func identityErrorCode(err error) string {
+	var refusal *adaptercloud.CloudRefusal
+	switch {
+	case errors.As(err, &refusal):
+		if refusal.Code == "" {
+			return fmt.Sprintf("cloud_http_%d", refusal.Status)
+		}
+		return "cloud_" + refusal.Code
+	case errors.Is(err, adaptercloud.ErrIdentityPollExhausted), errors.Is(err, context.DeadlineExceeded):
+		return "expired"
+	case errors.Is(err, adaptercloud.ErrIdentityGrantMissing):
+		return "grant_not_recorded"
+	case errors.Is(err, adaptercloud.ErrIdentityNoMaster):
+		return "no_master_secret"
+	case errors.Is(err, domaincloud.ErrIdentityTranscript), errors.Is(err, domaincloud.ErrIdentityPhaseDigest):
+		return "transcript_mismatch"
+	case errors.Is(err, context.Canceled):
+		return "cancelled"
+	default:
+		return "unavailable"
+	}
+}
+
+func (p *IdentityPairing) now() time.Time {
+	if p.Now != nil {
+		return p.Now()
+	}
+	return time.Now()
+}
+
+func (p *IdentityPairing) appOrigin() string {
+	if p.AppOrigin != "" {
+		return p.AppOrigin
+	}
+	return adaptercloud.DefaultAppOrigin
+}
+
+func (p *IdentityPairing) logf(format string, args ...any) {
 	if p.Log != nil {
 		p.Log(format, args...)
 	}

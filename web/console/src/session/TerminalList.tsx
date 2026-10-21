@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../LoadingSkeleton.js"
 import { useEffect, useRef, useState, type MutableRefObject } from "react"
 import type { Terminal } from "@clawdline/contract"
 import * as L from "../legacy/bridge.js"
@@ -104,7 +105,7 @@ export function TerminalList({ shown, filter, openId = "", reloadRef }: {
   return <div className="session-terminal-list">
     <h2 className="terminal-sr">{nextWord("terminalListMode")}</h2>
     {error && <p className="terminal-list-message" role="status">{error}</p>}
-    {loading && !rows.length && <p className="terminal-list-message">{nextWord("terminalListLoading")}</p>}
+    {loading && !rows.length && <LoadingSkeleton id="SK-19" label={nextWord("terminalListLoading")} />}
     {!loading && !matching.length && <p className="terminal-list-message">{q ? L.strings.webEmptyFilterHint : nextWord("terminalAllEmpty")}</p>}
     <ul className="session-terminal-rows">
       {matching.map((terminal) => {

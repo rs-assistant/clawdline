@@ -43,7 +43,7 @@ func (s *Server) squadRoleDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	provider := boardViewer(r).NarrativeProvider
-	receipt := store.ReceiptKey{Scope: "squad-role-draft", Actor: accessOf(r).verdict.Device, Key: key}
+	receipt := store.ReceiptKey{Scope: "squad-role-draft", Actor: actorOf(r), Key: key}
 	s.receipted(w, r, receipt, requestDigest(raw), func(status int) bool {
 		return status != http.StatusTooManyRequests && status != http.StatusNotImplemented
 	}, func(w http.ResponseWriter) {

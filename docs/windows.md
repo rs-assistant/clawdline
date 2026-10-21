@@ -129,7 +129,6 @@ Item by item, for the macOS-only features:
 | Apple Events | reached only through iTerm2, whose every file is `//go:build darwin`, so nothing on Windows compiles a call to one. Read, not run | `terminal/iterm_darwin.go` |
 | Notifications | Web Push only, and it works: a VAPID key pair was minted here. With nothing subscribed, `clawdline notify` answered `409 not_subscribed`, *"No device has asked for notifications yet."* | `/v1/push/key` |
 | Keychain | by design there is none: `cloudkeys` and `devices` are files on every platform, *"Files, not a keychain, on purpose."* On Windows that choice has a cost — §4.6 | `adapters/cloudkeys/files.go` |
-| cloudflared | `/v1/tunnel` → `installed: false`, `mode: "off"`, `state: "off"`, and it names the config path it would use | `/v1/tunnel` |
 | Voice | `503 no_whisper`, `reason: "no_binary"`, *"This machine has no whisper-cli, so there is nothing here to read a recording with."* The 16 kHz rule is stated in full rather than quietly resampling | `POST /v1/voice` |
 
 Two more that answered well:
@@ -404,5 +403,5 @@ read two `unknown`s rather than a real quota, no transcript was ever parsed, and
 route had nothing to fall back to. Not run: a Traditional Chinese Windows (CP950) console —
 §4.5's numbers are from a CP437 one; a non-SYSTEM interactive user, so the profile ACL in §4.6
 is inherited from a service profile rather than a person's; reboot survival; a ten-minute SSE
-soak; the layout at 760px; `cloudflared` with the binary present; whisper end-to-end; WSL2 in
+soak; the layout at 760px; whisper end-to-end; WSL2 in
 any form; and every `HasPrefix(p, "/")` site in §4.2 except the one the dispatch meets first.

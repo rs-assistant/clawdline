@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs"
+// @ts-expect-error -- Node's strip-types runner needs the source extension.
+import { activateCatalog, CATALOG_TAGS, resetCatalogForTest } from "../../catalog.ts"
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- Node's strip-types test runner needs the source extension.
@@ -63,8 +66,7 @@ test("paid conflicts and Taiwan wording remain distinct", async () => {
     { status: 200 })) as typeof fetch
   assert.deepEqual(await redeemPromo("https://api.example", code, held, fetcher),
     { status: "conflict", reason: "paid_entitlement_exists" })
-  assert.match(promoWords("zh-Hant-TW").conflict, /付費方案/)
-  assert.match(promoWords("zh-Hans").conflict, /paid plan/)
+  assert.match(promoWords().conflict, /paid plan/)
 })
 
 test("the Plan form shows the server receipt and rereads entitlements before claiming Pro", async () => {
@@ -99,5 +101,26 @@ test("the Plan form shows the server receipt and rereads entitlements before cla
   } finally {
     globalThis.fetch = originalFetch
     Object.defineProperty(globalThis, "sessionStorage", { configurable: true, value: originalStorage })
+  }
+})
+
+
+test("redemption messages use the active catalog in every shipped language", () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "document")
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { documentElement: { lang: "en", setAttribute() {} } } })
+  try {
+    for (const tag of CATALOG_TAGS) {
+      const catalog = JSON.parse(readFileSync(new URL(`../../../public/catalogs/${tag}.json`, import.meta.url), "utf8"))
+      assert.equal(activateCatalog(catalog, tag), tag)
+      const words = promoWords()
+      for (const [key, value] of Object.entries(words)) {
+        assert.equal(typeof value === "function" ? value("2027-01-18") : value,
+          catalog[`promo.${key}`].replace("{arg0}", "2027-01-18"))
+      }
+    }
+  } finally {
+    resetCatalogForTest()
+    if (previous) Object.defineProperty(globalThis, "document", previous)
+    else Reflect.deleteProperty(globalThis, "document")
   }
 })

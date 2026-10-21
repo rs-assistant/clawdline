@@ -30,6 +30,7 @@ function clientFixture() {
   const client = {
     ready: true,
     statusSnapshots,
+    orchestratorSnapshots: new Map<string, unknown>(),
     machineOffline: new Map<string, { until: number }>(),
     now: () => Date.now(),
     readContentCapabilities: new Map([[machineID, { at, supported: true }]]),
@@ -87,6 +88,46 @@ test("a status row event names the Session whose list title should refresh", () 
   emit({ type: "session_status", identity: { machine: machineID, session: sessionID } })
   assert.deepEqual(events, [{ machineID, sessionID, kind: "changed" }])
   stop()
+})
+
+test("a task descriptor arriving after status regroups the fleet without opening a Session", async () => {
+  const { client, row, emit } = clientFixture()
+  const marker = client.statusSnapshots.get(JSON.stringify([machineID, inventory])) as { payload: { inventory: { sessions: string[] } } }
+  marker.payload.inventory.sessions.push("root")
+  client.statusSnapshots.set(JSON.stringify([machineID, "root"]), {
+    identity: { machine: machineID, session: "root" }, payload: { ...row, session_id: "root" },
+    observedAt: row.projected_at, sequence: 3,
+  })
+  const source = statusSource(() => client as never)
+  const before = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(before.rows?.find((r) => r.destination.sessionID === sessionID)?.parentSessionID, undefined)
+  const events: unknown[] = []
+  const stop = source.subscribe((event) => events.push(event))
+  client.orchestratorSnapshots.set(machineID, { at: row.projected_at, tasks: [
+    { child: { terminalId: sessionID }, root: { terminalId: "root" } },
+  ] })
+  emit({ type: "orchestrator", machine: machineID })
+  assert.deepEqual(events, [{ machineID, kind: "access_changed" }])
+  for (let refresh = 0; refresh < 3; refresh++) {
+    const after = await source.readMachine(machineID, new AbortController().signal)
+    assert.equal(after.rows?.find((r) => r.destination.sessionID === sessionID)?.parentSessionID, "root")
+  }
+  stop()
+})
+
+test("a cold pinned list uses task roots when its real display status omits ancestry", async () => {
+  const { client, row } = clientFixture()
+  client.statusSnapshots.clear()
+  client.orchestratorSnapshots.set(machineID, { at: row.projected_at, tasks: [
+    { child: { terminalId: sessionID }, root: { terminalId: "root" } },
+  ] })
+  const original = client.listPresentationsForMachine
+  client.listPresentationsForMachine = async (machine) => {
+    const reply = await original(machine)
+    return { ...reply, sessions: [...reply.sessions, { ...reply.sessions[0], id: "root", title: "Root" }] }
+  }
+  const reading = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(reading.rows?.find((r) => r.destination.sessionID === sessionID)?.parentSessionID, "root")
 })
 
 test("a renewed client keeps the Session list hearing new Sessions", () => {
@@ -277,6 +318,22 @@ test("a cold pinned list retains an Epic child's visible parent", async () => {
       { ...base, id: "root", title: "Root", status: { ...base.status, state: "idle", sessionId: "root-conversation" } },
       { ...base, id: "child", title: "Child", status: { ...base.status, state: "idle",
         epic_parent: { owner_session_id: "root-conversation", epic_id: "epic" } } },
+    ] }
+  }
+  const reading = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(reading.rows?.find((row) => row.destination.sessionID === "child")?.parentSessionID, "root")
+})
+
+test("a cold pinned list retains a task child's listed parent without ss status", async () => {
+  const { client } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
+  const original = client.listPresentationsForMachine
+  client.listPresentationsForMachine = async (machine) => {
+    const reply = await original(machine)
+    const base = reply.sessions[0]
+    return { ...reply, sessions: [
+      { ...base, id: "root", title: "Root", status: { ...base.status, state: "idle" } },
+      { ...base, id: "child", title: "Child", status: { ...base.status, state: "idle", parent_session_id: "root" } },
     ] }
   }
   const reading = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
@@ -891,4 +948,90 @@ test("a direct list names the Clawdfather without any held status row", async ()
   assert.ok(reading.snapshotGeneration?.startsWith("direct:"))
   assert.equal(reading.rows?.[0]?.machineScope, true)
   assert.equal(reading.rows?.[0]?.coordinatorBound, true)
+})
+
+
+test("execution recovery bypasses a fresh retained old generation and subsequent reads use the verified replacement", async () => {
+  const { client, calls } = clientFixture()
+  const newer = "b".repeat(32)
+  client.listPresentationsForMachine = async (machine: string) => {
+    calls.push("sessions.list:" + machine)
+    return { at: Math.floor(Date.now() / 1000), complete: true, sessions: [{ id: sessionID,
+      execution_generation: newer, title: "Current", assistant: "claude",
+      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "product-manager" } }] }
+  }
+  const source = statusSource(() => client as never)
+  const before = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(before.rows?.[0].destination.executionGeneration, executionGeneration)
+  const recovered = await source.readMachine(machineID, new AbortController().signal, true)
+  assert.equal(recovered.kind, "ready")
+  assert.equal(recovered.rows?.[0].destination.executionGeneration, newer)
+  const next = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(next.rows?.[0].destination.executionGeneration, newer)
+  assert.equal(calls.filter((call) => call.startsWith("sessions.list:")).length, 1)
+})
+
+for (const assistant of ["codex", "claude", undefined, "unsupported"]) {
+  test(`a direct list preserves only a recognized assistant (${assistant}) without extra reads`, async () => {
+    const { client, calls } = clientFixture()
+    client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
+    client.listPresentationsForMachine = async (machine: string) => {
+      calls.push("sessions.list:" + machine)
+      return { at: Math.floor(Date.now() / 1000), complete: true,
+        sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "Named work", assistant,
+          status: { state: "idle", work_state: "ready" } }] } as never
+    }
+    const source = statusSource(() => client as never)
+    const signal = new AbortController().signal
+    const first = await source.readMachine(machineID, signal)
+    const second = await source.readMachine(machineID, signal)
+    const presentations = await source.readMachinePresentations?.(machineID, signal)
+    const expected = assistant === "claude" || assistant === "codex" ? assistant : undefined
+    assert.equal(first.kind, "ready")
+    assert.equal(first.rows?.[0]?.assistant, expected)
+    assert.equal(second.rows?.[0]?.assistant, expected)
+    assert.equal(presentations?.[0]?.assistant, expected)
+    assert.deepEqual(calls, ["sessions.list:" + machineID])
+  })
+}
+
+test("a direct list never carries the previous execution's assistant into a new one", async () => {
+  const { client, calls } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
+  let now = Date.now()
+  client.now = () => now
+  let generation = executionGeneration
+  let assistant: string | undefined = "codex"
+  client.listPresentationsForMachine = async (machine: string) => {
+    calls.push("sessions.list:" + machine)
+    return { at: Math.floor(now / 1000), complete: true,
+      sessions: [{ id: sessionID, execution_generation: generation, title: "Named work", assistant,
+        status: { state: "idle", work_state: "ready" } }] } as never
+  }
+  const source = statusSource(() => client as never)
+  const signal = new AbortController().signal
+  assert.equal((await source.readMachine(machineID, signal)).rows?.[0]?.assistant, "codex")
+  generation = "f".repeat(32)
+  assistant = undefined
+  now += 60_001
+  const restarted = await source.readMachine(machineID, signal)
+  assert.equal(restarted.rows?.[0]?.destination.executionGeneration, generation)
+  assert.equal(restarted.rows?.[0]?.assistant, undefined)
+  assert.equal(calls.length, 2)
+})
+
+test("a Cloud presentation preserves a project's SVG and independent accent", async () => {
+  const { client } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
+  const icon = { accent: "#123456", cells: [], svg: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>' }
+  client.listPresentationsForMachine = async () => ({
+    at: Math.floor(Date.now() / 1000), complete: true,
+    sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "Vector project", icon,
+      status: { state: "idle", work_state: "ready" } }],
+  }) as never
+  const source = statusSource(() => client as never)
+  const signal = new AbortController().signal
+  assert.equal((await source.readMachine(machineID, signal)).kind, "ready")
+  const presentations = await source.readMachinePresentations?.(machineID, signal)
+  assert.deepEqual(presentations?.[0]?.icon, icon)
 })

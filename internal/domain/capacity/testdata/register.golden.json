@@ -81,6 +81,66 @@
   },
   {
     "Register": "daemon",
+    "Name": "artifacts.report_image_pixels",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16777216,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/documents.MaximumImagePixels"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "artifacts.report_image_side",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8192,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/documents.MaximumImageSide"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "artifacts.report_total_image_pixels",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 67108864,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/documents.MaximumReportImagePixels"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "audit.security",
     "Class": "security_audit",
     "Unit": "bytes",
@@ -575,6 +635,25 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.content_key_epoch_record_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.maxEpochRecordBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.header_read_diagnostic_rows",
     "Class": "observation",
     "Unit": "rows",
@@ -606,6 +685,1039 @@
     "Projects": false,
     "QuietRecovery": false,
     "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_active_slots",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxActiveSlots"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_capture_budget_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxCaptureBudgetSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_capture_export_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 524288,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxCaptureExportBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_capture_frames",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxCaptureFrames"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_capture_raw_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxCaptureRawBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_captures_per_minute",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxCapturesPerWindow"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_journal_bytes",
+    "Class": "journal",
+    "Unit": "bytes",
+    "Limit": 4194304,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxJournalBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_journal_rows",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxJournalRecords"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_owner_incidents",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "cmd/clawdline.maxOwnerIncidents"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_pending_transitions",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxPendingTransitions",
+      "internal/domain/connectionhealth.NewWatchdog:chan(MaxPendingTransitions)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_query_bytes",
+    "Class": "observation",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxQueryBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_query_rows",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 200,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxQueryRecords"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_record_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxRecordBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_reserved_slots",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxReservedSlots"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_attempt_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "disconnect",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxAttemptSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_attempts",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxAttempts"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_ciphertext_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 262144,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxCiphertextBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_life_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 604800,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxLifeSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_queued_jobs",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxQueuedJobs",
+      "internal/adapters/healthsealed.NewWorker:chan(MaxQueuedJobs)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_request_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 409600,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxRequestBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_response_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxResponseBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_revisions",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxRevisions"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_snapshot_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxSnapshotBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_snapshot_coverage",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxSnapshotCoverage"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_snapshot_field_chars",
+    "Class": "buffer",
+    "Unit": "characters",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxSnapshotFieldChars"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_snapshot_frames",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 24,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxSnapshotFrames"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_snapshot_sources",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxSnapshotSources"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_store_attachments",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxPendingAttachments"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_store_bytes",
+    "Class": "idempotency",
+    "Unit": "bytes",
+    "Limit": 4194304,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxStoreBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_bytes",
+    "Class": "journal",
+    "Unit": "bytes",
+    "Limit": 104857600,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxStoreBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_dir_entries",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxDirEntries"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_frame_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxFrameBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_lost_ranges",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxLostRanges"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_queue_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 2097152,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxQueueBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_queue_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxQueueRecords"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_readers",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxConcurrentReads",
+      "internal/adapters/healthjournal.Open:chan(MaxConcurrentReads)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_seconds",
+    "Class": "journal",
+    "Unit": "seconds",
+    "Limit": 604800,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxStoreAgeSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_segment_bytes",
+    "Class": "journal",
+    "Unit": "bytes",
+    "Limit": 8388608,
+    "WarnAt": 0,
+    "AtLimit": "rotate",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxSegmentBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_segments",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxSegments"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_attempt_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "disconnect",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxAttemptSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_attempts",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 6,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxAttempts"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_batch_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 32768,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxBatchBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_batch_events",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 100,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxBatchEvents"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_hourly_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 983040,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxHourlyRoutineBytes",
+      "internal/adapters/healthupload.MaxHourlyBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_hourly_requests",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 120,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxHourlyRequests"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_receipts",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxReceipts"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_response_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxResponseBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_retry_after_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 3600,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxRetryAfterSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_retry_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 3600,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxRetrySeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_state_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxStateBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_step_pages",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxStepPages"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.identity_pairing_decision_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.maxIdentityDecisionBody"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.identity_pairing_poll_attempts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 600,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.MaxIdentityPollAttempts"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.identity_pairing_run_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 660,
+    "WarnAt": 0,
+    "AtLimit": "disconnect",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.IdentityPairingLifetimeLimit"
+    ]
   },
   {
     "Register": "daemon",
@@ -1834,10 +2946,402 @@
   },
   {
     "Register": "daemon",
+    "Name": "console.direct_history_hours",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 24,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.direct_history_machines",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.execution_recovery_attempts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "sender",
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
     "Name": "console.health_live_seconds",
     "Class": "cache",
     "Unit": "seconds",
     "Limit": 90,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1572864,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_budget_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 12,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_event_pages",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_export_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 524288,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_id_characters",
+    "Class": "buffer",
+    "Unit": "characters",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_incident_export_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_incident_pages",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_incident_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 50,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_incident_window_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 604800,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_page_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 200,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_parallel_reads",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_probe_claims",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_probe_hosts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 204,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_probe_targets",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_reads_per_load",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 3,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_refresh_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 15,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_request_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 6,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_trend_lanes",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 12,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_trend_signals",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.machine_list_poll_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
     "WarnAt": 0,
     "AtLimit": "expire",
     "Deviation": "",
@@ -1869,6 +3373,40 @@
   {
     "Register": "daemon",
     "Name": "console.opened_row_restate_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.owner_retention_poll_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.owner_retention_request_seconds",
     "Class": "cache",
     "Unit": "seconds",
     "Limit": 5,
@@ -2110,6 +3648,227 @@
     "Class": "cache",
     "Unit": "seconds",
     "Limit": 30,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_attempts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_backoff_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_batch_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 50,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_buffer_rows",
+    "Class": "progress",
+    "Unit": "rows",
+    "Limit": 200,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_coalesce_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_count_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1000000,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_elapsed_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 3600,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_hourly_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 262144,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_hourly_requests",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_request_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_retry_after_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 3600,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_send_every_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 60,
     "WarnAt": 0,
     "AtLimit": "expire",
     "Deviation": "",
@@ -4191,6 +5950,26 @@
   },
   {
     "Register": "daemon",
+    "Name": "session.codex_past_page",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projects.CodexPastPageLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "session.direct_todo_bytes",
     "Class": "evidence",
     "Unit": "bytes",
@@ -5846,6 +7625,66 @@
     "QuietRecovery": false,
     "Sources": [
       "internal/adapters/updatecheck.RefreshSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "usage.daily_days",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 57,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/transcript.DailyDayLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "usage.daily_rows",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 50000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.UsageDailyRowLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "usage.overview_tasks",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 10000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.UsageOverviewTaskLimit"
     ]
   },
   {

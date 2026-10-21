@@ -1,11 +1,3 @@
-/* --------------------------------------------------------------------------
-   The transport seam
-
-   JavaScript has no runtime interface declarations, so ClawdlineClient is a
-   deliberately small structural contract.  Both transports may expose more
-   compatibility methods, but the view's portable core depends only on these.
-   -------------------------------------------------------------------------- */
-
 export const LOCAL_MACHINE = "this-mac";
 
 /** The Cloud inventory marker's session id, and how many ids it may name.
@@ -23,12 +15,6 @@ export function boardReportSelection(item, report) {
         throw new TypeError("the report selection exceeds its transport bound");
     return value;
 }
-
-export const ClawdlineClient = Object.freeze({
-    methods: Object.freeze([
-        "events", "sessions", "transcript", "send", "answer", "dispatch", "schedules"
-    ])
-});
 
 /** Turn the old local id, or the cloud pair, into the one identity shape. */
 export function sessionIdentity(value, fallbackMachine) {

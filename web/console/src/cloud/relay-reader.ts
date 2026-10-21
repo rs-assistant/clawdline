@@ -23,6 +23,8 @@
 // little of it this file reads, so the rules here run under `node --test`
 // without a page (`relay-reader.test.ts`).
 import type { CarriedWord, CarryTable } from "./carry.js"
+// @ts-expect-error -- Node loads the source extension in focused behavior tests.
+import { usageOverviewQuery } from "./carry.ts"
 import type { Health, SessionRow, SessionsSnapshot, TaskList, TaskRow, TranscriptPage } from "@clawdline/contract"
 import type { StreamHandle, StreamHandlers, StreamTransport } from "@clawdline/core"
 import type { CloudWriteClient, WriteHost, WriteRoute } from "./relay-writer.js"
@@ -126,6 +128,7 @@ export interface CloudEvent {
  * are `CloudWriteClient`, reached only through `relay-writer.ts`.
  */
 export interface CloudReadClient {
+  sendDiagnostic?(machine: string, data: Record<string, unknown>): Promise<unknown>
   readonly ready?: boolean
   readonly allowWrites?: boolean
   /**
@@ -575,6 +578,7 @@ function recordHeaderRead(row: HeaderReadDiagnostic): void {
 }
 
 export interface RelayReaderOptions {
+  onExecutionChanged?: (machineID: string, sessionID: string) => void
   now?: () => number
   /** The interface's words for `GET /v1/strings`; the build's static catalog. */
   strings?: () => Promise<Record<string, string>>
@@ -719,18 +723,16 @@ export class RelayReader {
     if (client.ready !== false) for (const wake of [...this.awaitingClient]) wake()
   }
 
-  /** A deliberate phone-side sample, carried by the existing bounded viewer event log. */
-  recordSendDiagnostic(code: string): boolean {
-    try {
-      const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>): { n?: number | null } } } | null)?.viewerEvents
-      const result = log?.record?.("cloud.send.diagnostic_requested", {
-        code, machine: this.machine,
-        connection: !this.client ? "none" : this.client.ready === false ? "not_ready" : "ready",
-        online: typeof navigator === "undefined" ? null : navigator.onLine,
-        visible: typeof document === "undefined" ? null : document.visibilityState,
-      })
-      return typeof result?.n === "number"
-    } catch { return false }
+  /** A deliberate phone-side sample, confirmed by the selected machine's receipt. */
+  async recordSendDiagnostic(code: string): Promise<void> {
+    const client = this.client
+    if (!client?.sendDiagnostic) throw Object.assign(new Error("Diagnostic delivery is unavailable"), { code: "cloud_not_carried" })
+    await client.sendDiagnostic(this.machine, {
+      code,
+      connection: client.ready === false ? "not_ready" : "ready",
+      online: typeof navigator === "undefined" ? null : navigator.onLine,
+      visible: typeof document === "undefined" ? null : document.visibilityState,
+    })
   }
 
   /**
@@ -1011,6 +1013,11 @@ export class RelayReader {
         return await this.machineRead(init?.signal, method, path, "work.v2.item", { id: workItem })
       }
       switch (path) {
+        case "/v1/usage/overview": {
+          const body = usageOverviewQuery(url.searchParams)
+          if (!body) return this.refuse(method, path, 400, "invalid_query", "Usage overview accepts days=7 or days=28 and one project.")
+          return await this.machineRead(init?.signal, method, path, "usage.overview", body)
+        }
         case "/v1/squad/catalog":
           this.only(url, path)
           return await this.machineRead(init?.signal, method, path, "squad.catalog", {})
@@ -2324,7 +2331,9 @@ export class RelayReader {
         if (await this.askForStatusRow(session, signal)) return this.pinnedSession(session)
       }
       if (condition !== "pass_mismatch") {
-        if (["no_marker", "no_row", "marker_stale", "row_stale", "observed_stale"].includes(String(condition))) {
+        {
+          // A verified machine list can repair an older retained status set.
+          // It must still name the exact execution the person is reading.
           const resolved = await this.options.resolveSession?.(this.machine, session)
           if (resolved && !signal?.aborted) {
             const intended = this.options.fleetTarget?.()
@@ -2774,6 +2783,9 @@ export class RelayReader {
    * the page itself stopped waiting for is not a failure and is not recorded.
    */
   private reportReadFailure(read: { word: string; session: string | null; machine?: string }, started: number, error: unknown, answer: Response | null): void {
+    if ((error as { code?: unknown } | null)?.code === "execution_generation_changed" && read.session) {
+      this.options.onExecutionChanged?.(read.machine ?? this.machine, read.session)
+    }
     try {
       const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } } | null)?.viewerEvents
       if (typeof log?.record !== "function") return

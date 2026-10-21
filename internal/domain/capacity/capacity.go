@@ -413,6 +413,7 @@ const (
 	// reading cheap.
 	SessionsAgentRows = "sessions.agent_rows"
 	// The waited-on tasks one Session row names (transport/http/session_wait_targets.go).
+	SessionCodexPastPage  = "session.codex_past_page"
 	SessionWaitingFor     = "session.waiting_for"
 	CacheBackgroundAgents = "cache.background_agents"
 	// SessionsShellOutputBytes is the most of one background command's
@@ -478,6 +479,7 @@ const (
 	ConsoleTranscriptBackoffSeconds   = "console.transcript_backoff_seconds"
 	ConsoleRelayTranscriptExpectReask = "console.relay_transcript_expect_reask_seconds"
 	ConsoleRelayFeatureWait           = "console.relay_feature_wait_seconds"
+	ConsoleExecutionRecoveryAttempts  = "console.execution_recovery_attempts"
 	ConsoleStatusGapRetry             = "console.status_gap_retry_seconds"
 	ConsolePersonaRetry               = "console.persona_retry_seconds"
 	ConsoleStatusMarkerRetry          = "console.status_marker_retry_seconds"
@@ -489,6 +491,12 @@ const (
 	ConsoleSessionNotesSafety         = "console.session_notes_safety_seconds"
 	ConsoleOpenedRowRestate           = "console.opened_row_restate_seconds"
 	ConsoleOpenedRowQuiet             = "console.opened_row_quiet_seconds"
+	// This browser's own record of direct attempts per machine, drawn on the
+	// machine sheet (web/console/src/cloud/direct-history.ts), and how often
+	// the open machine list re-reads (pages/devices/AccountMachines.tsx).
+	ConsoleDirectHistoryHours    = "console.direct_history_hours"
+	ConsoleDirectHistoryMachines = "console.direct_history_machines"
+	ConsoleMachineListPoll       = "console.machine_list_poll_seconds"
 	// The ordinary shells this machine holds open for a person, and what one
 	// request may type into one or read back from it (limits N59).
 	TerminalCount        = "terminal.count"

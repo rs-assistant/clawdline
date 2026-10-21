@@ -24,9 +24,9 @@ let activeReader: RelayReader | null = null
 let networkFetch: typeof globalThis.fetch | null = null
 let cloudConnectionRetry: (() => void) | null = null
 /** Record a failed card without its message, attachment, session or request identifier. */
-export function recordSendDiagnostic(code: string): boolean {
-  if (!activeReader) return false
-  return activeReader.recordSendDiagnostic(code)
+export async function recordSendDiagnostic(code: string): Promise<void> {
+  if (!activeReader) throw new Error("Diagnostic delivery is unavailable")
+  await activeReader.recordSendDiagnostic(code)
 }
 /** The Board's Session list read failed; the local console has no reader and records nothing. */
 export function recordSessionListFailure(failure: { code: string; elapsedMs: number }): boolean {

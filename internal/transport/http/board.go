@@ -48,6 +48,14 @@ func (s *Server) board() *boardDeps {
 
 // boardViewer is `ProjectBoardHTTP.viewer`: the machine may do everything; a
 // device may write when it may send, and manage when it may also administer.
+//
+// **A Cloud viewer manages the board, on purpose.** `board-command` crosses
+// with `X-Clawdline-Actor: device`, which takes away `Local` and the machine
+// door and nothing else (notThisMachine), so the in-process request keeps
+// this machine's own Admin and may turn the board on and off and give or
+// withdraw AI reading consent. A device paired on this machine's own network
+// holds read and send and never Admin, so it may not. The person chose this on
+// 2026-10-19; TestACloudViewerManagesTheBoardOnPurpose holds it.
 func boardViewer(r *http.Request) boardstore.Viewer {
 	a := accessOf(r)
 	v := boardstore.Viewer{ID: "machine", CanWrite: a.machine, CanManage: a.machine,

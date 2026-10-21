@@ -26,6 +26,21 @@ depend on the target Linux or Windows installation carrying zoneinfo.
 `first_seen`（這支 daemon 第一次看見它）、`last_fire`（已經決定過的最近一次）、`last_missed`。
 舊的間隔模型用的 `schedules` 表留著不讀（沒有真的資料寫進去過），讓舊 store 照樣開得起來。
 
+## Calendar-day intervals
+
+A repeating schedule may use `when: {"at":"09:00", "every_days":3, "start":"2026-10-21"}`
+instead of `days` or `on`. The form API flattens these three keys beside `time_zone`.
+`every_days` is a positive integer; `start` is an inclusive Gregorian date in the existing
+1970–9999 date grammar. The rules are mutually exclusive, including `trigger_only`.
+Occurrences are anchored to that date in the schedule's named time zone, retaining the local
+wall-clock time across daylight-saving changes. Calculation jumps to the adjacent occurrence,
+without scanning each intervening day. A next date beyond the supported calendar is absent.
+Manual execution, failure, disabling and re-enabling do not move the anchor. Existing catch-up,
+first-seen, deduplication and active-run decisions still apply to the latest occurrence only.
+Changing the interval or anchor stamps `when_changed_at`, just like changing weekday or time.
+List rows include `when` for interval schedules, so the console can display their cadence.
+Older daemons reject these new keys; move targets must support them before accepting the copy.
+
 ## 路由（與舊版相同）
 
 | 路由 | 誰可以 |
@@ -232,6 +247,13 @@ failed list read reaches the machine's log as `cloud.read.failed word=schedules`
 binding) is sent to the machine the row was listed on (`?machine=`, `relay-writer.ts` `namedMachine`).
 A console with one machine — the daemon's own page, or an account with one machine — draws no machine
 column and no machine field, and sends what it sent before.
+
+A refresh preserves each machine's last rows until that machine answers, including with an empty list.
+An `unanswered` entry is a failed read even when the list endpoint resolves successfully. A Session
+answer permits one recovery read per failed machine per regular refresh cycle, including before the
+first schedule answer; repeated Session updates cannot create an unbounded retry loop. Returning to a
+visible page retries a failed reading immediately. Optional project-label reads from an older refresh
+cannot overwrite a newer inventory reading.
 
 **Creating.** The form has a Machine field, defaulting to the header's machine; the project list is the
 chosen machine's `GET /v1/places`. The create is routed by the place id, which names its machine.

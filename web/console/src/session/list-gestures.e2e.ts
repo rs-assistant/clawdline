@@ -828,6 +828,9 @@ function daemon(): Server {
             reasons: blockedCloseability().reasons,
           })
         }
+        if (decodeURIComponent(closing[1]) === UNKNOWN && force !== true) {
+          return json(res, 409, { error: "closeability_unknown", detail: "unreadable work" })
+        }
         json(res, 200, { ok: true })
       })
       return
@@ -2995,7 +2998,7 @@ test("a Project-page Board address selects and reads that Project", () =>
     const selected = await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const read = () => {
-        const text = document.querySelector('.work-project-trigger')?.textContent || ''
+        const text = document.querySelector('.project-picker-trigger')?.textContent || ''
         if (text.includes('Clawdline')) return resolve(text)
         if (Date.now() >= deadline) return reject(new Error('the Project-scoped Board did not arrive: ' + text))
         setTimeout(read, 25)
@@ -3701,4 +3704,24 @@ test("a reading beyond the retention window removes the row and says the source 
     } finally {
       readingScenario = "normal"
     }
+  }))
+
+test("an unreadable close reopens a modal and only an explicit second press forces it", () =>
+  inTab(async (tab) => {
+    await list(tab)
+    await swipeOpen(tab, UNKNOWN)
+    await tab.press("li.row[data-swipe='open'] > .swipe-end")
+    await tab.until("work has been checked", (s) => s.sheet !== null && s.confirmDisabled === false)
+    await tab.press("#action-confirm-go")
+    const warning = await tab.until("the force-close question is visible", (s) =>
+      s.sheet !== null && (s.sheetSay ?? "").includes("是否要強制關閉"))
+    assert.equal(warning.focused, "action-confirm-cancel")
+    assert.equal(closes.length, 1, "showing the override never sends it")
+    assert.notEqual(closes[0].force, true)
+    await tab.press("#action-confirm-go")
+    await tab.until("the confirmed close has finished", (s) => s.sheet === null)
+    assert.equal(closes.length, 2)
+    assert.equal(closes[1].force, true)
+    assert.equal(closes[1].version, closes[0].version)
+    assert.notEqual(closes[1].key, closes[0].key)
   }))

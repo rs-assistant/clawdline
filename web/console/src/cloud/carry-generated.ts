@@ -34,6 +34,7 @@ export const CARRIED = {
   // anything once a row is recorded (`cloud-viewer-events.js`); a failed
   // carried read is one (`cloud.read.failed`, `relay-reader.ts`).
   "diagnostics.events": "cloud-client.js _deliverViewerEvents (after a recorded failure)",
+  "direct-local-network-enable": "cloud-client.js enableSameNetwork",
   "dismiss-restorable": "POST /v1/sessions/restorable/dismiss",
   document: "GET /v1/sessions/{id}/documents/{scope}/{path}",
   documents: "GET /v1/sessions/{id}/documents",
@@ -174,6 +175,7 @@ export const CARRIED = {
   // --compare-handoff` does.
   "usage.compare-handoff": "GET /v1/usage/compare-handoff[?since=]",
   "usage.item": "GET /v1/usage/items/{id}",
+  "usage.overview": "GET /v1/usage/overview[?days=&project=]",
   "usage.session": "GET /v1/usage/sessions/{conversation}",
   "usage.task": "GET /v1/usage/tasks/{id}",
   // The raw samples a before/after report is folded from (docs/token-ledger.md

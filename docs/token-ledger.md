@@ -189,7 +189,7 @@ the rules above left open:
 - **Bounded**: at most `usagePassLimit` (32) transcripts are fed per pass, in round robin after the
   last one fed, so one that stays due (unreadable, or longer than a pass reads) cannot starve the
   rest; a pass that meets the limit logs it once, until a pass no longer does. The look-back window
-  is `usageWindowLimit` (7 days); a transcript last written before it keeps its stored totals and is
+  is `usageWindowLimit` (57 days); a transcript last written before it keeps its stored totals and is
   not visited again until it is written. Both are `docs/limits.md` N43. The bytes per `Feed` (64 MiB,
   finishing the line it is in) and the longest line decoded (8 MiB; a longer one is skipped and
   counted) are N42.
@@ -267,7 +267,7 @@ What the implementation settled (`UsageLedger.ForSession`, `ForTask`, `ForItem`)
   else is a 400 before it reaches a query or a file name.
 - **On a phone.** The hosted console asks the same three routes through Clawdline Cloud, as the words
   `usage.session`, `usage.task` and `usage.item` (`internal/app/cloudops/ops.go`,
-  `web/console/src/cloud/carry.ts`), so Session detail's 「Token 帳單」 and a Board item's bill read
+  `web/console/src/cloud/carry.ts`), so Session detail's “Token bill” and a Board item's bill read
   the same answer on a phone as on this machine's own network, reasons and refusals included. The
   bill's component does not know which: the seam turns `/v1/usage/…` into the word. `carry.test.ts`
   reads every `/v1/usage/…` path the console spells and fails on one that does not cross.
@@ -506,3 +506,62 @@ verdict is `met` only when every group with enough evidence is met and at least 
 A work-samples answer reads at most 2000 tasks, newest first, and says `truncated` past that
 (limits N74). A sample's fields are versioned by `definition_version`; a report refuses a baseline
 frozen under another version.
+
+
+## Usage overview
+
+The Usage overview page reads `/v1/usage/overview` locally and `usage.overview`
+through Cloud for the explicitly selected machine. It shows the last 7 or 28
+complete local calendar days and the preceding equal period. Today is excluded.
+Dispatch counts exclude background command callbacks and follow agent-task creation dates; successful-task elapsed medians follow
+completion dates and measure spawned-to-finished time, with sample counts.
+
+Daily tokens come from provider event timestamps, not transcript modification
+or task completion dates. The parser persists primitive input, cache read, cache
+write and output summaries with its cursor in one transaction. A separate replay
+cursor backfills older ledger rows without rewinding cumulative billing. Repeated
+reads replace the summary snapshot rather than adding the same tokens again.
+No prompt, tool input or transcript content is added to persistent summaries.
+
+Daily summaries retain 57 local dates (today plus two 28-day periods), with a
+50,000-row machine-wide ceiling. Idle passes also expire old summaries. These
+limits do not delete the cumulative session ledger. Overview task queries read at
+most 10,000 records and report truncation when that ceiling is reached. Registered
+bounds and their measures are in `internal/domain/capacity`.
+
+Historical source discovery is bounded and cannot prove a complete inventory.
+Token readings therefore remain partial; unavailable days are null chart gaps,
+not zero usage. The page suppresses token percentage comparisons when either
+period is incomplete. Project bars and token composition conserve the included
+primitive readings. Project identities are opaque hashes of canonical repository
+paths; unattributed readings remain visible. API list prices are not shown as
+subscription spending.
+
+Dispatched work belongs to its source repository, including its native
+subagents. Overview attribution joins the recorded task id, the broker's child
+conversation id, and recorded worktree paths (including working directories
+below them). Recorded links follow nested worktrees back to the source even
+after their checkouts or transcripts have been removed. The same resolution
+serves token bars, task cohorts and project filtering; it changes ownership,
+never the primitive token counts. Conflicting or missing evidence stays in
+Unattributed rather than displaying a directory basename or task UUID.
+
+The background reader keeps the original working directory and a separately
+verified canonical repository key. Older cursors become due once to populate
+that key without rewinding their bill; missing transcripts can still have
+their existing summaries attributed. The SQLite upgrade adds an empty key to
+old daily rows without deleting or replaying them. Until background verification
+or a durable dispatch link identifies their project, these readings remain
+unattributed. Overview requests read only persisted evidence and do not walk
+the filesystem. Verified identity remains usable after a checkout disappears.
+
+The completed-source count requires a readable, caught-up cursor with no replay,
+remaining bytes or unknown timestamps. It is not proof that every historical
+source still exists. Date-scoped eviction evidence expires with retained history;
+token eviction and task-query truncation are independent. Local timezone identity
+includes its transition rules, so a system timezone change triggers daily replay
+even when both locations are named `Local`. Cumulative billing is preserved.
+
+The page includes an explicit refresh control for background backfill. Its charts
+support pointer selection and arrow/Home/End keyboard navigation. Missing history
+and read failures have distinct states; retry does not substitute example values.

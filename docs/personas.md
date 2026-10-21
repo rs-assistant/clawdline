@@ -13,6 +13,16 @@ call it "Role".
 The [skill candidate decisions](persona-skill-decisions.md) review one bounded-task candidate for
 each built-in persona. They are research records, not installed or adopted skills.
 
+## Create your own roles and skills
+
+Run `clawdline guide squad` (alias `clawdline guide persona`) for the complete local Agent
+CLI/API contract, runnable private role and skill example, authentication, versioned updates,
+retry recovery, bindings and multicolor pixel icons. The same guide ships in Taiwan Traditional
+Chinese with `clawdline guide zh-Hant squad`. The published copies are
+[English](../skills/clawdline/squad.md) and [Traditional Chinese](../skills/clawdline/squad.zh-TW.md).
+The CLI uses the machine orchestrator credential on explicitly admitted Squad routes; it never
+borrows a browser credential. Catalog writes are handwritten and do not call a paid AI provider.
+
 ## The catalog
 
 The built-in catalog is closed and compiled into the daemon (`internal/domain/persona`). Each built-in persona is
@@ -26,7 +36,7 @@ Every persona belongs to one or more **teams** (`teams: [engineering, quality]` 
 the same list syntax as `suggested_kinds`; `teams` on the wire). The set is closed, in this order:
 `engineering`, `marketing`, `product`, `quality`, `operations`, `design`, `business`, `custom`. `parse`
 refuses an empty list, a name outside the set and a name listed twice. The console names the teams
-(工程團隊, 行銷團隊, 產品團隊, 品質團隊, 維運團隊, 設計團隊, 商業營運團隊, 客製化); the catalog only says which.
+(Engineering, Marketing, Product, Quality, Operations, Design, Business operations, Custom); the catalog only says which.
 
 **The same role may appear in several teams, and that is wanted**: a code reviewer is as much at
 home in a quality team as in an engineering one. A persona in two teams is still one persona —
@@ -51,7 +61,7 @@ dropped, and every one edits files in the repository, never posts or sends anyth
 writes in the site's own language and locale (Taiwan usage for zh-TW). None is
 suggested for a Board kind. The eight below are in the marketing team only; `technical-writer` is in it too.
 
-| id | Name | 中文 | Source |
+| id | Name | Traditional Chinese name | Source |
 | --- | --- | --- | --- |
 | `seo` | SEO Specialist | SEO 專家 | [`marketing-seo-specialist.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/marketing/marketing-seo-specialist.md) |
 | `content-writer` | Content Writer | 文章寫手 | [`marketing-content-creator.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/marketing/marketing-content-creator.md), with the long-form voice of `marketing-book-co-author.md` |
@@ -79,7 +89,7 @@ all three: `PASS`, `FAIL`, or `NEEDS_WORK`, per-claim evidence, and a reason for
 claim. No persona text is changed for this gate. A missing result or unavailable checker is a
 technical failure, not an inferred PASS. The maker's persona does not grant checker authority.
 
-| id | Name | 中文 | Teams | Adapted from |
+| id | Name | Traditional Chinese name | Teams | Adapted from |
 | --- | --- | --- | --- | --- |
 | `product-manager` | Product Manager | 產品經理 | product | [`product-manager.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/product/product-manager.md) |
 | `sprint-prioritizer` | Sprint Prioritizer | Sprint 排序員 | product | [`product-sprint-prioritizer.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/product/product-sprint-prioritizer.md) |
@@ -103,7 +113,7 @@ pricing, customers, support, data, developer docs and privacy as analyses and dr
 and never charges, contacts, sends or publishes anything itself. `privacy` advises and checks, and
 says it is not legal advice. None is suggested for a Board kind.
 
-| id | Name | 中文 | Teams | Adapted from |
+| id | Name | Traditional Chinese name | Teams | Adapted from |
 | --- | --- | --- | --- | --- |
 | `ui-designer` | UI Designer | UI 設計師 | design | [`design-ui-designer.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/design/design-ui-designer.md) |
 | `ux-architect` | UX Architect | UX 架構師 | design, engineering | [`design-ux-architect.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/design/design-ux-architect.md) |
@@ -130,7 +140,7 @@ is the only persona that names `epic`, and the console offers a kind's default o
 one persona names it (`suggestedPersonaForKind`), so a second would take the default away from
 every Epic.
 
-| id | Name | 中文 | Teams | Source |
+| id | Name | Traditional Chinese name | Teams | Source |
 | --- | --- | --- | --- | --- |
 | `zero-review-lead` | Zero-based Review Lead | 歸零審查召集人 | custom | original |
 | `zh-editor` | Chinese Editor | 中文主編 | custom | original |
@@ -151,6 +161,14 @@ share one can export a squad package and review its contents and license before 
 `suggested_kinds` tells a picker which persona is the safe fallback for a Board item's kind when
 exactly one catalog entry names it. It only suggests a choice: no kind gives a persona to
 anything.
+
+The Squad page has one machine-wide switch, "Automatically choose roles for Child Sessions."
+It defaults on and is stored with this machine's global Squad settings. When off, automatic
+candidate reads and Agent child dispatches naming a role receive
+`squad_auto_dispatch_disabled`; dispatches without a role continue. This applies across Projects
+and does not alter already running Sessions. The person's explicit role choices in Session start
+and Board assignment remain available. Per-role auto-assignment eligibility remains a separate
+setting and is retained while the machine switch is off.
 
 Every persona has a pixel bot. It is eight columns by seven rows, in the same `Icon` shape a
 project's mark uses (`common.schema.json`), and it is defined in `icons.go`.
@@ -330,7 +348,7 @@ merge keeps it whichever side it arrived on (`richer`). `SessionRow.persona` rep
 
 ## Console and Cloud
 
-The console calls a persona a "Role" (角色). It reads `GET /v1/personas` once per machine
+The console calls a persona a "Role". It reads `GET /v1/personas` once per machine
 (`web/console/src/personas.ts`), including machines shown in the Cloud fleet. A failed read
 temporarily draws no chips or bots. A transient transport, timeout, rate-limit or server failure
 is retried once per machine after five seconds; a successful catalog, including an empty one, is
@@ -343,7 +361,7 @@ paired machine without sending role names.
 - **The team switcher.** The start sheet, its resume step and the Board's new-Session assignment
   draw one role row (`session/RoleRow.tsx`). When the catalog has personas in more than one team,
   its "Role" label is a native select naming the teams that have at least one persona, in the
-  order above (工程團隊 / Engineering, 行銷團隊 / Marketing, 品質團隊 / Quality, …), styled like
+  order above (Engineering, Marketing, Quality, …), styled like
   the label with a caret so a phone opens its own picker; the chips to its right are "No role"
   and that team's personas only. With a persona chosen, the team shown is the team last picked
   in this browser (localStorage, `clawdline.persona.team`) when it holds the persona, otherwise

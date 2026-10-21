@@ -80,7 +80,7 @@ func (r Router) Do(ctx context.Context, req cloudops.LocalRequest) (cloudops.Loc
 		Header: http.Header{}, Host: host, RequestURI: target,
 		Body:          io.NopCloser(bytes.NewReader(req.Body)),
 		ContentLength: int64(len(req.Body)),
-	}).WithContext(WithAppOrigin(withViaCloud(ctx), r.AppOrigin))
+	}).WithContext(withCloudViewer(WithAppOrigin(withViaCloud(ctx), r.AppOrigin), req.Viewer))
 	if len(req.Body) > 0 {
 		// The gate refuses a change whose body is neither JSON nor nothing,
 		// because a page elsewhere can post a form without asking and cannot
@@ -126,6 +126,37 @@ func withViaCloud(ctx context.Context) context.Context {
 func ViaCloud(ctx context.Context) bool {
 	via, _ := ctx.Value(viaCloudKey{}).(bool)
 	return via
+}
+
+// cloudViewerKey carries the Cloud viewer a request was dispatched for.
+type cloudViewerKey struct{}
+
+// withCloudViewer marks ctx as answered on behalf of `viewer`, the envelope's
+// verified sender. Empty leaves ctx unmarked.
+func withCloudViewer(ctx context.Context, viewer string) context.Context {
+	if viewer == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, cloudViewerKey{}, viewer)
+}
+
+// CloudViewerOf is the Cloud viewer device this request is answered on behalf
+// of, or "" for one that did not come from a viewer: every request over a
+// socket, and this machine's own in-process reads.
+//
+// **It is what tells two phones apart here.** Every viewer reaches the routes
+// holding this machine's own local credential (`LocalAuthorizer`), so the
+// gate's verdict names the same device for all of them. The sender of a
+// verified envelope does not: the bridge has already checked its signature
+// and the account's roster before it is carried. A route that owns something
+// per device — a push subscription, an idempotency receipt — owns it by this.
+//
+// A context value and not a header, for the reason the app origin is one: a
+// header naming a viewer would be a header that grants, and nothing arriving
+// over a socket can put a value into a request's context.
+func CloudViewerOf(ctx context.Context) string {
+	viewer, _ := ctx.Value(cloudViewerKey{}).(string)
+	return viewer
 }
 
 // recorder is the ResponseWriter an in-process dispatch answers into. It keeps

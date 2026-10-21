@@ -50,6 +50,35 @@ export function knownTier(tier: unknown): string | null {
   return trimmed && trimmed !== COPIED_TIER_FALLBACK ? trimmed : null
 }
 
+/**
+ * A device used within this long is asked about before it is removed; one idle
+ * for longer is removed at a press. The question is there to stop a person
+ * signing out the phone in their hand, not to slow down clearing a dead slot.
+ */
+export const RECENT_USE_MS = 24 * 60 * 60 * 1000
+
+function seenAt(device: RecoveryDevice): number | null {
+  const parsed = device.last_seen_at ? Date.parse(device.last_seen_at) : NaN
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
+ * The devices with the one unused longest first: a device never seen since it
+ * was added leads, then the oldest last use; ties keep the order they came in.
+ */
+export function byIdle(devices: readonly RecoveryDevice[]): RecoveryDevice[] {
+  return devices
+    .map((device, index) => ({ device, index, seen: seenAt(device) }))
+    .sort((a, b) => (a.seen ?? -Infinity) - (b.seen ?? -Infinity) || a.index - b.index)
+    .map((row) => row.device)
+}
+
+/** Whether removing this device needs the in-card question first. */
+export function usedRecently(device: RecoveryDevice, now: number): boolean {
+  const seen = seenAt(device)
+  return seen !== null && now - seen < RECENT_USE_MS
+}
+
 /** What one failed call came to, kept apart so the card says which. */
 export interface DeviceLimitFailure {
   step: "list" | "revoke"
@@ -146,7 +175,7 @@ export class DeviceLimitRun {
         phase: "listed",
         tier: knownTier(listed.tier) ?? knownTier(this.options.tier),
         limit: listed.limit ?? this.options.limit ?? null,
-        devices: listed.devices,
+        devices: byIdle(listed.devices),
         asking: null,
         revoking: null,
         failure: null,
@@ -164,12 +193,33 @@ export class DeviceLimitRun {
     this.set({ ...held, asking: id, failure: id === null ? held.failure : null })
   }
 
+  /**
+   * The row's Remove: a device used in the last day is asked about first, any
+   * other is removed at once.
+   */
+  async remove(id: string, now = Date.now()): Promise<void> {
+    const held = this.state
+    if (held.phase !== "listed" || held.revoking) return
+    const device = held.devices.find((row) => row.id === id)
+    if (!device) return
+    if (usedRecently(device, now)) {
+      this.ask(id)
+      return
+    }
+    await this.send(held, device)
+  }
+
   /** Remove the device being asked about; on success, ask for the session again. */
   async revoke(id: string): Promise<void> {
     const held = this.state
     if (held.phase !== "listed" || held.revoking || held.asking !== id) return
     const device = held.devices.find((row) => row.id === id)
     if (!device) return
+    await this.send(held, device)
+  }
+
+  private async send(held: Extract<DeviceLimitState, { phase: "listed" }>, device: RecoveryDevice): Promise<void> {
+    const id = device.id
     this.set({ ...held, asking: null, revoking: id, failure: null })
     try {
       await this.session.revokeRecoveryDevice(id)

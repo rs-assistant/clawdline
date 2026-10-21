@@ -37,6 +37,7 @@ import (
 	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 )
 
 // How many decrypted requests may wait for the bridge is the capacity
@@ -152,9 +153,20 @@ func (r *Relay) DeliverDirect(envelope domaincloud.Envelope, plaintext []byte, v
 	r.deliver(envelope, plaintext, verifiedKey, true)
 }
 
+// DeliverTraced is Deliver or DeliverDirect carrying the transport phase's
+// connection-health correlation (adaptercloud.Options.InboundTraced).
+func (r *Relay) DeliverTraced(envelope domaincloud.Envelope, plaintext []byte, verifiedKey ed25519.PublicKey, correlation string, direct bool) {
+	r.deliverCorrelated(envelope, plaintext, verifiedKey, direct, correlation)
+}
+
 func (r *Relay) deliver(envelope domaincloud.Envelope, plaintext []byte, verifiedKey ed25519.PublicKey, direct bool) {
+	r.deliverCorrelated(envelope, plaintext, verifiedKey, direct, "")
+}
+
+func (r *Relay) deliverCorrelated(envelope domaincloud.Envelope, plaintext []byte, verifiedKey ed25519.PublicKey, direct bool, correlation string) {
 	r.start()
 	in := Inbound{
+		Correlation: correlation,
 		Channel:     envelope.Ch,
 		Class:       string(envelope.Class),
 		Sender:      envelope.Sender,
@@ -276,11 +288,17 @@ func (r *Relay) PublishTracked(ctx context.Context, out Outbound) (uint64, error
 	// carrier, against the carrier's own envelope sequence, and never enters
 	// the spool: the spool exists to re-send what the relay did not
 	// acknowledge, and a data channel either delivers an answer or is gone.
+	//
+	// Its phase stops at the carrier's write: what the carrier does after is
+	// the carrier's, and no relay receipt stands for a direct answer.
 	if out.Direct {
 		if r.Direct == nil || out.Reply.Sender == "" {
 			return 0, ErrNoDirectCarrier
 		}
-		return 0, r.Direct(out.Reply.Sender, out.Channel, class, out.Payload)
+		h := connectionhealth.StartCarried(ctx, connectionhealth.StageHandlerCompleted, connectionhealth.LocRelayDirect)
+		err := r.Direct(out.Reply.Sender, out.Channel, class, out.Payload)
+		h.End(err == nil)
+		return 0, err
 	}
 	key, keyID := r.Secret, r.keyID()
 	if strings.HasPrefix(out.Channel, "term/") || strings.HasPrefix(out.Channel, "termd/") || strings.HasPrefix(out.Channel, "termr/") {
@@ -291,6 +309,14 @@ func (r *Relay) PublishTracked(ctx context.Context, out Outbound) (uint64, error
 	}
 
 	kind := adaptercloud.SpoolChannel(strings.SplitN(out.Channel, "/", 2)[0])
+	// The answer's own phase, under the handler's correlation when its
+	// context carries one (connectionhealth.WithCorrelation). It begins
+	// before the spool's lock, so a reservation that never gets it is seen at
+	// cloud.relay.reserve, and it ends once the row is queued: the drain's
+	// writes are later phases of the same correlation, kept on the row.
+	h := connectionhealth.StartCarried(ctx, connectionhealth.StageHandlerCompleted, connectionhealth.LocRelayReserve)
+	queued := false
+	defer func() { h.End(queued) }()
 	var (
 		seq uint64
 		err error
@@ -315,6 +341,7 @@ func (r *Relay) PublishTracked(ctx context.Context, out Outbound) (uint64, error
 		return 0, err
 	}
 
+	_ = h.Step(connectionhealth.StageHandlerCompleted, connectionhealth.LocRelaySeal)
 	now := r.now()
 	envelope, err := domaincloud.Seal(out.Payload, domaincloud.SealParams{
 		Ch:     out.Channel,
@@ -334,9 +361,13 @@ func (r *Relay) PublishTracked(ctx context.Context, out Outbound) (uint64, error
 	if err != nil {
 		return 0, err
 	}
-	if err := r.Spool.Seal(seq, sealed, now); err != nil {
+	_ = h.Step(connectionhealth.StageResponseSealed, connectionhealth.LocRelaySpoolSeal)
+	if err := r.Spool.SealCorrelated(seq, sealed, now, connectionhealth.CarriedCorrelation(ctx)); err != nil {
 		return 0, err
 	}
+	_ = h.Progress(connectionhealth.StageSpoolQueued)
+	queued = true
+	h.End(true)
 	// A Session row the relay is about to deliver also goes straight to every
 	// viewer whose carrier is open. It is the same envelope under the same
 	// number, so a page may read it from either road and the row is ordered

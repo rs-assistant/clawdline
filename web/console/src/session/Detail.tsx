@@ -20,7 +20,7 @@ import { askFocus, askInterrupt } from "../legacy/screen-bridge.js"
 import type { FleetDetailProblem } from "../cloud/all-machine-sessions.js"
 import { Transcript } from "./Transcript.js"
 import { GitPanel } from "./GitPanel.js"
-import { Composer } from "./Composer.js"
+import { Composer, type ComposerDraftHandoff } from "./Composer.js"
 import { ScreenPanel } from "./ScreenPanel.js"
 import { ShellPanel } from "./ShellPanel.js"
 import { BackgroundStrip } from "./BackgroundStrip.js"
@@ -98,7 +98,9 @@ export function Detail({
   projectedCoordinatorBound = false,
   emptyProblem,
   scanSources,
+  draftHandoff,
 }: {
+  draftHandoff?: ComposerDraftHandoff
   row: SessionRow | null
   tasks: TaskRow[] | null
   onOpenSession: (id: string) => void
@@ -355,7 +357,7 @@ export function Detail({
           line above the composer. Kept while an agent's transcript is open, so
           the way to the next one is where the last one was. */}
       {row ? <BackgroundStrip row={row} selected={agentId} onAgent={chooseAgent} onShell={openShell} /> : null}
-      {loading ? <div className="composer detail-loading-composer" aria-hidden="true"><div><span /><i /></div></div> : selectedAgent ? null : <Composer row={row} onDid={onDid} onSent={onSent} onScreen={() => setScreenOpen(true)} restoredDraft={savedComposerDraft} suggestedDraft={suggestedDraft} />}
+      {loading ? <div className="composer detail-loading-composer" aria-hidden="true"><div><span /><i /></div></div> : selectedAgent ? null : <Composer draftHandoff={draftHandoff} row={row} onDid={onDid} onSent={onSent} onScreen={() => setScreenOpen(true)} restoredDraft={savedComposerDraft} suggestedDraft={suggestedDraft} />}
       {selectedAgent || !row ? null : <StatusLine row={row} onOpenGit={() => setGitOpen(true)} />}
       {/* `input/user-messages.js` puts its overlay on the body at import; this
           one is drawn into the body from here, because the `⋯` row that opens
@@ -554,8 +556,11 @@ function Tools({
   }
   const closeMenu = (restore: boolean) => {
     if (!open) return
+    if (mainRef.current?.contains(document.activeElement) || moreRef.current?.contains(document.activeElement)) {
+      triggerRef.current?.focus({ preventScroll: true })
+    }
     setOpen(false)
-    setMore(false)
+    // Preserve the current level while its closing picture is retained by CSS.
     if (restore) focusNext.current = "trigger"
   }
 
@@ -745,13 +750,15 @@ function Tools({
         </button>
         <div
           className="session-actions"
+          data-motion-id="AN-001"
           id="session-actions"
           role="menu"
           hidden={!open}
+          inert={!open}
           aria-label={T.webSessionActions}
           onKeyDown={onMenuKey}
         >
-          <div className="session-action-stage">
+          <div className="session-action-stage" data-motion-id="AN-002">
             <div
               className="session-action-level"
               id="session-actions-main"

@@ -85,6 +85,10 @@ func (s *Server) usageRoute(w http.ResponseWriter, r *http.Request) {
 		s.usageCompareCompaction(w, r)
 		return
 	}
+	if routePath(r) == "/v1/usage/overview" {
+		s.usageOverview(w, r)
+		return
+	}
 	if routePath(r) == "/v1/usage/compare-handoff" {
 		s.usageCompareHandoff(w, r)
 		return

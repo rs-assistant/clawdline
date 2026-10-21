@@ -49,7 +49,7 @@ export interface MoveRecord {
   title?: string
   time_zone?: string
   enabled?: boolean
-  when?: { at?: string; days?: string | string[]; on?: string; trigger_only?: boolean }
+  when?: { every_days?: number; start?: string; at?: string; days?: string | string[]; on?: string; trigger_only?: boolean }
   task?: Record<string, unknown> & {
     assistant?: string
     model?: string
@@ -234,6 +234,8 @@ export function recordBody(record: MoveRecord, place: string, enabled: boolean):
     body.trigger_only = true
   } else {
     body.at = when.at || ""
+    if (when.every_days !== undefined) body.every_days = when.every_days
+    if (when.start !== undefined) body.start = when.start
     if (when.days !== undefined) body.days = when.days
     if (when.on !== undefined) body.on = when.on
   }

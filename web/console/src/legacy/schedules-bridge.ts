@@ -59,7 +59,7 @@ import {
    original's JSON objects, read the way its page reads them, and the page is
    the only reader. */
 
-export type ScheduleIcon = { cells?: unknown[]; accent?: string } | null | undefined
+export type ScheduleIcon = { cells?: unknown[]; accent?: string; svg?: string } | null | undefined
 
 /** `last_run` on a row and on a record. */
 export interface ScheduleLastRun {
@@ -75,6 +75,7 @@ export interface ScheduleListRow {
   /** IANA zone whose wall clock `when.at` names; absent on legacy schedules. */
   time_zone?: string
   enabled?: boolean
+  when?: { at?: string; every_days?: number; start?: string }
   next_fire?: number
   once?: boolean
   /** A schedule with no time, run only by Run now or its webhook: never a `next_fire`. */
@@ -125,7 +126,7 @@ export interface ScheduleRecord {
   enabled?: boolean
   file?: string
   /** `{ trigger_only: true }` alone for a schedule with no time. */
-  when?: { at?: string; days?: string | string[]; on?: string; trigger_only?: boolean }
+  when?: { every_days?: number; start?: string; at?: string; days?: string | string[]; on?: string; trigger_only?: boolean }
   task?: {
     assistant?: string
     model?: string
@@ -166,6 +167,8 @@ export interface ScheduleBody {
   time_zone?: string
   /** `at` and `days`, or `trigger_only` alone: never both (`schedule-when.ts`). */
   at?: string
+  every_days?: number
+  start?: string
   days?: string | string[]
   trigger_only?: true
   place_id: string | null

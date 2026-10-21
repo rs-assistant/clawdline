@@ -8,17 +8,17 @@ up.
 
 ## In short
 
-- **How you know there is a new release.** The Settings page's **Clawdline 版本** panel shows the
+- **How you know there is a new release.** The Settings page's **Clawdline version** panel shows the
   running and the latest version; when a newer release is out, the session list also shows a banner
   that links there. In a terminal, `clawdline update` says the same and exits 10 when a newer
   release is available.
-- **How to install it.** Press **立即更新** in that panel, or run `clawdline update --apply`.
+- **How to install it.** Press **Update now** in that panel, or run `clawdline update --apply`.
   Clawdline restarts for a few seconds; the sessions running in tmux keep running.
 - **What happens when it fails.** If the new release does not come up within 60 seconds, Clawdline
   switches back to the release that was running and starts it again, by itself; there is nothing to
   do. Automatic updates will not try that version again. A failure before the restart changes
   nothing at all.
-- **Automatic updates.** Off by default, per machine. Turn them on with the **自動更新** switch in
+- **Automatic updates.** Off by default, per machine. Turn them on with the **Automatic updates** switch in
   the same panel, in a console signed in on that machine, or with
   `clawdline setting set update_auto_apply true`. They install only **stable** releases, never a
   pre-release, and wait until no assistant session is working
@@ -45,8 +45,8 @@ deploying the hosted console does not require quitting the local app or restarti
 1. Keep the installed app and service running while the new release is built, signed, reviewed,
    published, and checked. Do not run the installer again, install a locally built app over it,
    quit the app, kill its process, or restart its LaunchAgent to prepare for a release.
-2. After the signed release is public, let the installed Clawdline discover it. Use **立即更新** in
-   the local console, or enable **自動更新** and let its idle-session rule choose when to apply it.
+2. After the signed release is public, let the installed Clawdline discover it. Use **Update now** in
+   the local console, or enable **Automatic updates** and let its idle-session rule choose when to apply it.
    Do not substitute `clawdline setup`, a manual bundle replacement, or a service restart for this
    update path. When a person wants to experience the prompt, verify that the button appears and
    leave the install action for that person to initiate.
@@ -200,8 +200,8 @@ A failure before step 5 changes nothing the running daemon uses and is recorded 
 
 ### Automatic updates
 
-Off by default, and per machine. Turn it on with the **自動更新** switch in the Settings page's
-**Clawdline 版本** panel, in a console signed in on that machine, or from a terminal:
+Off by default, and per machine. Turn it on with the **Automatic updates** switch in the Settings page's
+**Clawdline version** panel, in a console signed in on that machine, or from a terminal:
 
 ```sh
 clawdline setting set update_auto_apply true
@@ -282,7 +282,7 @@ clawdline dev install [--rev <commit>]     # inside a clawdline checkout
 
 ## The console's update panel
 
-The Settings page's **Clawdline 版本** panel (`web/console/src/machine/UpdatePanel.tsx`, its logic
+The Settings page's **Clawdline version** panel (`web/console/src/machine/UpdatePanel.tsx`, its logic
 in `update-model.ts`) shares one update reading with the session list's banner. While the
 console is visible, it reads when first opened and every ten minutes. These reads ask
 `GET /v1/update/fresh`, which contacts the update source within a ten-second request bound;
@@ -295,10 +295,10 @@ reads immediately. During a return check the previous update prompt and install 
 a response from before the page was backgrounded cannot restore them. A network return checks a
 stale reading and retries a recent failed reading. The banner disappears when a fresh answer says the
 release is current, unknown, or otherwise no longer available, and when the read fails.
-The panel shows the running and latest version (a short commit for a source build), a **版本說明** link to
+The panel shows the running and latest version (a short commit for a source build), a **Release notes** link to
 `latest.notes_url`, when the last check ran, and the channel.
 
-- On a release install with `update_available`, **立即更新** posts `/v1/update/apply` (over Cloud,
+- On a release install with `update_available`, **Update now** posts `/v1/update/apply` (over Cloud,
   the word `update-apply`), then reads `/v1/update` every two seconds until `apply.state` settles.
   The seconds in which the daemon restarts and no read answers show as restarting, not as a
   failure; when the new daemon serves a different console, the page reloads itself.
@@ -307,16 +307,16 @@ The panel shows the running and latest version (a short commit for a source buil
   result visible after a page reload until dismissed, and shows `staged_app` beside that result: the
   daemon has updated, while the open Mac app keeps its old bundle until it restarts into the new
   one by itself, the person presses **Restart app now**, or it next quits.
-- **自動更新** writes `update_auto_apply` through `/v1/settings`. Over Cloud it is shown but disabled,
+- **Automatic updates** writes `update_auto_apply` through `/v1/settings`. Over Cloud it is shown but disabled,
   with a sentence saying to change it on the machine: the settings route takes only the machine's
   own token.
 - `source_deploy` and `source_checkout` show no button, only how that machine updates and that
   `clawdline setup --adopt` moves a Linux source deploy onto releases.
 - An older daemon — no `install_kind`, or a `501 not_implemented` for the POST — gets the earlier
-  quiet line or the needs-update sentence, never "讀取失敗".
+  quiet line or the needs-update sentence, never "Could not load".
 
 On a release install with `update_available`, the session list also shows a per-version banner.
-Its **立即更新** button rechecks the signed release source, starts the update directly, and shows
+Its **Update now** button rechecks the signed release source, starts the update directly, and shows
 progress and the final result in the same place. A withdrawn release or an unavailable source
 cannot be installed from an old banner. Dismissing the banner is remembered per version in that
 browser. Settings retains the full version check, release notes, and update controls.
@@ -333,7 +333,7 @@ cache. Its ten-minute checks are fresh; progress polling reads cached status. If
 request fails, cached running and apply facts remain visible but latest becomes unknown, so an
 old cached release is never offered. It names the machine and available version in a banner, including when this
 page is shown inside the Mac app's Cloud tab. Its button switches to that machine's console, where
-the person can choose **立即更新**; the banner itself never starts an update. An offline, unpaired,
+the person can choose **Update now**; the banner itself never starts an update. An offline, unpaired,
 unanswered, or rolled-back machine cannot produce this prompt. The local Mac app and its Cloud tab
 remain open while the release is prepared and while the prompt is shown.
 
@@ -369,7 +369,7 @@ A machine running a source build — a checkout, or a source deploy made by
 console instead.
 
 The hosted console at app.clawdline.com moves ahead as features land. A machine left on an older
-daemon shows "讀取失敗" beside console features it predates, and until 2026-10-04 nothing said the
+daemon shows "Could not load" beside console features it predates, and until 2026-10-04 nothing said the
 machine was behind: that day `https://app.clawdline.com/BUILD.json` named `4b7c3f8d…` while a
 machine's daemon served `08b4277b…`.
 

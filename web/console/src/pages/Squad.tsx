@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../LoadingSkeleton.js"
 import { catalogFormat, catalogWordLanguage } from "../catalog.js"
 import { catalogWord } from "../catalog.js"
 import { showModalWithoutChoice } from "../modal-focus.js"
@@ -9,6 +10,7 @@ import type { PageModule } from "./types.js"
 import { squadApi, type PackPreview, type SkillSourceRow, type SquadAPI } from "./squad/api.js"
 import { ReceiptGate, sourceLabel, visiblePersonas, type SquadDraft, type SquadPersona, type SquadReadState, type SquadSkill, type SquadView } from "./squad/model.js"
 import { ACTIVE_SKILL_BYTES, activeSkillBytes, makeSkill, sameSkill, skillInputError, type SkillTransaction } from "./squad/skill-create.js"
+import { RoleIconUpdate } from "./squad/RoleIconEditor.js"
 import { PersonaCreator } from "./squad/PersonaCreator.js"
 import { forgetPersonas } from "../personas.js"
 import "../page-skeleton.css"
@@ -411,6 +413,17 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
     finally { setBusy("") }
   }
 
+  const saveAutoDispatch = async (value: boolean) => {
+    if (!data) return
+    const requestScope = scope
+    setBusy("autoDispatch"); setNotice({ text: catalogWord("literal", "70a7ff14d82d") })
+    try {
+      await api.saveAutoDispatch(value, data.autoDispatchVersion)
+      if (currentScope.current === requestScope) { await load(requestScope); setNotice({ text: catalogWord("literal", "d294b20a8375") }) }
+    } catch (error) { if (currentScope.current === requestScope) setNotice({ text: catalogFormat("template", "dad86b25350d", [errorDetail(error)]), error: true }) }
+    finally { setBusy("") }
+  }
+
   const restoreToggle = async (kind: "enabled" | "motion") => {
     if (!data || (kind === "enabled" && !persona)) return
     const requestScope = scope
@@ -719,6 +732,14 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
       {reading.kind === "error" && <div className="squad-error" role="alert"><h2>{readErrorTitle(reading.code)}</h2><p>{reading.detail}</p><button type="button" onClick={() => void load(scope)}>{catalogWord("inline", "07244b042280")}</button></div>}
       {data?.partial && <div className="squad-notice" role="status">{catalogWord("inline", "08228e7394ef")}<button type="button" onClick={() => void load(scope)}>{catalogWord("inline", "07244b042280")}</button></div>}
       {data && !data.canWrite && <p className="squad-notice" role="status">{catalogWord("inline", "7bdb8640f903")}</p>}
+      {data?.autoDispatchSupported && <section className="squad-machine-setting" aria-labelledby="squad-auto-dispatch-title">
+        <div><span className="squad-machine-setting-eyebrow">{catalogWord("squad", "machineSetting")}</span>
+          <h2 id="squad-auto-dispatch-title">{catalogWord("squad", "autoDispatchTitle")}</h2>
+          <p>{catalogWord("squad", "autoDispatchDescription")}</p></div>
+        <label className="squad-machine-toggle"><input type="checkbox" checked={data.autoDispatch.value} disabled={!canWrite || !!busy}
+          aria-label={catalogWord("squad", "autoDispatchTitle")} onChange={(event) => void saveAutoDispatch(event.target.checked)} />
+          <span>{data.autoDispatch.value ? catalogWord("squad", "on") : catalogWord("squad", "off")}</span></label>
+      </section>}
       {data && <div className="squad-layout" data-mobile-view={mobileView}>
         <aside className="squad-rail" aria-labelledby="squad-teams-title"><div className="squad-panel-head"><h2 id="squad-teams-title">{catalogWord("inline", "d13ccaf2da5f")}</h2><span>{catalogFormat("count", "squadGroups", [data.teams.length])}</span></div>
           <div className="squad-teams" role="group" aria-label={catalogWord("inline", "7a889ffdecb5")}><button type="button" aria-pressed={!team} onClick={() => setTeam("")}>{catalogWord("inline", "2878fe586472")} <small>{data.personas.length}</small></button>
@@ -736,6 +757,7 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
         <div className="squad-detail" ref={detailPanel} aria-labelledby="squad-detail-title">{persona ? <>
           <div className="page-bar squad-back-bar"><button className="squad-back" type="button" onClick={backToRoster}>{catalogWord("inline", "a614ac7abbc2")}</button></div>
           <div className="squad-profile"><IconCanvas icon={persona.icon} size={5} /><div><p>{catalogWord("inline", "863e4b25f68c")}</p><h2 id="squad-detail-title" ref={detailTitle} tabIndex={-1}>{persona.name}</h2><span>{persona.subtitle}</span></div></div>
+          {!persona.id.startsWith("clawdline.") && <RoleIconUpdate key={`${persona.id}:${persona.version}`} api={api} id={persona.id} icon={persona.icon} canWrite={canWrite} onSaved={async () => { forgetPersonas(); await load(scope) }} />}
           <div className="squad-meta"><span>{persona.teamIds.map((id) => data.teams.find((row) => row.id === id)?.name ?? id).join(" · ") || catalogWord("literal", "800a6095679f")}</span>
             <details className="squad-meta-detail"><summary>{catalogWord("inline", "230d9c9e189c")}</summary>
               <dl><div><dt>{catalogWord("inline", "c21db84c0653")}</dt><dd><LinkedText text={persona.source} /></dd></div>
@@ -831,13 +853,13 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
           <div className="squad-source-list" aria-label={catalogWord("inline", "b71045effb84")}>
             <div className="squad-source-list-head"><strong>{catalogWord("inline", "113db9dc3197")}</strong><button type="button" disabled={sourceLoading} onClick={() => setSourceReload((value) => value + 1)}>{catalogWord("inline", "358a13c304aa")}</button></div>
             {sourceRows.length > 0 && <label>{catalogWord("inline", "f57aace56ce8")}<input type="search" value={sourceSearch} onChange={(event) => setSourceSearch(event.target.value)} placeholder={catalogWord("inline", "50c8b05ea375")} /></label>}
-            {sourceLoading ? <p role="status">{catalogWord("inline", "9fb52113c298")}</p> : sourceError ? <p role="alert">{sourceError}</p> : sourceRows.length === 0 ? <p role="status">{catalogWord("inline", "b0c972ae30e5")}</p> :
+            {sourceLoading ? <LoadingSkeleton id="SK-31" label={catalogWord("inline", "9fb52113c298")} /> : sourceError ? <p role="alert">{sourceError}</p> : sourceRows.length === 0 ? <p role="status">{catalogWord("inline", "b0c972ae30e5")}</p> :
               <div className="squad-source-options" role="group" aria-label={catalogWord("inline", "e627673e6a28")}>{sourceRows.filter((row) => `${row.name} ${row.purpose} ${row.location}`.toLocaleLowerCase().includes(sourceSearch.toLocaleLowerCase())).map((row) =>
                 <button key={row.id} type="button" className="squad-source-option" aria-pressed={selectedSourceID === row.id} disabled={skillBusy || !!skillTransaction.current} onClick={() => setSelectedSourceID(row.id)}>
                   <strong>{row.name}</strong><span>{row.purpose || catalogWord("literal", "9eb1948e6879")}</span><small>{row.location}</small>
                 </button>)}{sourceRows.length > 0 && !sourceRows.some((row) => `${row.name} ${row.purpose} ${row.location}`.toLocaleLowerCase().includes(sourceSearch.toLocaleLowerCase())) && <p>{catalogWord("inline", "e93b3a514ab9")}</p>}</div>}
           </div>
-          {sourceDetailLoading && <p role="status">{catalogWord("inline", "80a6f335a94e")}</p>}
+          {sourceDetailLoading && <LoadingSkeleton id="SK-31" kind="text" label={catalogWord("inline", "80a6f335a94e")} />}
           {sourceFolderError && <p role="alert">{sourceFolderError}</p>}
           {newSkillContent && <><label>{catalogWord("inline", "d8ac7c87e3f0")}<input required value={newSkillName} disabled={skillBusy || !!skillTransaction.current} onChange={(event) => setNewSkillName(event.target.value)} /></label>
             <label>{catalogWord("inline", "9c9a28f5de45")}<input required value={newSkillPurpose} disabled={skillBusy || !!skillTransaction.current} onChange={(event) => setNewSkillPurpose(event.target.value)} /></label>

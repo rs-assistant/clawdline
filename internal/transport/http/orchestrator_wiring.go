@@ -70,9 +70,10 @@ func newBroker(s *Server) *orchestrator.Broker {
 		// A written task row, for the Cloud publisher that carries the task
 		// list on its machine descriptor and otherwise has no way to know the
 		// list moved but to read it (cloud.go, noteTaskListChanged).
-		TaskListChanged:      s.noteTaskListChanged,
-		SquadActorRequired:   true,
-		ResolveSquadSnapshot: s.resolveSquadSnapshot,
+		TaskListChanged:          s.noteTaskListChanged,
+		SquadActorRequired:       true,
+		SquadAutoDispatchEnabled: s.squadAutoDispatchEnabled,
+		ResolveSquadSnapshot:     s.resolveSquadSnapshot,
 		SquadAutoAssignable: func(ctx context.Context, personaID, projectPath string) (bool, error) {
 			snapshot, err := s.ResolveSquadLaunch(ctx, personaID, projectPath)
 			if err != nil {

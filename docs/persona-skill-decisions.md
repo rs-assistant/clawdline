@@ -124,4 +124,4 @@ text at `internal/domain/squad/builtin_skills/<name>.md`. `--verify-upstream` re
 
 | Persona | Skill | Purpose |
 | --- | --- | --- |
-| zero-review-lead | zero-based-review (歸零審查) | Re-justify an existing design from zero with role reviewers. The persona is original too (`source: original`, [Session personas](personas.md)). Written 2026-10-02; no research round was run for it. |
+| zero-review-lead | zero-based-review (Zero-Based Review) | Re-justify an existing design from zero with role reviewers. The persona is original too (`source: original`, [Session personas](personas.md)). Written 2026-10-02; no research round was run for it. |

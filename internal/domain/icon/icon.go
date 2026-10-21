@@ -25,6 +25,7 @@ import (
 type Grid struct {
 	Accent string      `json:"accent"`
 	Cells  [][]*string `json:"cells"`
+	SVG    string      `json:"svg,omitempty"`
 }
 
 // hues are the sixteen the generator picks between, in degrees.
@@ -164,6 +165,7 @@ type entry struct {
 }
 
 type art struct {
+	SVG     string            `json:"svg"`
 	Accent  string            `json:"accent"`
 	BG      string            `json:"bg"`
 	Palette map[string]string `json:"palette"`
@@ -247,6 +249,22 @@ func (r *Registry) refreshLegacy() error {
 	}
 	if err := json.Unmarshal(data, &root); err != nil {
 		return err
+	}
+	for _, row := range root.Projects {
+		if len(row.Art) > 0 {
+			var a art
+			if err := json.Unmarshal(row.Art, &a); err != nil {
+				return err
+			}
+			if a.SVG != "" {
+				if err := Validate(Grid{Accent: a.Accent, SVG: a.SVG}); err != nil {
+					return err
+				}
+			}
+			if _, ok := artGrid(a); !ok {
+				return errors.New("invalid project icon art")
+			}
+		}
 	}
 	r.projects = root.Projects
 	r.legacyData = append([]byte(nil), data...)
@@ -449,7 +467,14 @@ func fromEntry(e entry) (Grid, bool) {
 // dot is the background, and an unknown character is too — an icon with a typo
 // in it should come out slightly wrong, not blank.
 func artGrid(a art) (Grid, bool) {
-	if len(a.Rows) == 0 {
+	if a.SVG != "" {
+		if len(a.Rows) != 0 {
+			return Grid{}, false
+		}
+		g := Grid{Accent: a.Accent, Cells: [][]*string{}, SVG: a.SVG}
+		return g, Validate(g) == nil
+	}
+	if len(a.Rows) == 0 || len(a.Rows) > MaxIconSide {
 		return Grid{}, false
 	}
 	look := map[rune]string{}
@@ -463,6 +488,9 @@ func artGrid(a art) (Grid, bool) {
 	rows := make([][]rune, len(a.Rows))
 	for i, row := range a.Rows {
 		rows[i] = []rune(row)
+		if len(rows[i]) > MaxIconSide {
+			return Grid{}, false
+		}
 		if len(rows[i]) > width {
 			width = len(rows[i])
 		}
@@ -500,5 +528,6 @@ func artGrid(a art) (Grid, bool) {
 	if accent == "" {
 		accent = "#FFFFFF"
 	}
-	return Grid{Accent: accent, Cells: cells}, true
+	g := Grid{Accent: accent, Cells: cells}
+	return g, Validate(g) == nil
 }

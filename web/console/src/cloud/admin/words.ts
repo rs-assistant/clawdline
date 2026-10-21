@@ -1,28 +1,20 @@
-/*
- * The operations pages' addresses and own words, in the two languages every product change
- * carries (docs/localization.md). The page stands outside the console, before
- * any catalog is loaded, so it holds a small table of its own; every other
- * language reads the English one.
- *
- * Nothing is imported at run time, so `node --test` loads it as it is.
- */
+/* Operations source copy and routes. The validated public catalog supplies displayed copy. */
+// @ts-expect-error -- Node's strip-types tests import this module directly.
+import { bootCatalog, catalogWord } from "../../catalog.ts"
+// @ts-expect-error -- Node's strip-types tests import this module directly.
+import { catalogURL, type StringsConfig } from "../strings.ts"
 
 export type AdminLocale = "en" | "zh-TW"
 
-/** Taiwan Traditional Chinese for any Traditional Chinese preference; English for the rest. */
-export function adminLocale(languages: readonly string[]): AdminLocale {
-  for (const raw of languages) {
-    const tag = raw.toLowerCase()
-    if (tag === "zh-tw" || tag === "zh-hk" || tag === "zh-mo" || tag.startsWith("zh-hant")) return "zh-TW"
-    if (tag === "en" || tag.startsWith("en-")) return "en"
-  }
-  return "en"
+/** Catalog loading needs only the public build declaration, never a paired machine. */
+export function bootAdminCatalog(config: StringsConfig | null, baseURI: string, get: typeof fetch = fetch) {
+  return bootCatalog((tag) => catalogURL(config ?? { build: "", strings: {} }, tag, baseURI), get)
 }
 
 /* ---- the pages and their addresses --------------------------------------- */
 
 /** The operations pages, in the order the navigation lists them. */
-export const ADMIN_ROUTES = ["overview", "accounts", "promotions", "usage"] as const
+export const ADMIN_ROUTES = ["overview", "accounts", "promotions", "usage", "survey", "health"] as const
 export type AdminRoute = (typeof ADMIN_ROUTES)[number]
 
 const BASE = "/admin"
@@ -36,15 +28,26 @@ export function isAdminPath(pathname: string): boolean {
   return pathname === BASE || pathname.startsWith(BASE + "/")
 }
 
-/** The page an address names; null for an address under `/admin` that names none. */
+/** The page an address names; null for an address under `/admin` that names none. Connection
+ *  health owns everything under `/admin/health`; its own screens are `health/route.ts`'s. */
 export function adminRoute(pathname: string): AdminRoute | null {
   if (!isAdminPath(pathname)) return null
   const rest = pathname.slice(BASE.length).replace(/^\/+|\/+$/g, "")
   if (rest === "") return "overview"
+  if (rest === "health" || rest.startsWith("health/")) return "health"
   return (ADMIN_ROUTES as readonly string[]).includes(rest) && rest !== "overview" ? (rest as AdminRoute) : null
 }
 
 const en = {
+  nav_health: "Connection health",
+  hint_health: "Stored evidence from Cloud",
+  lead_health: "What Cloud has stored about connections, and how much of it can be seen.",
+  healthUnknownAddress: "This address names no connection health screen.",
+  fixtureOnlyTitle: "Fixture harness",
+  fixtureOnlyBody: "This development harness serves only connection health, from task-owned example data. Other operations pages need a real session.",
+  nav_survey: "Onboarding survey",
+  hint_survey: "Workflows and discovery",
+  lead_survey: "Voluntary answers about workflows, tools and discovery.",
   docTitle: "Operations · Clawdline Cloud",
   title: "Operations",
   subtitle: "Anonymous totals for Clawdline Cloud",
@@ -374,6 +377,15 @@ const en = {
 export type AdminWord = keyof typeof en
 
 const zhTW: Record<AdminWord, string> = {
+  nav_health: "連線健康",
+  hint_health: "Cloud 已保存的證據",
+  lead_health: "Cloud 保存了哪些連線證據，以及看得到多少。",
+  healthUnknownAddress: "這個網址沒有對應的連線健康畫面。",
+  fixtureOnlyTitle: "固定測試資料環境",
+  fixtureOnlyBody: "這個開發環境只提供連線健康，資料是任務自備的範例。其他營運頁面需要真正登入。",
+  nav_survey: "新使用者問卷",
+  hint_survey: "工作需求與認識來源",
+  lead_survey: "自願填答的工作需求、AI 工具與認識來源。",
   docTitle: "營運 · Clawdline Cloud",
   title: "營運",
   subtitle: "Clawdline Cloud 的匿名匯總數據",
@@ -704,9 +716,9 @@ const TABLES: Record<AdminLocale, Record<AdminWord, string>> = { en, "zh-TW": zh
 
 export type Say = (key: AdminWord, values?: Record<string, string | number>) => string
 
-/** The sentence for `key` in `locale`, with `{name}` placeholders filled. */
-export function adminWords(locale: AdminLocale): Say {
-  const table = TABLES[locale]
+/** Runtime copy uses the active catalog; an explicit source locale supports pure source checks. */
+export function adminWords(locale?: AdminLocale): Say {
+  const table = locale ? TABLES[locale] : null
   return (key, values) =>
-    table[key].replace(/\{(\w+)\}/g, (whole, name: string) => (values && name in values ? String(values[name]) : whole))
+    (table ? table[key] : catalogWord("admin", key)).replace(/\{(\w+)\}/g, (whole, name: string) => (values && name in values ? String(values[name]) : whole))
 }

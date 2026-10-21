@@ -5,16 +5,28 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/squadfiles"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 )
 
 // checkSquadDispatchActor ties an automatic assignment to the bound root
-// terminal, provider conversation, and Project scope before opening a child.
+// terminal and provider conversation before opening a child. The target Project
+// may differ from the actor's launch snapshot.
 func (b *Broker) checkSquadDispatchActor(ctx context.Context, req DispatchRequest, record Record, rootTerminal string) error {
 	if !b.SquadActorRequired || record.Root == nil || req.Respawn != nil || req.Schedule != nil || req.InternalGate {
 		return nil
+	}
+	if record.Persona != "" {
+		if b.SquadAutoDispatchEnabled == nil {
+			return refuse(http.StatusServiceUnavailable, "squad_policy_unavailable", "Machine role dispatch setting is unavailable.")
+		}
+		enabled, err := b.SquadAutoDispatchEnabled(ctx)
+		if err != nil {
+			return err
+		}
+		if !enabled {
+			return refuse(http.StatusConflict, "squad_auto_dispatch_disabled", "Automatic role selection is off on this machine.")
+		}
 	}
 	actor, bound, err := b.Store.AuthenticateSquadActor(ctx, req.ActorCapability)
 	if err != nil {
@@ -24,7 +36,7 @@ func (b *Broker) checkSquadDispatchActor(ctx context.Context, req DispatchReques
 		// A Session opened before squad snapshots, or without a role, has no
 		// capability. Preserve its existing dispatch route. A pending squad
 		// launch cannot use this compatibility path.
-		hasLaunch, err := b.Store.SquadHasLaunchForTerminal(ctx, rootTerminal)
+		hasLaunch, err := b.Store.SquadHasLaunchForSession(ctx, rootTerminal, record.Root.SessionID)
 		if err != nil {
 			return err
 		}
@@ -34,10 +46,6 @@ func (b *Broker) checkSquadDispatchActor(ctx context.Context, req DispatchReques
 	}
 	if !bound || actor.TerminalID != rootTerminal || actor.ConversationID != record.Root.SessionID {
 		return refuse(http.StatusForbidden, "session_actor_required", "This dispatch needs the current root Session's squad capability.")
-	}
-	rootScope, ok := projects.ResolveScope(record.Root.ProjectDir)
-	if !ok || rootScope.ID != actor.ScopeID {
-		return refuse(http.StatusForbidden, "session_scope_mismatch", "The root Session's Project does not match its role snapshot.")
 	}
 	if record.Persona != "" && (actor.DefinitionID == "clawdline.persona.product-manager" || actor.DefinitionID == "clawdline.persona.architect") {
 		if b.SquadAutoAssignable == nil {

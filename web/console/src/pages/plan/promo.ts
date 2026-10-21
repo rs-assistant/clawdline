@@ -1,4 +1,6 @@
 /** A promo link carries a bearer code only in the fragment. Remove it before OAuth starts. */
+// @ts-expect-error -- Node's strip-types runner needs the source extension.
+import { catalogWord, catalogFormat } from "../../catalog.ts"
 import { failureSentence } from "../../legacy/js/core/failure-text.js"
 
 const CODE_KEY = "clawdline.promo.code"
@@ -66,23 +68,47 @@ export async function redeemPromo(apiOrigin: string, code: string, storage: Stor
   throw promoError(body?.error?.code ?? "unavailable")
 }
 
-export function promoWords(language: string) {
-  return /^(zh-hant|zh-tw)/i.test(language) ? {
-    title: "兌換 Cloud Pro 禮遇", label: "官方兌換碼", action: "兌換", working: "正在確認兌換碼…",
-    success: (date: string) => `Pro 已啟用，有效至 ${date}。`,
-    rejected: "此兌換碼無法使用；請確認代碼與活動期限。",
-    signedOut: "請先登入，再回到這裡兌換。", rateLimited: "嘗試次數過多，請稍後再試。",
-    conflict: "這個帳號目前已有付費方案或 Pro 贈期，無法再兌換。",
-    unavailable: "暫時無法確認兌換結果，請稍後重試。",
-    elsewhere: "請在 Clawdline Cloud 兌換此代碼。",
-  } : {
-    title: "Redeem a Cloud Pro offer", label: "Official redemption code", action: "Redeem", working: "Checking your code…",
-    success: (date: string) => `Pro is active until ${date}.`,
-    rejected: "This code cannot be redeemed. Check the code and campaign dates.",
-    signedOut: "Sign in, then return here to redeem.", rateLimited: "Too many attempts. Try again later.",
-    conflict: "This account already has a paid plan or Pro grant, so it cannot redeem this code.",
-    unavailable: "The redemption result could not be confirmed. Try again later.",
-    elsewhere: "Redeem this code in Clawdline Cloud.",
+const promoEn = {
+  "title": "Redeem a Cloud Pro offer",
+  "label": "Official redemption code",
+  "action": "Redeem",
+  "working": "Checking your code…",
+  "success": "Pro is active until {arg0}.",
+  "rejected": "This code cannot be redeemed. Check the code and campaign dates.",
+  "signedOut": "Sign in, then return here to redeem.",
+  "rateLimited": "Too many attempts. Try again later.",
+  "conflict": "This account already has a paid plan or Pro grant, so it cannot redeem this code.",
+  "unavailable": "The redemption result could not be confirmed. Try again later.",
+  "elsewhere": "Redeem this code in Clawdline Cloud."
+}
+const promoZh = {
+  "title": "兌換 Cloud Pro 禮遇",
+  "label": "官方兌換碼",
+  "action": "兌換",
+  "working": "正在確認兌換碼…",
+  "success": "Pro 已啟用，有效至 {arg0}。",
+  "rejected": "此兌換碼無法使用；請確認代碼與活動期限。",
+  "signedOut": "請先登入，再回到這裡兌換。",
+  "rateLimited": "嘗試次數過多，請稍後再試。",
+  "conflict": "這個帳號目前已有付費方案或 Pro 贈期，無法再兌換。",
+  "unavailable": "暫時無法確認兌換結果，請稍後重試。",
+  "elsewhere": "請在 Clawdline Cloud 兌換此代碼。"
+}
+export const promoSourceWords = { en: promoEn, "zh-Hant": promoZh }
+
+export function promoWords() {
+  return {
+    title: catalogWord("promo", "title"),
+    label: catalogWord("promo", "label"),
+    action: catalogWord("promo", "action"),
+    working: catalogWord("promo", "working"),
+    success:  (date: string) => catalogFormat("promo", "success", [date]),
+    rejected: catalogWord("promo", "rejected"),
+    signedOut: catalogWord("promo", "signedOut"),
+    rateLimited: catalogWord("promo", "rateLimited"),
+    conflict: catalogWord("promo", "conflict"),
+    unavailable: catalogWord("promo", "unavailable"),
+    elsewhere: catalogWord("promo", "elsewhere"),
   }
 }
 
@@ -93,7 +119,7 @@ export function bindPromoForm(doc: Document, apiOrigin: string | null, onGranted
   const button = doc.getElementById("plan-promo-submit") as HTMLButtonElement | null
   const link = doc.getElementById("plan-promo-cloud") as HTMLAnchorElement | null
   if (!form || !input || !message || !button || !link) return () => {}
-  const words = promoWords(doc.documentElement.lang)
+  const words = promoWords()
   const title = doc.getElementById("plan-promo-title")
   const label = doc.getElementById("plan-promo-label")
   if (title) title.textContent = words.title

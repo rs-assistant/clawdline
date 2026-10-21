@@ -1,3 +1,4 @@
+import { loadingSkeletonHTML } from "../loading-skeleton.js"
 import { useEffect, useLayoutEffect, useRef } from "react"
 import * as L from "../legacy/bridge.js"
 import { nextWord, type NextWord } from "../next-strings.js"
@@ -10,6 +11,7 @@ import { historyRecordFor, shouldOpenHistory } from "../schedule-history-open.js
 import { CHECK_ICON, COPY_ICON, maskedWebhookURL } from "../schedule-webhook-url.js"
 import { runScheduleWithForce } from "../schedule-force-run.js"
 import { laneOnScreen, laneOwesRead } from "./schedules-lane.js"
+import { ScheduleRecovery, retainScheduleRows } from "./schedules-recovery.js"
 import "../schedule-errors.css"
 import {
   createPlacesCache,
@@ -175,12 +177,13 @@ function validRow(schedule: ScheduleListRow, at?: number): string {
   const next = schedule.next_fire ? relativeTime(schedule.next_fire, at) : ""
   const nextTitle = schedule.next_fire ? new Date(schedule.next_fire * 1000).toLocaleString() : ""
   const enabled = schedule.enabled ? T().webScheduleEnabled : T().webScheduleDisabled
-  const nextLine = scheduleNextLine(schedule, next, {
+  let nextLine = scheduleNextLine(schedule, next, {
     next: T().webScheduleNext,
     disabled: T().webScheduleDisabled,
     noNext: T().webScheduleNoNext,
     triggerOnly: nextWord("scheduleTriggerOnlyNext"),
   })
+  if (schedule.when?.every_days) nextLine = nextWord("scheduleIntervalSummary", { days: schedule.when.every_days, at: schedule.when.at || "" }) + " · " + nextLine
   const missed = schedule.last_missed_at
     ? '<time class="schedule-missed" title="' +
       esc(new Date(schedule.last_missed_at * 1000).toLocaleString()) +
@@ -283,7 +286,9 @@ function renderSchedules(
             esc(group.unanswered === "loading" ? machineWords(group.machine) + " · " + nextWord("schedulesLoading") :
               group.unanswered ? silentMachine(group.machine, group.unanswered) : machineWords(group.machine)) +
             "</li>" +
-            group.rows.map(row).join(""),
+            (group.unanswered === "loading" && group.rows.length === 0
+              ? '<li role="presentation">' + loadingSkeletonHTML(nextWord("schedulesLoading"), "SK-11") + '</li>'
+              : group.rows.map(row).join("")),
         )
         .join("")
     : list.map(row).join("")
@@ -330,12 +335,16 @@ const Schedules = (() => {
   let lastAnswerMachines = ""
   let readState: "loading" | "ready" | "failed" = "loading"
   let answerVersion = 0
-  const readyMachines = new Set<string>()
-  const retriedMissing = new Set<string>()
+  const recovery = new ScheduleRecovery()
   const machineKey = () => scheduleFleet()?.machines.map((machine) => machine.id).join(" ") ?? ""
   const paintReadState = () => {
     const state = document.getElementById("schedules-state")
     if (!state) return
+    if (readState === "loading" && !lastAnswer) {
+      state.innerHTML = loadingSkeletonHTML(nextWord("schedulesLoading"), "SK-11")
+      state.hidden = false
+      return
+    }
     state.textContent = readState === "loading" ? nextWord("schedulesLoading") :
       readState === "failed" ? nextWord(lastAnswer ? "schedulesRefreshFailed" : "schedulesReadFailed") :
         lastAnswer?.schedules.length === 0 && lastAnswer.unanswered.length === 0 ? nextWord("schedulesEmpty") : ""
@@ -403,6 +412,7 @@ const Schedules = (() => {
    */
   function look(): void {
     if (!laneOwesRead({ pageHidden: pageHidden(), lastRefreshAt, now: Date.now(), everyMs: LANE_MS, onScreen: sectionOnScreen })) return
+    recovery.begin()
     refresh()
   }
 
@@ -411,6 +421,7 @@ const Schedules = (() => {
     const fleet = scheduleFleet()
     if (choosesMachine(fleet)) { refreshFleet(fleet); return }
     inFlight = true
+    answerVersion++
     lastRefreshAt = Date.now()
     const requestedMachines = machineKey()
     if (!lastAnswer) { readState = "loading"; paintReadState() }
@@ -428,6 +439,7 @@ const Schedules = (() => {
         // inventory unknown: the same as a refusal, below. With several, it is
         // one named group and the rest still draw.
         if (unanswered.length && !choosesMachine(scheduleFleet())) throw new Error("schedule inventory unanswered")
+        recovery.answered(scheduleFleet()?.current || "")
         rememberScheduleOwners(schedules)
         lastAnswer = { schedules: schedules.map((schedule) => {
             const project = schedule && schedule.id ? projectBySchedule[schedule.id] : undefined
@@ -453,6 +465,7 @@ const Schedules = (() => {
         }).catch(() => { /* Optional project labels do not invalidate the schedule inventory. */ })
       })
       .catch(() => {
+        recovery.missed(scheduleFleet()?.current || "")
         // **Nothing is drawn from here, and that is the point.** A refusal —
         // the relay seam's `cloud_read_unavailable` and
         // `cloud_schedules_unpublished`, a machine that did not answer the
@@ -476,15 +489,17 @@ const Schedules = (() => {
   /** Each machine paints when it answers; a slow peer does not hold the other groups. */
   function refreshFleet(fleet: NonNullable<ReturnType<typeof scheduleFleet>>): void {
     inFlight = true
+    answerVersion++
     lastRefreshAt = Date.now()
     const requestedMachines = machineKey()
+    const previous = lastAnswer?.schedules ?? []
     const pending = new Set(fleet.machines.map((machine) => machine.id))
     const answers = new Map<string, ScheduleListRow[]>()
     const failures = new Map<string, NonNullable<ScheduleList["unanswered"]>[number]>()
     let at = 0
     const paint = () => {
       if (requestedMachines !== machineKey()) return
-      const schedules = [...answers.values()].flat()
+      const schedules = retainScheduleRows(previous, answers)
       const unanswered = [
         ...fleet.machines.filter((machine) => pending.has(machine.id)).map((machine) =>
           ({ machine: machine.id, code: "loading" })),
@@ -497,7 +512,7 @@ const Schedules = (() => {
           return project ? { ...schedule, project } : schedule
         }), at, unanswered }
         lastAnswerMachines = requestedMachines
-        readState = pending.size ? "loading" : "ready"
+        readState = pending.size ? "loading" : failures.size ? "failed" : "ready"
         renderSchedules(lastAnswer.schedules, at, unanswered)
       } else if (!lastAnswer) {
         readState = pending.size ? "loading" : "failed"
@@ -513,13 +528,17 @@ const Schedules = (() => {
       try {
         const data = await scheduleApi.schedules(machine.id)
         if (requestedMachines !== machineKey()) return
+        const missing = data.unanswered?.find((row) => row.machine === machine.id)
+        if (missing) throw { code: missing.code || "cloud_read_unavailable" }
         answers.set(machine.id, (data.schedules ?? []).filter((row) => row.machine === machine.id))
+        recovery.answered(machine.id)
         at = Math.max(at, data.at ?? 0)
         // An answer is proof the machine is reachable now; without this, a Mac
         // that was offline when the page opened and came back would still be
         // called offline the next time a read times out.
         noteScheduleMachineAnswered(machine.id)
       } catch (error) {
+        recovery.missed(machine.id)
         failures.set(machine.id, { machine: machine.id,
           code: typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
             ? error.code : "cloud_read_unavailable" })
@@ -547,11 +566,8 @@ const Schedules = (() => {
   }
 
   function retryReadyMissing(): void {
-    if (inFlight || !lastAnswer || !arrivedFlag) return
-    const missing = lastAnswer.unanswered.flatMap(({ machine }) =>
-      machine && readyMachines.has(machine) && !retriedMissing.has(machine) ? [machine] : [])
-    if (!missing.length) return
-    for (const machine of missing) retriedMissing.add(machine)
+    if (inFlight || !arrivedFlag || pageHidden() || !sectionOnScreen()) return
+    if (!recovery.takeRetry()) return
     refresh()
   }
 
@@ -574,6 +590,7 @@ const Schedules = (() => {
         return
       }
       if (lane === null) lane = setInterval(look, LANE_MS)
+      if (readState === "failed") lastRefreshAt = null
       look()
     })
     // The phone's one screen at a time is in the address and in the history
@@ -587,7 +604,7 @@ const Schedules = (() => {
 
   return {
     machineReady(machine: string): void {
-      readyMachines.add(machine)
+      recovery.machineReady(machine)
       retryReadyMissing()
     },
     /** Read again now: a read already in the air cannot contain the row just made, so it lands first. */
@@ -622,7 +639,7 @@ const Schedules = (() => {
         const next = machineKey()
         if (next === machines) return
         machines = next
-        retriedMissing.clear()
+        recovery.reset()
         answerVersion++
         lastAnswer = null
         readState = "loading"
@@ -691,6 +708,7 @@ const Schedule = (() => {
   let chosenPermission = ""
   // What the schedule being edited has, so a save to "not set" sends "" to take it off.
   let storedPermission = ""
+  let intervalOn = false
   let days: string | string[] = "daily"
   let daysGuessed = false
   // No time: the clock never fires it; Run now and its webhook do.
@@ -737,6 +755,8 @@ const Schedule = (() => {
     const b = busy()
     el("schedule-sheet").setAttribute("aria-busy", b ? "true" : "false")
     ;[
+      "schedule-every-days",
+      "schedule-start",
       "schedule-title",
       "schedule-at",
       "schedule-instructions",
@@ -906,18 +926,27 @@ const Schedule = (() => {
     }
     const daily = document.createElement("button")
     daily.type = "button"
-    const dailyOn = days === "daily" && !daysGuessed
+    const dailyOn = !intervalOn && days === "daily" && !daysGuessed
     daily.className = "chip" + (dailyOn ? " on" : "")
     daily.textContent = T().webScheduleDaily
     daily.setAttribute("aria-pressed", dailyOn ? "true" : "false")
     daily.onclick = () => {
+      intervalOn = false
       days = "daily"
       daysGuessed = false
       drawDays()
     }
     row.appendChild(daily)
+    const interval = document.createElement("button")
+    interval.type = "button"
+    interval.className = "chip" + (intervalOn ? " on" : "")
+    interval.textContent = nextWord("scheduleInterval")
+    interval.setAttribute("aria-pressed", String(intervalOn))
+    interval.onclick = () => { intervalOn = true; daysGuessed = false; drawDays() }
+    row.appendChild(interval)
+    el("schedule-interval-fields").hidden = !intervalOn || triggerOnly
     DAY_CODES.forEach((code, i) => {
-      const on = Array.isArray(days) && days.indexOf(code) >= 0
+      const on = !intervalOn && Array.isArray(days) && days.indexOf(code) >= 0
       const chip = document.createElement("button")
       chip.type = "button"
       chip.className = "chip" + (on ? " on" : "")
@@ -930,6 +959,7 @@ const Schedule = (() => {
   }
 
   function toggleDay(code: string): void {
+    intervalOn = false
     const picked = Array.isArray(days) ? days.slice() : []
     const at = picked.indexOf(code)
     if (at >= 0) picked.splice(at, 1)
@@ -953,6 +983,7 @@ const Schedule = (() => {
     row.appendChild(chip)
     el("schedule-at-block").hidden = triggerOnly
     el("schedule-days-block").hidden = triggerOnly
+    el("schedule-interval-fields").hidden = triggerOnly || !intervalOn
     paint()
   }
 
@@ -1158,6 +1189,10 @@ const Schedule = (() => {
     chosenEffort = ""
     chosenPermission = ""
     storedPermission = ""
+    intervalOn = false
+    el<HTMLInputElement>("schedule-every-days").value = "3"
+    const today = new Date()
+    el<HTMLInputElement>("schedule-start").value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`
     days = "daily"
     daysGuessed = false
     triggerOnly = false
@@ -1270,6 +1305,11 @@ const Schedule = (() => {
     const task = record.task || {}
     el<HTMLInputElement>("schedule-title").value = record.title || ""
     el<HTMLInputElement>("schedule-at").value = when.at || ""
+    intervalOn = !!when.every_days
+    if (intervalOn) {
+      el<HTMLInputElement>("schedule-every-days").value = String(when.every_days)
+      el<HTMLInputElement>("schedule-start").value = when.start || ""
+    }
     const whenDays = when.days
     const heard = Array.isArray(whenDays) ? DAY_CODES.filter((c) => whenDays.indexOf(c) >= 0) : null
     days = heard && heard.length ? heard : "daily"
@@ -1405,6 +1445,14 @@ const Schedule = (() => {
       if (needsTime) el("schedule-at").focus({ preventScroll: true })
       return
     }
+    const interval = intervalOn && !triggerOnly && !editingOn ? {
+      every_days: Number(el<HTMLInputElement>("schedule-every-days").value),
+      start: el<HTMLInputElement>("schedule-start").value,
+    } : undefined
+    if (interval && (!Number.isSafeInteger(interval.every_days) || interval.every_days < 1 || !el<HTMLInputElement>("schedule-start").validity.valid || !interval.start)) {
+      said(nextWord("scheduleIntervalInvalid"))
+      return
+    }
     const editing = !!editingId
 
     let catchUp = parseInt(el<HTMLInputElement>("schedule-catch").value, 10)
@@ -1416,7 +1464,7 @@ const Schedule = (() => {
       title: el<HTMLInputElement>("schedule-title").value.trim(),
       time_zone: scheduleTimeZone(editRecord?.time_zone, Intl.DateTimeFormat().resolvedOptions().timeZone),
       // A time and its days, or `trigger_only` with neither.
-      ...scheduleWhenFields(triggerOnly, el<HTMLInputElement>("schedule-at").value, days, editingOn),
+      ...scheduleWhenFields(triggerOnly, el<HTMLInputElement>("schedule-at").value, days, editingOn, interval),
       place_id: chosenPlace,
       assistant: chosenAssistant,
       model: chosenModel,
@@ -2120,7 +2168,9 @@ const ScheduleHistory = (() => {
         : ""
     el("schedule-history-meta").textContent = [path, next].filter(Boolean).join(" · ")
     el("schedule-history-runs-label").textContent = nextWord("scheduleRunsHeading")
-    el("schedule-run-rows").innerHTML = scheduleRunsHTML(runs, Date.now() / 1000, terminalIsOpen)
+    el("schedule-run-rows").innerHTML = loading && !record
+      ? '<li role="presentation">' + loadingSkeletonHTML(T().webLoading, "SK-12") + "</li>"
+      : scheduleRunsHTML(runs, Date.now() / 1000, terminalIsOpen)
     el("schedule-history-empty").textContent = nextWord("scheduleRunsEmpty")
     el("schedule-history-empty").hidden = loading || started || runs.length > 0 || !!el("schedule-history-said").textContent
     el("schedule-history-capped").textContent = T().webResumeCapped
@@ -2422,6 +2472,9 @@ function paintStatic(): void {
   attr(node("schedule-title"), "aria-label", t.webScheduleTitle)
   text(node("schedule-at-label"), t.webScheduleAt)
   attr(node("schedule-at"), "aria-label", t.webScheduleAt)
+  text(node("schedule-every-days-label"), nextWord("scheduleEveryDays"))
+  text(node("schedule-start-label"), nextWord("scheduleStart"))
+  text(node("schedule-interval-help"), nextWord("scheduleIntervalHelp"))
   text(node("schedule-days-label"), t.webScheduleOn)
   attr(node("schedule-days"), "aria-label", t.webScheduleOn)
   text(node("schedule-where-label"), t.webScheduleWhere)
@@ -2646,7 +2699,7 @@ export function ScheduleSection({ arrived, waitForFleet = false, onOpen, canOpen
           </svg>
         </button>
       </summary>
-      <p id="schedules-state" role="status">{nextWord("schedulesLoading")}</p>
+      <div id="schedules-state" role="status" />
       <ul className="schedule-rows" id="schedule-rows" aria-label={nextWord("schedulesListLabel")}></ul>
     </details>
   )

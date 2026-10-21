@@ -10,8 +10,9 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/forget.test.ts.
-import { COPIED_TIER_FALLBACK, DeviceLimitRun, knownTier, readFailure, type DeviceLimitState } from "./device-limit.ts"
+import { COPIED_TIER_FALLBACK, DeviceLimitRun, RECENT_USE_MS, byIdle, knownTier, readFailure, type DeviceLimitState } from "./device-limit.ts"
 import { CloudViewerSession } from "../legacy/js/net/cloud-boot.js"
+import { cloudViewerDeviceMetadata } from "../legacy/js/net/cloud-onboarding.js"
 
 const API = "https://api.example.test"
 const CONFIG = { appOrigin: "https://app.example.test", apiOrigin: API, relayURL: "wss://relay.example.test", build: "test", strings: {} }
@@ -139,10 +140,14 @@ test("a full account lists its devices, and removing one asks for the session ag
   const listed = run.current
   assert.equal(listed.phase, "listed")
   assert.ok(listed.phase === "listed")
-  assert.deepEqual(listed.devices.map((d: { id: string }) => d.id), ["dev_old", "dev_phone"], "the card lists every active device")
+  assert.deepEqual(
+    listed.devices.map((d: { id: string }) => d.id),
+    ["dev_phone", "dev_old"],
+    "the card lists every active device, the one never used since it was added first",
+  )
   assert.equal(listed.tier, "pro")
   assert.equal(listed.limit, 2)
-  assert.equal(listed.devices[1]!.last_seen_at, null, "a device never seen since it was added says so, not a made-up time")
+  assert.equal(listed.devices[0]!.last_seen_at, null, "a device never seen since it was added says so, not a made-up time")
 
   await run.revoke("dev_old")
   assert.equal(control.asked.filter((a) => a.method === "DELETE").length, 0, "nothing is removed before the in-card question is answered")
@@ -226,4 +231,71 @@ test("a fetch that never reached the control plane says so", () => {
     code: "network_unreachable",
     expired: false,
   })
+})
+
+test("devices are ordered by how long they have gone unused", () => {
+  const row = (id: string, last_seen_at: string | null) => ({ id, kind: "browser", name: id, created_at: null, last_seen_at })
+  const ordered = byIdle([
+    row("today", "2026-10-19T08:00:00.000Z"),
+    row("month", "2026-09-19T08:49:00.000Z"),
+    row("never", null),
+    row("unreadable", "not a time"),
+    row("week", "2026-10-13T13:00:00.000Z"),
+    row("also-today", "2026-10-19T08:00:00.000Z"),
+  ])
+  assert.deepEqual(
+    ordered.map((d) => d.id),
+    ["never", "unreadable", "month", "week", "today", "also-today"],
+    "a device with no readable last use leads, then the oldest use; ties keep the list's order",
+  )
+})
+
+test("Remove takes a device idle for a day at once, and asks first about one used since", async () => {
+  const now = Date.parse("2026-10-19T09:00:00.000Z")
+  const recent = new Date(now - RECENT_USE_MS + 60_000).toISOString()
+  const stale = new Date(now - RECENT_USE_MS - 60_000).toISOString()
+  const devices = [
+    { id: "dev_stale", kind: "browser", name: "Safari · macOS", created_at: null, last_seen_at: stale },
+    { id: "dev_recent", kind: "ios", name: "iPhone", created_at: null, last_seen_at: recent },
+  ]
+  const removed: string[] = []
+  const viewer = {
+    recoveryDevices: () => Promise.resolve({ tier: "pro", limit: 2, active: 2, devices }),
+    revokeRecoveryDevice: (id: string) => (removed.push(id), Promise.resolve({})),
+  }
+  let continued = 0
+  const run = new DeviceLimitRun(viewer, { onState: () => {}, continueSignIn: () => continued++ })
+  await run.load()
+
+  await run.remove("dev_recent", now)
+  assert.deepEqual(removed, [], "a device used in the last day is not removed at a press")
+  assert.equal(run.current.phase === "listed" && run.current.asking, "dev_recent")
+  run.ask(null)
+
+  await run.remove("dev_stale", now)
+  assert.deepEqual(removed, ["dev_stale"], "a device idle for longer is removed without the question")
+  assert.equal(run.current.phase, "continuing")
+  assert.equal(continued, 1)
+})
+
+test("a new browser is named by its browser and its system, never by its user agent", () => {
+  const named = (platform: string, userAgent: string) =>
+    cloudViewerDeviceMetadata({ navigator: { platform, userAgent, maxTouchPoints: 0 } })
+  assert.deepEqual(
+    named("MacIntel", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"),
+    { kind: "browser", name: "Safari · macOS" },
+  )
+  assert.deepEqual(
+    named("Win32", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 Edg/130.0"),
+    { kind: "browser", name: "Edge · Windows" },
+  )
+  assert.deepEqual(
+    named("Linux x86_64", "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0"),
+    { kind: "browser", name: "Firefox · Linux" },
+  )
+  assert.deepEqual(
+    named("MacIntel", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"),
+    { kind: "browser", name: "Chrome · macOS" },
+  )
+  assert.deepEqual(named("", ""), { kind: "browser", name: "Web browser" }, "nothing to go on keeps the old name")
 })

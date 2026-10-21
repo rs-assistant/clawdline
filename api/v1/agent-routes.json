@@ -88,6 +88,16 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/cloud/pairing/identity",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/cloud/pairing/identity/decision",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/cloud/pairing/offer",
       "guide": "cloud"
     },
@@ -145,6 +155,11 @@
       "method": "*",
       "pattern": "/v1/devstacks",
       "guide": "project"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/connection-health/",
+      "guide": "connect"
     },
     {
       "method": "*",
@@ -494,32 +509,32 @@
     {
       "method": "*",
       "pattern": "/v1/squad/",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/events",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/events/head",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/session-bindings",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/session-events",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/session-snapshots/",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
@@ -540,11 +555,6 @@
       "method": "*",
       "pattern": "/v1/transcript",
       "guide": "connect"
-    },
-    {
-      "method": "*",
-      "pattern": "/v1/tunnel",
-      "guide": "cloud"
     },
     {
       "method": "*",

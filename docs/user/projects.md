@@ -4,12 +4,12 @@ After this page you can make a directory appear as a project to start sessions i
 worktrees and undelivered work, and give a second machine the same project names, icons and
 untracked skills as the first.
 
-Labels below use Traditional Chinese examples with their English meaning; the console supports other interface languages.
+Labels below follow the English interface; the console also supports other languages.
 
 ## Add a project
 
 A project is an existing directory on a machine. Clawdline finds directories from Claude Code's
-and Codex's own records and from live sessions. If a directory is missing from **專案** (Projects),
+and Codex's own records and from live sessions. If a directory is missing from **Projects**,
 run this on the machine that holds it, from inside that directory:
 
 ```sh
@@ -41,13 +41,11 @@ session start sheet refreshes automatically; `clawdline project add` from its di
 
 ## The Projects page
 
-Open **專案** (Projects). It lists existing, durable directories explicitly added with
+Open **Projects**. It lists existing, durable directories explicitly added with
 `clawdline project add` or found in assistant history and live Sessions. The retired Board catalog
 does not decide whether a Project appears. Press a Project row to open its repository detail.
-Under **版本庫生命週期** (repository lifecycle) each repository shows its **工作樹**
-(worktrees), work that is **做完了，沒有落地** (delivered, not landed) and what is **已落地**
-(landed). Worktrees that belong to no project are listed apart. Press **重新觀測** to look again.
-**查看工作項目** opens the current Board filtered to that Project; Board membership and counts do
+Under **Repository lifecycle** each repository shows its **Worktrees**, work that is **Delivered, not landed** and what is **Landed**. Worktrees that belong to no project are listed apart. Press **Refresh observation** to look again.
+**View work items** opens the current Board filtered to that Project; Board membership and counts do
 not control the Project list.
 
 Each project has a pixel icon, used in the session list and on the Board. Icons are described in
@@ -55,7 +53,7 @@ Each project has a pixel icon, used in the session list and on the Board. Icons 
 
 ## Set up how a project appears
 
-At the top of **專案** (Projects), **專案能力健檢** (Project capability check) shows four separate
+At the top of **Projects**, **Project capability check** shows four separate
 facts for every project: whether its icon was chosen or only generated from the path, whether local
 deploy-progress evidence is connected, whether `.devstack.json` declares development services,
 and whether a git origin can identify the same project on another machine. The deploy row separates
@@ -63,14 +61,14 @@ and whether a git origin can identify the same project on another machine. The d
 being misreported as missing configuration. A non-GitHub remote is marked not applicable and is
 not counted as unfinished GitHub-workflow setup.
 
-The gear beside a project's **工作樹** button opens the same check for that project alone.
+The gear beside a project's **Worktrees** button opens the same check for that project alone.
 
 This check is local and read-only. It runs no repository command, probes no port, reaches no
 network and starts or deploys nothing. An older daemon that does not send the evidence is shown as
 unknown rather than guessed. Loading, empty and unreadable answers each remain visible and offer
-**重新讀取** (read again).
+**Refresh**.
 
-Press **補齊設定**, **檢查設定** or **重新檢視** on a project. Clawdline opens its ordinary
+Press **Complete setup**, **Check setup** or **Review again** on a project. Clawdline opens its ordinary
 new-Session review with that project already chosen and a first message covering the Project name
 and pixel icon, deploy and long-running progress, and the development-server list. You can edit the
 message, assistant and model before pressing Start; no Session is created until that final press.
@@ -100,8 +98,7 @@ for it.
 
 ### Before you start
 
-- Both machines run this version. An older one is listed with **需要更新 Clawdline** (needs a newer
-  Clawdline) and cannot be chosen.
+- Both machines run this version. An older one is listed with **Clawdline needs an update** and cannot be chosen.
 - For the Cloud route: the browser is paired with both machines, and the receiving machine lets it
   act (`./bin/clawdline cloud commands on` there; [remote-access.md](remote-access.md)).
 - Each project has an `origin` remote the other machine can reach. A project with no origin, or a
@@ -109,19 +106,18 @@ for it.
 
 ### Through Clawdline Cloud
 
-1. In the hosted console, open the **receiving** machine and go to **專案** (Projects).
-2. Open **專案設定同步** (project settings sync) and choose the source under **主要機器** (main
-   machine).
-3. Press **讀取它的專案** (read its projects), untick anything you do not want, and, if the receiving
+1. In the hosted console, open the **receiving** machine and go to **Projects**.
+2. Open **Project settings sync** and choose the source under **Primary machine**.
+3. Press **Read its Projects**, untick anything you do not want, and, if the receiving
    machine lacks some repositories, tick the line that clones them. It names the directory they go
    into: the one most of that machine's projects already sit in, or `CLAWDLINE_PROJECTS_ROOT` if you
    set it for the daemon.
-4. Press **同步所選的 N 個專案** (sync the selected projects). Each project reports what happened:
+4. Press **Sync the selected N projects**. Each project reports what happened:
    files written, files kept because they were edited on this machine, or a clone in progress.
 
-From then on, change a project's icon or skills on the source; opening **專案** on the receiving
+From then on, change a project's icon or skills on the source; opening **Projects** on the receiving
 machine applies whatever changed. To make a project the receiving machine's own again, press
-**改回本機設定** (use this machine's settings) on its row.
+**Switch back to local settings** on its row.
 
 ### Without Cloud
 
@@ -137,7 +133,7 @@ already mirrors here.
 
 ### Check
 
-On the receiving machine, **專案** shows each project with the source's name and icon, and a
+On the receiving machine, **Projects** shows each project with the source's name and icon, and a
 mirrored skill is in that checkout's `.claude/skills/`. The source owns its icon.
 
 ### What is never copied

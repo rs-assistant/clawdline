@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 // The open session in the address, through a real browser and real URLs:
 //
 //   (cd web && npm run build)
@@ -81,6 +82,9 @@ const ROWS = [
   row(ITERM, "Charlie in iTerm", "iterm", "10000000-0000-4000-8000-000000000003"),
   row(LEGACY, "Delta from an old link", "tmux", "10000000-0000-4000-8000-000000000004"),
 ]
+let modelMenuScenario: { stage: "missing" | "models" | "gap" | "effort"; looks: number; keys: number; failed: boolean; readyAt: number } | null = null
+const picker = (question: string, labels: string[]) => ({ question,
+  options: labels.map((label, i) => ({ n: i + 1, label, can: true, selected: i === 0 })) })
 let currentClaudeModel = "claude-opus-5-5"
 
 // ---- the stand-in daemon
@@ -126,6 +130,7 @@ let namingAssistant = "claude"
 let smartTitleNamedBy = ""
 let interruptRequests: { id: string; key: string }[] = []
 let requestedPaths: string[] = []
+let untrustedContent = ""
 let refusedCatalog: string | null = null
 let failPlacesOnRequest = 0
 // The machine's persona catalog, as many roles as the daemon compiles in and
@@ -173,7 +178,12 @@ function snapshot() {
       generation,
       provenance: "fixture",
     },
-    sessions: ROWS,
+    sessions: ROWS.map((row) => !modelMenuScenario || row.id !== TMUX ? row : {
+      ...row, assistant: "codex", isClaude: false,
+      state: modelMenuScenario.stage === "gap" ? "idle" : "waiting",
+      menu: modelMenuScenario.stage === "models" ? picker("Select Model and Effort", ["Model Alpha", "Model Beta"]) :
+        modelMenuScenario.stage === "effort" ? picker("Select Reasoning Level for Model Alpha", ["Low", "High"]) : null,
+    }),
   }
 }
 
@@ -214,11 +224,28 @@ function document(): string {
   return html.replace("<!-- clawdline:strings -->", slot).replace("<!-- clawdline:cloud -->", "")
 }
 
+const usageFixtureID = (path: string) => createHash("sha256").update(path).digest("hex")
+const usagePickerOptions = [
+  { id: usageFixtureID("/tmp/fixture"), name: "fixture" },
+  { id: usageFixtureID("/tmp/other/fixture"), name: "fixture" },
+  ...Array.from({ length: 16 }, (_, i) => ({ id: usageFixtureID("/tmp/history-" + i), name: "Historical project with a very long name " + i })),
+  { id: "unattributed", name: "unattributed" },
+]
+let usagePickerQueries: URLSearchParams[] = []
+
 function daemon(): Server {
   return createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://fixture")
     const path = url.pathname
     requestedPaths.push(`${req.method} ${path}`)
+    if (path === "/v1/usage/overview") {
+      usagePickerQueries.push(url.searchParams)
+      const totals = { tokens: 1200, dispatches: 2, duration_samples: 1, duration_median_seconds: 60,
+        parts: { input: 400, output: 400, cache_read: 200, cache_write: 200 } }
+      return json(res, 200, { days: Number(url.searchParams.get("days") || 7), project: url.searchParams.get("project") || "", timezone: "UTC",
+        daily: [{ date: "2026-10-12", ...totals, coverage: "complete" }], previous_daily: [], totals, previous_totals: totals,
+        coverage: { state: "complete", sessions_read: 1, sessions_total: 1 }, projects: [], project_options: usagePickerOptions })
+    }
     if (path === "/v1/strings") {
       const tag = url.searchParams.get("lang") || "en"
       if (tag === refusedCatalog) return json(res, 200, { lang: tag, dir: "ltr", broken: "not a catalog" })
@@ -227,6 +254,18 @@ function daemon(): Server {
       return json(res, 200, JSON.parse(readFileSync(file, "utf8")))
     }
     if (path === "/v1/sessions") {
+      if (modelMenuScenario && url.searchParams.get("look") === TMUX) {
+        modelMenuScenario.looks++
+        if (modelMenuScenario.stage === "missing" && modelMenuScenario.looks >= 2) modelMenuScenario.stage = "models"
+        if (modelMenuScenario.stage === "gap") {
+          if (!modelMenuScenario.failed) {
+            modelMenuScenario.failed = true
+            return json(res, 503, { error: { code: "screen_read_unavailable", message: "Try reading again." } })
+          }
+          if (Date.now() < modelMenuScenario.readyAt) return json(res, 200, snapshot())
+          modelMenuScenario.stage = "effort"
+        }
+      }
       if (heldSessions) return void heldSessions.push(() => json(res, 200, snapshot()))
       return json(res, 200, snapshot())
     }
@@ -245,6 +284,12 @@ function daemon(): Server {
         return json(res, 200, machineSettings)
       }, () => json(res, 400, { error: "bad_request", detail: "That is not JSON." }))
       return
+    }
+    if (modelMenuScenario && path === "/v1/sessions/" + encodeURIComponent(TMUX) + "/key" && req.method === "POST") {
+      modelMenuScenario.keys++
+      modelMenuScenario.stage = "gap"
+      modelMenuScenario.readyAt = Date.now() + 12_000
+      return json(res, 200, { ok: true, id: TMUX, action: "keyed" })
     }
     const info = /^\/v1\/sessions\/([^/]+)\/info$/.exec(path)
     if (info && req.method === "GET") {
@@ -482,7 +527,15 @@ function daemon(): Server {
       return // held open, as the daemon's stream is
     }
     if (path === "/v1/transcript") {
-      return json(res, 200, { entries: [], evidence: "process", id: url.searchParams.get("session"), signature: "fixture" })
+      return json(res, 200, { entries: untrustedContent ? [{ role: "assistant", text: untrustedContent, at: 1 }] : [], evidence: "process", id: url.searchParams.get("session"), signature: "fixture" })
+    }
+    if (path === "/v1/sessions/" + encodeURIComponent(TMUX) + "/documents/project/report.html") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" })
+      return res.end("<!doctype html><html><body><h1>HTML navigation marker</h1></body></html>")
+    }
+    if (path === "/v1/sessions/" + encodeURIComponent(TMUX) + "/documents/project/security.md") {
+      res.writeHead(200, { "content-type": "text/markdown; charset=utf-8" })
+      return res.end(untrustedContent)
     }
     if (path.startsWith("/v1/")) return json(res, 404, { error: { code: "not_found", message: path } })
     if (path === "/") {
@@ -643,7 +696,7 @@ class Tab {
   async press(key: string, code = key): Promise<void> {
     const virtual = key === "Tab" ? 9 : key === "Enter" ? 13 : 0
     const event = { key, code, windowsVirtualKeyCode: virtual, nativeVirtualKeyCode: virtual }
-    await this.b.send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...event }, this.session)
+    await this.b.send("Input.dispatchKeyEvent", { type: key === "Enter" ? "keyDown" : "rawKeyDown", text: key === "Enter" ? "\r" : undefined, ...event }, this.session)
     await this.b.send("Input.dispatchKeyEvent", { type: "keyUp", ...event }, this.session)
   }
 
@@ -730,6 +783,72 @@ let origin: string
 const DESK = { width: 1280, height: 800, mobile: false }
 const PHONE = { width: 390, height: 844, mobile: true }
 
+test("localization batch renders Sessions and Settings without page overflow", async () => {
+  const supported = ["en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"]
+  const requested = process.env.CLAWDLINE_LOCALES?.split(",") ?? supported
+  for (const tag of requested) {
+    assert.ok(supported.includes(tag), `unsupported evidence locale ${tag}`)
+    for (const [sizeName, size] of [["desktop", DESK], ["phone", PHONE]] as const) {
+      await inTab(size, async (tab) => {
+        await tab.go("/")
+        await tab.run(`localStorage.setItem("ui_language", ${JSON.stringify(tag)})`)
+        await tab.reload()
+        await tab.until(`${tag} Sessions arrive`, (seen) => seen.rows === ROWS.length)
+        const locale = await tab.run(`({ lang: document.documentElement.lang,
+          missing: document.documentElement.getAttribute("data-i18n-missing"),
+          booting: document.documentElement.classList.contains("booting") })`)
+        // Progress captures may precede a new source family's catch-up. The
+        // default acceptance run still requires every current key.
+        const reference = JSON.parse(readFileSync(join(dist, "catalogs", "en.json"), "utf8"))
+        const selected = JSON.parse(readFileSync(join(dist, "catalogs", `${tag}.json`), "utf8"))
+        const expectedMissing = process.env.CLAWDLINE_ALLOW_PARTIAL === "1"
+          ? Object.keys(reference).filter((key) => !Object.hasOwn(selected, key)).length : 0
+        assert.deepEqual(locale, { lang: tag, missing: String(expectedMissing), booting: false })
+        assert.ok((await tab.run(`document.getElementById("counts")?.textContent ?? ""`)).includes(selected["literal.1b40e6344265"]), `${tag} Session summary uses the selected catalog`)
+        const assertPageFits = async (page: string) => {
+          const bounds = await tab.run(`({ width: innerWidth,
+            page: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) })`)
+          assert.ok(bounds.page <= bounds.width + 1, `${tag} ${sizeName} ${page} overflows: ${JSON.stringify(bounds)}`)
+        }
+        await assertPageFits("Sessions")
+        if (shots) {
+          mkdirSync(shots, { recursive: true })
+          await tab.shot(`${tag}-${sizeName}-sessions`)
+        }
+        await tab.run(`location.hash = "page=settings"`)
+        await tab.run(`new Promise((resolve, reject) => {
+          const deadline = Date.now() + 5000
+          const wait = () => document.getElementById("settings-ui-language-select")?.offsetWidth
+            ? resolve(true) : Date.now() < deadline ? setTimeout(wait, 50) : reject(new Error("Settings did not open"))
+          wait()
+        })`)
+        const expected = JSON.parse(readFileSync(join(dist, "catalogs", `${tag}.json`), "utf8"))["ui.language"]
+        assert.equal(await tab.run(`document.getElementById("settings-ui-language-select")?.getAttribute("aria-label")`), expected)
+        await assertPageFits("Settings")
+        if (shots) await tab.shot(`${tag}-${sizeName}-settings`)
+      })
+    }
+  }
+})
+
+test("redemption copy waits for the selected catalog on a cold Plan page", async () => {
+  for (const tag of ["en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"]) {
+    await inTab(PHONE, async (tab) => {
+      await tab.go("/")
+      await tab.run(`localStorage.setItem("ui_language", ${JSON.stringify(tag)}); location.hash = "page=plan"`)
+      await tab.reload()
+      const selected = JSON.parse(readFileSync(join(dist, "catalogs", `${tag}.json`), "utf8"))
+      const deadline = Date.now() + 5000
+      while (await tab.run(`document.getElementById("plan-promo-title")?.textContent`) !== selected["promo.title"]) {
+        if (Date.now() > deadline) assert.fail(`${tag} cold Plan redemption did not use its catalog`)
+        await new Promise(resolve => setTimeout(resolve, 30))
+      }
+      assert.equal(await tab.run(`document.getElementById("plan-promo-label")?.textContent`), selected["promo.label"])
+      assert.equal(await tab.run(`document.getElementById("plan-promo-message")?.textContent`), selected["promo.elsewhere"])
+    })
+  }
+})
+
 before(async () => {
   assert.ok(existsSync(join(dist, "index.html")), "no built console at " + dist + "; run `npm run build` in web first")
   assert.ok(existsSync(chrome), "no Chrome at " + chrome + "; set CHROME")
@@ -764,7 +883,7 @@ before(async () => {
 after(async () => {
   browser?.close()
   // Its profile is removed below, and Chrome writes to it until it has gone.
-  if (browserProcess && browserProcess.exitCode === null) {
+  if (browserProcess && browserProcess.exitCode === null && browserProcess.signalCode === null) {
     const gone = new Promise((ok) => browserProcess.once("exit", ok))
     browserProcess.kill()
     await gone
@@ -773,6 +892,102 @@ after(async () => {
   server?.closeAllConnections()
   await new Promise<void>((ok) => (server ? server.close(() => ok()) : ok()))
   if (profile) rmSync(profile, { recursive: true, force: true, maxRetries: 5 })
+})
+
+test("a phone follows a document fragment without closing its Session first", async () => {
+  untrustedContent = "Document navigation marker"
+  try {
+    for (const filename of ["security.md", "report.html"]) await inTab(PHONE, async (tab) => {
+      await tab.go("/" + FRAGMENT[TMUX])
+      await tab.until("the Session is open", (s) => s.open === TMUX && s.view === "detail")
+      const hash = "#document=1&machine=this-mac&session=" + escapedPane(801) + "&scope=project&path=" + filename
+      await tab.run(`(() => {
+        const link = document.createElement("a")
+        link.href = ${JSON.stringify(hash)}
+        link.textContent = "Read report"
+        document.body.append(link)
+        link.click()
+      })()`)
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const read = () => {
+          const body = document.querySelector('#documents-page:not([hidden]) #document-body')
+          const loaded = ${JSON.stringify(filename)}.endsWith(".html")
+            ? body?.querySelector("iframe")?.srcdoc?.includes("HTML navigation marker")
+            : body?.textContent?.includes("Document navigation marker")
+          if (location.hash === ${JSON.stringify(hash)} && loaded) return resolve(true)
+          if (Date.now() > deadline) return reject(new Error("document navigation was lost: " + location.hash))
+          setTimeout(read, 25)
+        }
+        read()
+      })`)
+      await tab.run("history.back()")
+      await tab.until("Back returns to the open Session", (s) => s.hash === FRAGMENT[TMUX] && s.open === TMUX && s.view === "detail")
+    })
+  } finally { untrustedContent = "" }
+})
+
+test("untrusted transcript and document Markdown stays inert in the browser", async () => {
+  untrustedContent = [
+    "Security boundary marker",
+    '<img src=x onerror="globalThis.securityExecuted=true">',
+    '<svg onload="globalThis.securityExecuted=true"></svg>',
+    "[script](javascript:globalThis.securityExecuted=true)",
+    "[encoded](jav&#x61;script:alert(1))",
+    "[document](data:text/html,hello)",
+    '[safe](https://example.invalid/?a=1&b="quoted")',
+    "[mail](mailto:fixture@example.invalid)",
+    "**https://example.invalid/bold**",
+    '`<t0><0><img onerror="globalThis.securityExecuted=true">`',
+    "```html\n<script>globalThis.securityExecuted=true</script>\n```",
+    "| Name | Value |\n| --- | --- |\n| <img src=x onerror=alert(1)> | **safe** |",
+  ].join("\n\n")
+  try {
+    // A fresh tab per address: the two differ only in their fragment, and a
+    // fragment-only navigation fires no load event.
+    for (const [address, selector] of [
+      ["/" + FRAGMENT[TMUX], "#tx"],
+      ["/#document=1&machine=this-mac&session=" + escapedPane(801) + "&scope=project&path=security.md", "#document-body"],
+    ]) {
+      await inTab(DESK, async (tab) => {
+        await tab.go(address)
+        await tab.run(`new Promise((resolve, reject) => {
+          const deadline = Date.now() + 5000
+          const read = () => {
+            const body = document.querySelector(${JSON.stringify(selector)})
+            if (body?.textContent?.includes("Security boundary marker")) return resolve(true)
+            if (Date.now() > deadline) return reject(new Error("security fixture did not render: " + document.body.textContent))
+            setTimeout(read, 25)
+          }
+          read()
+        })`)
+        const seen = await tab.run(`(() => {
+          const body = document.querySelector(${JSON.stringify(selector)})
+          return {
+            executed: globalThis.securityExecuted === true,
+            active: body.querySelectorAll("script, img, iframe, object, embed, [onerror], [onload]").length,
+            links: [...body.querySelectorAll("a[href]")].map(a => ({ href: a.href, target: a.target, rel: a.rel })),
+            text: body.textContent,
+            copied: body.querySelector("[data-code-copy]")?.getAttribute("data-code-copy"),
+          }
+        })()`)
+        assert.equal(seen.executed, false, selector)
+        assert.equal(seen.active, 0, selector)
+        assert.match(seen.text, /<img src=x onerror=/)
+        assert.equal(seen.copied, "<script>globalThis.securityExecuted=true</script>")
+        assert.ok(seen.links.some((link: { href: string }) => link.href === "https://example.invalid/bold"))
+        assert.ok(seen.links.some((link: { href: string }) => link.href === "mailto:fixture@example.invalid"))
+        for (const link of seen.links) {
+          assert.match(link.href, /^(https?:\/\/|mailto:)/i)
+          assert.equal(link.target, "_blank")
+          assert.match(link.rel, /noopener/)
+          assert.match(link.rel, /noreferrer/)
+        }
+      })
+    }
+  } finally {
+    untrustedContent = ""
+  }
 })
 
 test("desk: opening a session writes it into the address, and a reload comes back to it", () =>
@@ -797,7 +1012,7 @@ test("browser language selector survives reload and a broken catalog falls back 
     const assertVisibleLocale = async (tag: string) => {
       const expected = JSON.parse(readFileSync(join(dist, "catalogs", `${tag}.json`), "utf8"))["ui.language"]
       const seen = await tab.run(`(() => {
-        const label = document.querySelector('label[for="settings-ui-language-select"]')
+        const label = document.querySelector('#settings-ui-language .ui-language-label')
         return { text: label?.textContent, lang: label?.lang, dir: document.documentElement.dir,
           missing: document.documentElement.getAttribute('data-i18n-missing') }
       })()`)
@@ -807,8 +1022,14 @@ test("browser language selector survives reload and a broken catalog falls back 
     const select = async (tag: string) => {
       await tab.run(`(() => {
         const input = document.getElementById("settings-ui-language-select")
-        input.value = ${JSON.stringify(tag)}
-        input.dispatchEvent(new Event("change", { bubbles: true }))
+        input.click()
+      })()`)
+      await tab.run(`(() => {
+        const names = { en: "English", "zh-Hant": "繁體中文", ja: "日本語", "zh-Hans": "简体中文", ko: "한국어", es: "Español", "pt-BR": "Português (Brasil)", fr: "Français", de: "Deutsch" }
+        const option = [...document.querySelectorAll('#settings-ui-language [role="option"]')]
+          .find((item) => item.querySelector('.choice-menu-text')?.textContent === names[${JSON.stringify(tag)}])
+        if (!option) throw new Error("language option is missing")
+        option.click()
       })()`)
       const until = Date.now() + 5000
       for (;;) {
@@ -830,7 +1051,7 @@ test("browser language selector survives reload and a broken catalog falls back 
     }
     await assertVisibleLocale("zh-Hant")
     for (const tag of ["ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de", "en"] as const) {
-      await tab.run(`localStorage.setItem("ui_language", ${JSON.stringify(tag)})`)
+      await select(tag)
       await tab.reload()
       const until = Date.now() + 5000
       for (;;) {
@@ -1965,11 +2186,11 @@ test("phone: a spoken Board item is prefilled but not created until confirmation
       const deadline = Date.now() + 5000
       const read = () => {
         const modal = document.querySelector(".work-new-modal")
-        const project = modal?.querySelector(".work-project-trigger")
+        const project = modal?.querySelector(".project-picker-trigger")
         if (modal && project?.textContent?.includes("Example project")) return resolve({
           heading: modal.querySelector("h2")?.textContent,
           note: modal.querySelector(".work-note")?.textContent,
-          project: project.querySelector("span:not(.work-project-chevron)")?.textContent,
+          project: project.querySelector("span:not(.project-picker-chevron)")?.textContent,
           title: modal.querySelector("input.work-input")?.value,
           description: modal.querySelector("textarea")?.value,
           kind: modal.querySelector('.work-kind-option[aria-pressed="true"] b')?.textContent,
@@ -2027,9 +2248,9 @@ test("phone: reopening an empty Project picker reads the Projects again", () =>
     })`)
     const recovered = await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 5000
-      document.querySelector(".work-new-modal .work-project-trigger").click()
+      document.querySelector(".work-new-modal .project-picker-trigger").click()
       const read = () => {
-        const option = document.querySelector(".work-new-modal .work-project-option")
+        const option = document.querySelector(".work-new-modal .project-picker-option")
         if (option) return resolve(option.textContent)
         if (Date.now() >= deadline) return reject(new Error("opening the empty Project picker did not read again"))
         setTimeout(read, 25)
@@ -2037,8 +2258,8 @@ test("phone: reopening an empty Project picker reads the Projects again", () =>
       read()
     })`)
     assert.match(String(recovered), /Example project/)
-    await tab.run(`document.querySelector(".work-new-modal .work-project-trigger").click()`)
-    await tab.run(`document.querySelector(".work-new-modal .work-project-trigger").click()`)
+    await tab.run(`document.querySelector(".work-new-modal .project-picker-trigger").click()`)
+    await tab.run(`document.querySelector(".work-new-modal .project-picker-trigger").click()`)
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 5000
       const read = () => {
@@ -2102,10 +2323,10 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 5000
       const choose = () => {
-        const trigger = document.querySelector(".work-new-modal .work-project-trigger")
+        const trigger = document.querySelector(".work-new-modal .project-picker-trigger")
         if (trigger) {
           trigger.click()
-          const option = document.querySelector(".work-new-modal .work-project-option")
+          const option = document.querySelector(".work-new-modal .project-picker-option")
           if (option) { option.click(); return resolve(true) }
         }
         if (Date.now() >= deadline) return reject(new Error("the Board item modal did not load its Project"))
@@ -2175,7 +2396,7 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
             actionsUseChips: [...card.querySelectorAll(".work-assignment-action")].every((button) =>
               button.classList.contains("chip") && getComputedStyle(button).backgroundColor ===
                 getComputedStyle(card.querySelector(".work-persona-ai-button")).backgroundColor),
-            focus: document.activeElement?.getAttribute("aria-label"),
+            focus: document.activeElement === modal,
             progressBeforeStart: !!card.querySelector(".work-milestones"),
             sessionsPage: !document.getElementById("app").hidden,
             boardPage: !document.getElementById("work").hidden,
@@ -2199,7 +2420,7 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
       paths: ["指派給既有 Session", "開啟新 Session"],
       actions: ["開新 Codex Session"],
       actionsUseChips: true,
-      focus: "關閉",
+      focus: true,
       progressBeforeStart: false,
       sessionsPage: true,
       boardPage: false,
@@ -2526,3 +2747,154 @@ test("phone: an empty Session picker adds and removes a Project in edit mode", (
     assert.equal(projectAdds, beforeAdds + 1)
     assert.equal(projectRemoves, beforeRemoves + 1)
   }))
+
+
+test("phone: model choices and Effort recover without another press or leaving the Session", async () => {
+  modelMenuScenario = { stage: "missing", looks: 0, keys: 0, failed: false, readyAt: 0 }
+  try {
+    await inTab(PHONE, async (tab) => {
+      await tab.go("/" + FRAGMENT[TMUX])
+      await tab.until("the Session opens", (state) => state.open === TMUX)
+      const waitFor = async (expression: string) => await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 20000
+        const check = () => (${expression}) ? resolve(true) : Date.now() < deadline ? setTimeout(check, 30) : reject(new Error("menu did not arrive: " + document.getElementById("waiting")?.textContent))
+        check()
+      })`)
+      await waitFor(`document.querySelector('#waiting .question')?.textContent === 'Select Model and Effort'`)
+      await tab.run(`document.querySelector('#waiting [data-key="1"]').click()`)
+      await waitFor(`document.querySelector('#waiting [data-refresh]') && !document.getElementById('waiting').hidden`)
+      await tab.run(`new Promise((resolve) => setTimeout(resolve, 11000))`)
+      assert.equal(await tab.run(`!document.getElementById('waiting').hidden && !!document.querySelector('#waiting [data-refresh]')`), true)
+      assert.equal(await tab.run(`[...document.querySelectorAll('#waiting [data-key]')].every((button) => button.disabled)`), true,
+        "a late Effort menu cannot reopen stale model buttons after the press hold expires")
+      await waitFor(`document.querySelector('#waiting .question')?.textContent === 'Select Reasoning Level for Model Alpha'`)
+      assert.equal(modelMenuScenario?.keys, 1, "recovery never answers the model a second time")
+      assert.equal(modelMenuScenario?.failed, true, "one failed read was injected")
+      await tab.until("the same Session remains open", (state) => state.open === TMUX)
+      assert.equal(await tab.run(`!!document.querySelector('#waiting [data-refresh]')`), true)
+      assert.equal(await tab.run(`document.querySelector('#waiting [data-key="1"]').disabled`), false)
+    })
+  } finally { modelMenuScenario = null }
+})
+
+for (const size of [DESK, PHONE, { width: 320, height: 640, mobile: true }]) {
+  test(`shared usage picker keeps its filter layout and exact project identity at ${size.width}px`, async () => {
+    usagePickerQueries = []
+    await inTab(size, async tab => {
+      await tab.go("/#page=usage")
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const read = () => {
+          if (document.querySelector('#usage:not([hidden]) .project-picker-trigger') && !document.querySelector('#usage .usage-state')) return resolve(true)
+          if (Date.now() > deadline) return reject(new Error('usage did not load'))
+          setTimeout(read, 25)
+        }; read()
+      })`)
+      const layout = await tab.run(`(() => {
+        const filter = document.querySelector('.usage-project-filter')
+        const picker = filter.querySelector('.project-picker')
+        const rect = el => { const r = el.getBoundingClientRect(); return [r.x,r.y,r.width,r.height] }
+        const before = [rect(filter), rect(picker), rect(document.querySelector('.usage-filters > .usage-switch'))]
+        const native = document.createElement('select'); native.innerHTML = '<option>All projects</option>'
+        picker.replaceWith(native)
+        const original = [rect(filter), rect(native), rect(document.querySelector('.usage-filters > .usage-switch'))]
+        native.replaceWith(picker)
+        return { before, original, overflow: document.documentElement.scrollWidth > innerWidth }
+      })()`)
+      assert.deepEqual(layout.before, layout.original, "filter, period buttons and control retain their native-select geometry")
+      assert.equal(layout.overflow, false)
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      const menu = await tab.run(`(() => {
+        const menu = document.querySelector('#usage [role="listbox"]')
+        const options = [...menu.querySelectorAll('[role="option"]')]
+        const r = menu.getBoundingClientRect()
+        return { count: options.length, icons: options.map(o => !!o.querySelector('canvas')), scrolls: menu.scrollHeight > menu.clientHeight,
+          fits: r.left >= 0 && r.right <= innerWidth, focused: document.activeElement === options[0] }
+      })()`)
+      assert.equal(menu.count, usagePickerOptions.length + 1)
+      assert.deepEqual(menu.icons.slice(1, 3), [true, false], "same basenames do not borrow each other's icon")
+      assert.equal(menu.scrolls, true)
+      assert.equal(menu.fits, true)
+      assert.equal(menu.focused, true)
+      const readsBeforeSameSelection = usagePickerQueries.length
+      await tab.press("Enter")
+      assert.equal(await tab.run(`!!document.querySelector('#usage .usage-state')`), false, 'choosing the current filter keeps its data visible')
+      assert.equal(usagePickerQueries.length, readsBeforeSameSelection)
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      await tab.press("ArrowDown")
+      assert.equal(await tab.run(`document.activeElement === document.querySelectorAll('#usage [role="option"]')[1]`), true, "ArrowDown focuses the first project")
+      await tab.press("Enter")
+      await tab.run(`new Promise(resolve => setTimeout(resolve, 100))`)
+      assert.equal(usagePickerQueries.at(-1)?.get("project"), usagePickerOptions[0].id)
+      assert.equal(await tab.run(`!!document.querySelector('#usage .project-picker-trigger canvas')`), true)
+      assert.equal(await tab.run(`document.activeElement === document.querySelector('#usage .project-picker-trigger')`), true)
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      await tab.press("Escape")
+      assert.equal(await tab.run(`!!document.querySelector('#usage [role="listbox"]')`), false)
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      await tab.press("End")
+      await tab.press("Enter")
+      await tab.run(`new Promise(resolve => setTimeout(resolve, 100))`)
+      assert.equal(usagePickerQueries.at(-1)?.get("project"), "unattributed")
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      await tab.press("Home")
+      await tab.press("Enter")
+      await tab.run(`new Promise(resolve => setTimeout(resolve, 100))`)
+      assert.equal(usagePickerQueries.at(-1)?.has("project"), false)
+      await tab.run(`document.querySelector('#usage .usage-switch button:last-child').click()`)
+      await tab.run(`new Promise(resolve => setTimeout(resolve, 100))`)
+      assert.equal(usagePickerQueries.at(-1)?.get("days"), "28")
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      await tab.run(`document.querySelector('#usage h1').dispatchEvent(new PointerEvent('pointerdown', {bubbles: true}))`)
+      assert.equal(await tab.run(`!!document.querySelector('#usage [role="listbox"]')`), false)
+      await tab.shot('usage-project-picker-' + size.width)
+    })
+  })
+}
+
+for (const size of [DESK, { width: 640, height: 844, mobile: true }, PHONE, { width: 320, height: 640, mobile: true }]) {
+  test(`shared Board picker preserves control dimensions at ${size.width}px`, async () => {
+    await inTab(size, async tab => {
+      await tab.go("/#page=work")
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const read = () => {
+          if (document.querySelector('#work:not([hidden]) .work-plan-toggle')?.textContent === '顯示 Plan') return resolve(true)
+          if (Date.now() > deadline) return reject(new Error('work board did not arrive'))
+          setTimeout(read,25)
+        }; read()
+      })`)
+      const selector = '.project-picker, .work-project-picker'
+      const measure = `(() => {
+        const bar = document.querySelector('.work-filter-bar')
+        const picker = bar.querySelector(${JSON.stringify(selector)})
+        const rect = el => { const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height] }
+        return { bar: rect(bar), picker: rect(picker), trigger: rect(picker.querySelector('button')), controls: rect(document.querySelector('.work-filter-controls')) }
+      })()`
+      const before = await tab.run(measure)
+      assert.equal(before.picker[2], Math.min(360, before.bar[2]))
+      assert.equal(before.trigger[3], 38)
+      await tab.run(`document.querySelector('.work-filter-bar').querySelector(${JSON.stringify(selector)}).querySelector('button').click()`)
+      assert.deepEqual(await tab.run(measure), before, 'opening the menu does not move the board controls')
+      await tab.press('Escape')
+      await tab.run(`document.getElementById('work-create-go').click()`)
+      const modal = await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const read = () => {
+          const field = document.querySelector('.work-new-modal .work-modal-field')
+          const picker = field?.querySelector(${JSON.stringify(selector)})
+          if (picker) {
+            const r = picker.getBoundingClientRect(), f = field.getBoundingClientRect()
+            return resolve({ width: r.width, fieldWidth: f.width, x: r.x, height: r.height, fits: r.left >= 0 && r.right <= innerWidth })
+          }
+          if (Date.now() > deadline) return reject(new Error('create picker did not arrive'))
+          setTimeout(read,25)
+        }; read()
+      })`)
+      assert.equal(modal.width, modal.fieldWidth)
+      assert.equal(modal.height, 38)
+      assert.equal(modal.fits, true)
+      if (process.env.CLAWDLINE_PICKER_LAYOUT) console.log('picker-layout ' + JSON.stringify({ width: size.width, before, modal }))
+    })
+  })
+}

@@ -866,7 +866,7 @@ A proposal is also the fallback when a Session has no run to create an item unde
 person typed straight into the terminal, so the Session proposes and tells them to accept it here.
 
 It does not expire into acceptance, does not create a work item through a rule, and is never mixed
-with the Board count. The compact row shows the title, source, and reason; its **Explain / 詳細說明**
+with the Board count. The compact row shows the title, source, and reason; its **Explain / Details**
 control reveals what changes and the observable completion result. The person can preview and edit
 it before accepting. Acceptance creates one new item and links the proposal to it in one idempotent
 transaction. Rejection keeps provenance without creating work.
@@ -978,6 +978,25 @@ Open direct to-dos are returned oldest first so an Agent can process them in ord
 place all open rows first and then the newest completed rows, so the bounded view cannot hide old
 unfinished work behind completion history. The Agent may use children for independent rows, but
 Clawdline does not automatically schedule or parallelize them.
+
+A Workflow can be the first instruction in a newly opened Session. When the
+provider has not written a conversation record (`no_record`), direct to-dos
+are temporarily owned by the exact assistant, terminal, PID and kernel process
+start time. Unreadable or ambiguous identity is still refused. Once a live
+reading binds that process to its real conversation, person and Agent queue
+routes move the existing rows in one transaction, retaining their ids, images,
+receipts and completion state. Moving rows respects the existing 500-open-row
+bound and one-running-Workflow rule; neither a reused terminal nor a reused PID
+can adopt an earlier process's work.
+
+The first terminal send reserves its to-do durably before typing. A successful
+submission records `sent_at`; a concurrent Agent queue read keeps its `read_at`.
+A typed, uncertain or interrupted write leaves the reservation unresolved and
+further sends fail with `todo_delivery_unknown`, including after restart or
+conversation binding. Only proof that no bytes were typed clears a reservation
+for retry. The reservation is one row per to-do and is removed with that to-do.
+Existing recorded Sessions retain their send/reminder behavior. No synthetic
+warm-up message is sent and the console's create-then-send API stays unchanged.
 
 ### 11.3 Execution detail
 

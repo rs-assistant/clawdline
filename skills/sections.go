@@ -108,7 +108,7 @@ func SectionNames() []string {
 	for i, s := range sections {
 		out[i] = s.Name
 	}
-	return out
+	return append(out, "squad", "persona")
 }
 
 // split cuts a guide at every "## " and "### " heading: the preamble before
@@ -151,6 +151,9 @@ func guideParts(lang string) ([]byte, [][]byte, error) {
 
 // Section is one named part of the guide in lang ("" is DefaultTopic).
 func Section(lang, name string) ([]byte, error) {
+	if name == "squad" || name == "persona" {
+		return SquadGuide(lang)
+	}
 	_, parts, err := guideParts(lang)
 	if err != nil {
 		return nil, err
@@ -189,6 +192,11 @@ func Core(lang string) ([]byte, error) {
 		if !s.Core {
 			fmt.Fprintf(&b, "- `%s%s` — %s\n", prefix, s.Name, sectionTitle(parts[i]))
 		}
+	}
+	if resolved == "zh-Hant" {
+		fmt.Fprintf(&b, "- `%ssquad`（別名 persona）— 建立私人角色、技能、綁定與多色像素機器人\n", prefix)
+	} else {
+		fmt.Fprintf(&b, "- `%ssquad` (alias persona) — create private roles, skills, bindings and multicolor pixel robots\n", prefix)
 	}
 	if resolved == "zh-Hant" {
 		fmt.Fprintf(&b, "\n`%sroutes` 列出此 build 已註冊的路由、起始 API 等級與對應的指南部分；路由不是授權。\n", prefix)

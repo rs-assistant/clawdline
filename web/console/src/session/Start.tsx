@@ -104,6 +104,9 @@ let pasts: PastRow[] | null = null
 /** The past list was asked for and not read: it is not empty, it is unknown, and the sheet must not say "no records". */
 let pastsUnread = false
 let capped = false
+let pastCursor = ""
+let pastFailed = false
+let pastGeneration = 0
 let reading = false
 let wait: { id: string; from: string | null; late: boolean; eager: boolean; place: Place } | null = null
 let detached: string | null = null
@@ -267,6 +270,7 @@ function ownWhy(e: Failure, reading?: "past"): string {
   if (code === "coordinator_session_exists") return nextWord("machineSessionExists")
   if (code === "machine_workspace_invalid") return nextWord("machineWorkspaceInvalid")
   if (code === "coordinator_store_invalid") return nextWord("machineRoleInvalid")
+  if (code === "codex_unavailable") return nextWord("startPastUnavailable")
   if (code === "not_found") return T().webStartGone
   if (e && e.app && code === "terminal_closed") return L.fillString(T().webStartTerminalClosed, { app: e.app })
   if (code === "terminal_unsupported") return T().webStartTerminalUnsupported
@@ -409,7 +413,8 @@ function drawMachines(): void {
 function drawResume(): void {
   const row = el("start-resume")
   row.innerHTML = ""
-  row.hidden = !write
+  // Resuming needs a project to resume in; with none, the sheet's one job is adding a folder.
+  row.hidden = !write || (!at && !!places && places.length === 0)
   if (row.hidden) return
 
   if (at) {
@@ -483,6 +488,9 @@ function draw(): void {
     webkit?: { messageHandlers?: { shellAgentSetup?: unknown } }
   }).webkit?.messageHandlers?.shellAgentSetup)
   retry.hidden = machineOnly || mode !== "session" || !(placesUnread || needsAgent)
+  // The only labelled way on when this machine has no project: the same picker as the small "+".
+  el<HTMLButtonElement>("start-add-first").hidden = machineOnly || !!at || !write || placesUnread || !places || places.length > 0
+  el<HTMLButtonElement>("start-add-first").disabled = !!pressing || !!wait
   retry.disabled = loading
   retry.textContent = placesUnread ? nextWord("firstSessionRetry") : nextWord("firstSessionRetryAgent")
   setup.hidden = machineOnly || mode !== "session" || !needsAgent || !localMac
@@ -629,7 +637,7 @@ function drawPast(list: HTMLElement, box: HTMLInputElement): void {
         : pastsUnread
           ? ""
           : pasts && !pasts.length
-            ? T().webResumeEmpty
+            ? pastCursor ? nextWord("startPastFiltered") : T().webResumeEmpty
             : T().webResumePick,
   )
   const loadingPast = reading && !pasts
@@ -685,7 +693,18 @@ function drawPast(list: HTMLElement, box: HTMLInputElement): void {
     list.appendChild(li)
   })
 
-  if (capped && all.length) {
+  if (pastCursor || pastFailed) {
+    const li = document.createElement("li")
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "place"
+    button.disabled = reading || !!pressing || !!wait
+    button.textContent = reading ? T().webLoading : pastFailed ? nextWord("usageRetry") : nextWord("startPastMore")
+    button.onclick = () => readPast(pastCursor)
+    li.appendChild(button)
+    list.appendChild(li)
+  }
+  if (capped && !pastCursor && all.length) {
     const note = document.createElement("li")
     note.className = "note"
     note.setAttribute("role", "status")
@@ -727,6 +746,8 @@ function load(background = false): void {
 }
 
 function enter(place: Place): void {
+  pastGeneration += 1
+  reading = false
   at = place
   pasts = null
   pastsUnread = false
@@ -734,33 +755,55 @@ function enter(place: Place): void {
   find = ""
   el<HTMLInputElement>("start-filter").value = ""
   said("")
+  pastCursor = ""
+  pastFailed = false
+  readPast("")
+}
+
+function readPast(cursor: string): void {
+  if (!at || reading) return
+  const place = at
+  const assistant = with_
+  const generation = ++pastGeneration
+  pastFailed = false
+  said("")
   reading = true
   draw()
-  asked(() => api.pastSessions(place.id, with_))
+  asked(() => api.pastSessions(place.id, assistant, cursor || undefined))
     .then((d) => {
-      if (!at || at.id !== place.id) return
-      pasts = (d && d.sessions) || []
+      if (generation !== pastGeneration || !at || at.id !== place.id) return
+      const rows = (d && d.sessions) || []
+      const byID = new Map((cursor ? pasts || [] : []).map((row) => [row.id, row]))
+      rows.forEach((row) => byID.set(row.id, row))
+      pasts = Array.from(byID.values())
       pastsUnread = false
-      capped = !!(d && d.more)
+      pastCursor = d?.next_cursor || ""
+      capped = !!d?.more
     })
     .catch((e: Failure) => {
-      if (!at || at.id !== place.id) return
+      if (generation !== pastGeneration || !at || at.id !== place.id) return
       pastsUnread = !pasts
       pasts = pasts || []
+      pastFailed = true
       if (e && e.code === "not_found") {
         leave()
         places = null
         load()
+        return
       }
       said(why(e, "past"), e)
     })
     .then(() => {
+      if (generation !== pastGeneration) return
       reading = false
       draw()
     })
 }
 
 function leave(): void {
+  pastGeneration += 1
+  pastCursor = ""
+  pastFailed = false
   at = null
   resumeAs = ""
   pasts = null
@@ -1199,6 +1242,7 @@ export function StartSheet() {
     el("start-close").addEventListener("click", onClose)
     el("start-machine-action").addEventListener("click", onMachine)
     el("start-add-project").addEventListener("click", onAddProject)
+    el("start-add-first").addEventListener("click", onAddProject)
     el("start-retry-places").addEventListener("click", onRetryPlaces)
     el("start-agent-setup").addEventListener("click", onAgentSetup)
     window.addEventListener("clawdline:agent-setup-changed", onAgentChanged)
@@ -1219,6 +1263,7 @@ export function StartSheet() {
       el("start-close")?.removeEventListener("click", onClose)
       el("start-machine-action")?.removeEventListener("click", onMachine)
       el("start-add-project")?.removeEventListener("click", onAddProject)
+      el("start-add-first")?.removeEventListener("click", onAddProject)
       el("start-retry-places")?.removeEventListener("click", onRetryPlaces)
       el("start-agent-setup")?.removeEventListener("click", onAgentSetup)
       window.removeEventListener("clawdline:agent-setup-changed", onAgentChanged)
@@ -1279,6 +1324,7 @@ export function StartSheet() {
             </div>
           </div>
           <ul className="places" id="start-list"></ul>
+          <button className="chip wide start-add-first" id="start-add-first" type="button" hidden>{nextWord("startAddFirstFolder")}</button>
           <button className="chip wide" id="start-retry-places" type="button" hidden>{nextWord("firstSessionRetry")}</button>
           <a className="chip wide" id="start-agent-setup" href="clawdline-next://setup" hidden>{nextWord("firstSessionOpenSetup")}</a>
           <p className="say" id="start-agent-help" hidden>{nextWord("firstSessionAgentOtherHint")}</p>

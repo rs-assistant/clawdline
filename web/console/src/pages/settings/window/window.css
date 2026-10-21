@@ -687,6 +687,9 @@
    accent treatment, but give each label a real cell instead of letting flex
    squeeze Chinese words into tall, clipped columns. */
 @media (max-width: 460px) {
+  .sw-row { flex-wrap: wrap; }
+  .sw-row-control { max-width: 100%; }
+  .sw-field { box-sizing: border-box; max-width: 100%; }
   .sw-strip {
     height: auto;
     min-height: var(--sw-strip);
@@ -697,7 +700,7 @@
     padding: 8px 12px;
   }
   .sw-strip-mark {
-    grid-row: 1 / span 2;
+    grid-row: 1 / span 3;
     margin-right: 0;
   }
   .sw-tab {

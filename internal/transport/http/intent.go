@@ -50,7 +50,7 @@ func (s *Server) intentRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = io.NopCloser(bytes.NewReader(raw))
-	k := store.ReceiptKey{Scope: scopeIntent, Actor: accessOf(r).verdict.Device, Key: key}
+	k := store.ReceiptKey{Scope: scopeIntent, Actor: actorOf(r), Key: key}
 	s.receipted(w, r, k, requestDigest(raw), func(status int) bool {
 		return status < 500 && status != http.StatusTooManyRequests
 	}, func(w http.ResponseWriter) { s.planSentence(w, r) })
@@ -87,7 +87,7 @@ func (s *Server) planSentence(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
 	draft, err := s.planner()(r.Context(), text, places, assistants)
 	ms := time.Since(started).Milliseconds()
-	device := accessOf(r).verdict.Device
+	device := actorOf(r)
 	if errors.Is(err, planner.ErrNoPlanner) {
 		log.Printf("audit intent.plan device=%s ms=%d ok=0 why=no_planner", device, ms)
 		writeRefusal(w, http.StatusServiceUnavailable, "no_planner", "This machine has neither claude nor codex on it, so there is nothing here to work out what you meant with.")

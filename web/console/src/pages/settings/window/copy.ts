@@ -13,9 +13,12 @@ const ownWords = {
   en: {
     settingsRemoteHint:
       "When this is off, nothing outside this machine can reach it. When it is on, the session list is available on 127.0.0.1 — to a browser here, a phone connected through a tunnel, or a script. What it exposes is repository names, branches, and work titles, so it stays off until you turn it on.",
-    settingsTunnel: "Connect to this machine from anywhere",
-    settingsTunnelHint:
-      "cloudflared connects outward from this machine — no port forwarding, and nothing listens on your network. It starts only after a device has been paired, because behind the tunnel are every repository name and work title on this machine.",
+    settingsTailscaleHostname: "Tailscale address",
+    settingsTailscaleHint:
+      "When this machine and your phone are on the same tailnet, run tailscale serve --bg 7727 on this machine and enter its full name here, such as my-machine.your-tailnet.ts.net. It answers only while the switch above is on, and a device still pairs before it sees anything. Serve stays private to your tailnet; Funnel would make the address public, so do not use it.",
+    settingsCloudflareRetired:
+      "Clawdline no longer runs a Cloudflare tunnel, so the tunnel this machine used to open stays closed and its settings are no longer read. To reach this machine from your phone, use Tailscale Serve (the Tailscale address above) or Clawdline Cloud.",
+    settingsCloudflareRetiredDone: "Got it",
     settingsRemoteWriteHint:
       "Every signed-in device paired with this machine can send. Clawdline Cloud commands can still be turned off for this machine with clawdline cloud commands off.",
     settingsOrchestratorMaxHint:
@@ -28,7 +31,7 @@ const ownWords = {
       "{combo} could not be registered (the operating system returned {status}). The ✳ in Clawdline's menu still opens the input box; press the button above to choose another combination.",
     webCloudStatusReadFailed: "Could not read this machine's status.",
     webRemoteMachineOnly:
-      "This browser cannot manage Cloud or the tunnel; only this machine's own sign-in can. Use the Clawdline app's settings on this machine, or run clawdline cloud login and clawdline tunnel in a terminal on this machine.",
+      "This browser cannot manage Cloud; only this machine's own sign-in can. Use the Clawdline app's settings on this machine, or run clawdline cloud login in a terminal on this machine.",
     webCloudManagedElsewhere:
       "Clawdline Cloud, which lets your phone and other machines reach this one, is not managed from a browser. On a Mac with the app, open Settings from the Clawdline menu bar icon and choose Remote. Anywhere else, run clawdline cloud login and then clawdline cloud on in a terminal on this machine; clawdline cloud pair shows a pairing link and QR code.",
     webCloudStatusToken: "Machine credential expires: {at}",
@@ -99,13 +102,18 @@ const ownWords = {
     voiceInstallingModel: "Downloading and verifying the model… Keep this page open.",
     voiceInstalledModel: "The model is installed.",
     voiceModelPaths: "Model search paths",
+    dictationNoModel: "Voice: Apple only — whisper-cli is installed, but no model is available",
+    dictationNoWhisper: "Voice: Apple only — whisper-cli is not installed",
   },
   "zh-Hant": {
     settingsRemoteHint:
       "關著的時候，這台機器以外的東西什麼都碰不到。打開之後，session 清單就在 127.0.0.1 上讀得到——給這裡的瀏覽器、隔著通道連進來的手機，或一支腳本。交出去的是儲存庫名稱、分支和工作標題，所以在你開口之前，它一直是關著的。",
-    settingsTunnel: "從任何地方連到這台機器",
-    settingsTunnelHint:
-      "透過 cloudflared 從這台機器往外連出去——不必開通訊埠轉發，你的網路上也沒有東西在聽。要先配對過一台裝置它才會啟動，因為通道後面就是這台機器上每一個儲存庫名稱、每一個工作標題。",
+    settingsTailscaleHostname: "Tailscale 位址",
+    settingsTailscaleHint:
+      "這台機器和手機在同一個 tailnet 時，在這台機器上執行 tailscale serve --bg 7727，再把它的完整名稱填在這裡，例如 my-machine.your-tailnet.ts.net。只有上面的開關打開時才會回應，裝置也一樣要先配對才看得到東西。Serve 只在你的 tailnet 裡看得到；Funnel 會把位址公開到網路上，不要用它。",
+    settingsCloudflareRetired:
+      "Clawdline 不再內建 Cloudflare 通道，這台機器以前開的通道不會再開，它的設定也不再讀取。要從手機連回這台機器，請改用 Tailscale Serve（上面的 Tailscale 位址）或 Clawdline Cloud。",
+    settingsCloudflareRetiredDone: "知道了",
     settingsRemoteWriteHint:
       "每台已登入並配對這台機器的裝置都可傳送。若要停止這台機器的 Cloud 遠端操作，可執行 clawdline cloud commands off。",
     settingsOrchestratorMaxHint:
@@ -118,7 +126,7 @@ const ownWords = {
       "{combo} 註冊不起來（作業系統回 {status}）。Clawdline 選單裡的 ✳ 一樣打得開輸入框；要換一組就按上面的按鈕。",
     webCloudStatusReadFailed: "讀不到這台機器的狀態。",
     webRemoteMachineOnly:
-      "這個瀏覽器不能管理 Cloud 與通道，只有這台機器本身的登入可以。請改用這台機器上 Clawdline App 的設定，或在這台機器的終端機執行 clawdline cloud login 與 clawdline tunnel。",
+      "這個瀏覽器不能管理 Cloud，只有這台機器本身的登入可以。請改用這台機器上 Clawdline App 的設定，或在這台機器的終端機執行 clawdline cloud login。",
     webCloudManagedElsewhere:
       "Clawdline Cloud（讓手機與其他機器連到這台）不在瀏覽器裡管理。有 App 的 Mac：從選單列的 Clawdline 圖示打開「設定」，選「遠端」。其他機器：在這台機器的終端機執行 clawdline cloud login，再執行 clawdline cloud on；clawdline cloud pair 會顯示配對連結與 QR 碼。",
     webCloudStatusToken: "機器憑證到期：{at}",
@@ -187,6 +195,8 @@ const ownWords = {
     voiceInstallingModel: "正在下載並驗證模型⋯⋯請保持此頁開啟。",
     voiceInstalledModel: "模型已安裝。",
     voiceModelPaths: "模型搜尋路徑",
+    dictationNoModel: "語音：只有 Apple——whisper-cli 有了，缺模型",
+    dictationNoWhisper: "語音：只有 Apple——沒有 whisper-cli",
   },
 } as const
 
@@ -259,11 +269,10 @@ const baseW = {
   settingsRemote: "遠端",
   settingsRemoteServe: "讓瀏覽器或你的手機看得到你的 session",
   settingsRemoteHint: ownWord("settingsRemoteHint"),
-  settingsTunnel: ownWord("settingsTunnel"),
-  settingsTunnelQuick: "自動產生的網址",
-  settingsTunnelNamed: "我自己的網域",
-  settingsTunnelHostname: "主機名稱",
-  settingsTunnelHint: ownWord("settingsTunnelHint"),
+  settingsTailscaleHostname: ownWord("settingsTailscaleHostname"),
+  settingsTailscaleHint: ownWord("settingsTailscaleHint"),
+  settingsCloudflareRetired: ownWord("settingsCloudflareRetired"),
+  settingsCloudflareRetiredDone: ownWord("settingsCloudflareRetiredDone"),
   settingsRemoteWrite: "已配對裝置可傳送",
   settingsRemoteWriteHint: ownWord("settingsRemoteWriteHint"),
   settingsPushDelivery: "session 回報交件時通知我",
@@ -448,6 +457,8 @@ const baseW = {
   voiceInstallingModel: ownWord("voiceInstallingModel"),
   voiceInstalledModel: ownWord("voiceInstalledModel"),
   voiceModelPaths: ownWord("voiceModelPaths"),
+  dictationNoModel: ownWord("dictationNoModel"),
+  dictationNoWhisper: ownWord("dictationNoWhisper"),
   voiceLanguageFixed: "每段錄音都當成{name}來讀。",
   voiceLanguageChinese: "現在是{name}——{why}。",
   voiceLanguageDetect: "語言交給 whisper 自己判斷——{why}。聽到中文時寫成{script}——{scriptWhy}。",
@@ -575,9 +586,9 @@ export function dictationStatus(status: { kind: string; model?: string }): strin
     case "ready":
       return catalogFormat("template", "7646119625b7", [status.model ?? ""])
     case "noModel":
-      return "語音：只有 Apple——whisper-cli 有了，缺模型"
+      return W.dictationNoModel
     default:
-      return "語音：只有 Apple——沒有 whisper-cli"
+      return W.dictationNoWhisper
   }
 }
 

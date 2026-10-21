@@ -132,12 +132,16 @@ func (s *Server) squadCandidateRead(w http.ResponseWriter, r *http.Request) {
 			"A bound Session capability is required.")
 		return
 	}
+	if !effective.AutoDispatch.Value {
+		writeRefusal(w, http.StatusConflict, "squad_auto_dispatch_disabled", "Automatic role selection is off on this machine.")
+		return
+	}
 	writeJSON(w, contract.SquadCandidates{ScopeID: actor.ScopeID, DefinitionIds: candidates})
 }
 
 func squadWriteAllowed(r *http.Request) bool {
 	a := accessOf(r)
-	return a.verdict.Allowed && (a.verdict.Local || maySend(r))
+	return (a.machine && squadAgentPath(routePath(r))) || (a.verdict.Allowed && (a.verdict.Local || maySend(r)))
 }
 
 func squadWriteDoor(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -153,6 +157,9 @@ func squadWriteDoor(w http.ResponseWriter, r *http.Request) (string, bool) {
 	}
 	// The credential-derived principal separates two writers' retry keys.
 	principal := personPrincipal(r)
+	if accessOf(r).machine {
+		principal = "agent"
+	}
 	if accessOf(r).verdict.Local {
 		principal = "local"
 	}
@@ -430,6 +437,22 @@ func squadMotionRow(row store.SquadSettingRow) (squad.MotionOverride, error) {
 	return v, err
 }
 
+func (s *Server) squadAutoDispatchEnabled(ctx context.Context) (bool, error) {
+	rows, err := s.store.SquadSettings(ctx, "global")
+	if err != nil {
+		return false, err
+	}
+	settings, err := squadRows(rows)
+	if err != nil {
+		return false, err
+	}
+	value, err := squadMotionRow(settings[""])
+	if err != nil {
+		return false, err
+	}
+	return value.AutoDispatch == nil || *value.AutoDispatch, nil
+}
+
 func squadDefaultChoices(d squad.Definition) []squad.Choice {
 	out := make([]squad.Choice, 0, len(d.Skills))
 	for _, r := range d.Skills {
@@ -472,8 +495,10 @@ func (s *Server) squadEffective(ctx context.Context, scope projects.Scope, place
 	}
 	out := squad.Effective{
 		PlaceID: placeID, ScopeID: scope.ID, ScopeKind: scope.Kind,
-		Motion:   squad.Resolve(true, gm.Motion, global[""].Version, pm.Motion, project[""].Version),
-		Personas: make([]squad.EffectivePersona, 0, len(catalog.Definitions)),
+		Motion:              squad.Resolve(true, gm.Motion, global[""].Version, pm.Motion, project[""].Version),
+		AutoDispatch:        squad.Resolve(true, gm.AutoDispatch, global[""].Version, (*bool)(nil), 0),
+		AutoDispatchVersion: global[""].Version,
+		Personas:            make([]squad.EffectivePersona, 0, len(catalog.Definitions)),
 	}
 	out.MotionSettingsVersion = project[""].Version
 	if scope.ID == "global" {
@@ -651,10 +676,42 @@ func (s *Server) squadMotionWrite(w http.ResponseWriter, r *http.Request) {
 		squadScopeRefusal(w, err)
 		return
 	}
-	var override squad.MotionOverride
-	if req.Motion.Present {
-		v := req.Motion.Value
-		override.Motion = &v
+	if req.Motion == nil && req.AutoDispatch == nil {
+		writeRefusal(w, http.StatusBadRequest, "bad_request", "Supply motion or auto_dispatch.")
+		return
+	}
+	if req.AutoDispatch != nil && scope.ID != "global" {
+		writeRefusal(w, http.StatusBadRequest, "bad_request", "Machine role dispatch is a global setting.")
+		return
+	}
+	rows, err := s.store.SquadSettings(r.Context(), scope.ID)
+	if err != nil {
+		squadFailure(w, err, false)
+		return
+	}
+	row, err := squadRows(rows)
+	if err != nil {
+		squadFailure(w, err, false)
+		return
+	}
+	override, err := squadMotionRow(row[""])
+	if err != nil {
+		squadFailure(w, err, false)
+		return
+	}
+	if req.Motion != nil {
+		override.Motion = nil
+		if req.Motion.Present {
+			v := req.Motion.Value
+			override.Motion = &v
+		}
+	}
+	if req.AutoDispatch != nil {
+		override.AutoDispatch = nil
+		if req.AutoDispatch.Present {
+			v := req.AutoDispatch.Value
+			override.AutoDispatch = &v
+		}
 	}
 	payload, _ := json.Marshal(override)
 	version, err := s.store.SaveSquadSetting(context.WithoutCancel(r.Context()),
@@ -859,4 +916,14 @@ func (s *Server) squadEntityWrite(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, contract.SquadEntityReply{
 		CatalogVersion: version, ID: row.ID, Version: row.Version, Digest: row.Digest})
+}
+
+// squadAgentPath is the explicit local Agent contract. It does not grant AI
+// drafting, package imports, Session telemetry, or paired-device permissions.
+func squadAgentPath(path string) bool {
+	switch path {
+	case "/v1/squad/catalog", "/v1/squad/settings", "/v1/squad/scopes":
+		return true
+	}
+	return strings.HasPrefix(path, "/v1/squad/definitions/")
 }

@@ -37,12 +37,13 @@
       }
     },
     "Icon": {
-      "description": "A project's mark: rows of `#RRGGBB`, with null for transparent. It is derived from the project path and the machine's icon registry by the same rules the Swift app uses, so both apps draw the same creature — a mark somebody recognises by colour and shape is not recognisable if the second app draws it differently, and near-identical is worse than obviously different.",
+      "description": "A project mark with an RGB accent and either bounded colour cells (null is transparent) or a self-contained static SVG with empty cells. Both render proportionally inside the existing icon slot.",
       "type": "object",
       "additionalProperties": false,
       "required": ["accent", "cells"],
       "properties": {
         "accent": { "type": "string" },
+        "svg": { "type": "string", "description": "Optional self-contained SVG; cells is empty when present." },
         "cells": {
           "type": "array",
           "items": { "type": "array", "items": { "type": "string", "nullable": true } }

@@ -1,4 +1,4 @@
-# Secret Handoff (機密交付)
+# Secret Handoff
 
 Secret Handoff is the person-to-Session path for a password, credential, or API key needed by a local tool. The Note is an invitation and status surface, never the value's storage. A normal Session message and its transcript are also unsuitable: they retain what was sent. The receiving agent names the credential in the Note summary, shown as the label immediately above the dedicated multi-line input. The summary is a non-secret label, never the value.
 
@@ -18,6 +18,6 @@ The protection is against incidental retention and disclosure by Clawdline's nor
 
 ## Person-facing steps
 
-1. Open the **Secret Handoff／機密交付** request in the intended Session and check its purpose and Session name.
+1. Open the **Secret Handoff** request in the intended Session and check its purpose and Session name.
 2. Paste the value into the dedicated field and submit. The button shows progress, then a green receipt appears beside the field before the panel folds away. Reopen the Note to see the receipt or explicitly replace an unclaimed value. Clawdline never shows the value again.
 3. The Session uses the one-time handoff. If it expires or the machine restarts before use, submit a fresh value.

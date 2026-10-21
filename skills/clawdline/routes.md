@@ -1,6 +1,6 @@
 # Agent routes in this build
 
-Generated from the registered routes and `api/v1/agent-routes.json`; API level: 21. Read `clawdline guide` first, then the part named below. A route here is discoverability, **not authorization or proof of completion**. For an action under a prefix, its input, permission, refusals, and receipt must be stated by that part and this build's schema. If the part does not specify that action, treat the route as unavailable to an Agent. Stop on a missing capability or version, mismatched identity, or unknown outcome; do not switch machines or use an older interface.
+Generated from the registered routes and `api/v1/agent-routes.json`; API level: 25. Read `clawdline guide` first, then the part named below. A route here is discoverability, **not authorization or proof of completion**. For an action under a prefix, its input, permission, refusals, and receipt must be stated by that part and this build's schema. If the part does not specify that action, treat the route as unavailable to an Agent. Stop on a missing capability or version, mismatched identity, or unknown outcome; do not switch machines or use an older interface.
 
 | Method | Registered route | Since API level | Agent guide | Human goal |
 | --- | --- | ---: | --- | --- |
@@ -21,6 +21,8 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | `*` | `/v1/cloud/pairing` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/pairing/agent` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/pairing/agent/` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
+| `*` | `/v1/cloud/pairing/identity` | 25 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
+| `*` | `/v1/cloud/pairing/identity/decision` | 25 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/pairing/offer` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/peer/control` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/peer/inbox` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
@@ -32,6 +34,7 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | `*` | `/v1/cloud/viewer/machines` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/viewer/receipts` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/viewer/sessions` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
+| `*` | `/v1/connection-health/` | 24 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/devstacks` | 1 | `clawdline guide project` | `docs/user/projects.md` |
 | `*` | `/v1/diagnostics` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/events` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
@@ -104,17 +107,16 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | `*` | `/v1/snippets` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/snippets/` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/squad-packages/` | 1 | `clawdline guide dispatch` | `docs/user/clawdfather-and-dispatch.md` |
-| `*` | `/v1/squad/` | 1 | `clawdline guide dispatch` | `docs/user/clawdfather-and-dispatch.md` |
-| `*` | `/v1/squad/events` | 1 | `clawdline guide dispatch` | `docs/user/clawdfather-and-dispatch.md` |
-| `*` | `/v1/squad/events/head` | 1 | `clawdline guide dispatch` | `docs/user/clawdfather-and-dispatch.md` |
-| `*` | `/v1/squad/session-bindings` | 1 | `clawdline guide dispatch` | `docs/user/clawdfather-and-dispatch.md` |
-| `*` | `/v1/squad/session-events` | 1 | `clawdline guide dispatch` | `docs/user/clawdfather-and-dispatch.md` |
-| `*` | `/v1/squad/session-snapshots/` | 1 | `clawdline guide dispatch` | `docs/user/clawdfather-and-dispatch.md` |
+| `*` | `/v1/squad/` | 1 | `clawdline guide squad` | `docs/personas.md` |
+| `*` | `/v1/squad/events` | 1 | `clawdline guide squad` | `docs/personas.md` |
+| `*` | `/v1/squad/events/head` | 1 | `clawdline guide squad` | `docs/personas.md` |
+| `*` | `/v1/squad/session-bindings` | 1 | `clawdline guide squad` | `docs/personas.md` |
+| `*` | `/v1/squad/session-events` | 1 | `clawdline guide squad` | `docs/personas.md` |
+| `*` | `/v1/squad/session-snapshots/` | 1 | `clawdline guide squad` | `docs/personas.md` |
 | `*` | `/v1/strings` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/terminals` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/terminals/` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/transcript` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
-| `*` | `/v1/tunnel` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/update` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/update/apply` | 2 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/update/dev-release` | 10 | `clawdline guide connect` | `docs/user/first-session.md` |

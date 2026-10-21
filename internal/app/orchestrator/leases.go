@@ -299,6 +299,7 @@ func (b *Broker) Acquire(ctx context.Context, req LeaseRequest) (LeaseAnswer, er
 		return LeaseAnswer{}, err
 	}
 	var answer LeaseAnswer
+	callbackMoved := false
 	err = b.Store.DecideLease(ctx, req.Resource, key, func(st store.LeaseState) (store.LeaseChange, error) {
 		var change store.LeaseChange
 		ev := func(kind string, body map[string]any) {
@@ -313,6 +314,7 @@ func (b *Broker) Acquire(ctx context.Context, req LeaseRequest) (LeaseAnswer, er
 			if req.Phase != "" {
 				next.Phase = req.Phase
 			}
+			callbackMoved = h.CallbackTaskID != "" && next.Phase != h.Phase
 			change.SetHolder = &next
 			answer = LeaseAnswer{State: "granted", LeaseID: h.LeaseID}
 			return change, nil
@@ -350,6 +352,7 @@ func (b *Broker) Acquire(ctx context.Context, req LeaseRequest) (LeaseAnswer, er
 			waiters = append(waiters, w)
 		}
 		if mine < 0 {
+			callbackMoved = req.CallbackTaskID != ""
 			if line := b.leaseLine(); len(waiters) >= line {
 				return change, refuseRawWith(http.StatusTooManyRequests, "queue_full",
 					fmt.Sprintf("%d askers are already waiting for this lease; nothing was queued.", line),
@@ -371,6 +374,7 @@ func (b *Broker) Acquire(ctx context.Context, req LeaseRequest) (LeaseAnswer, er
 		}
 		if holderFree && len(st.Blockers) == 0 && position == 1 {
 			w := waiters[mine]
+			callbackMoved = w.CallbackTaskID != ""
 			lease := uuidLike()
 			change.SetHolder = &store.LeaseRow{
 				Resource: req.Resource, Key: key, RequestID: w.RequestID, LeaseID: lease, Holder: w.Holder,
@@ -401,6 +405,9 @@ func (b *Broker) Acquire(ctx context.Context, req LeaseRequest) (LeaseAnswer, er
 	})
 	if err != nil {
 		return LeaseAnswer{}, leaseStoreError(err)
+	}
+	if callbackMoved {
+		b.taskListChanged()
 	}
 	answer.Resource, answer.Key = req.Resource, key
 	answer.View, _ = b.leaseView(ctx, req.Resource, key)
@@ -461,6 +468,7 @@ func (b *Broker) ownerMove(ctx context.Context, o LeaseOwner, move string) (Leas
 	}
 	now := b.now()
 	answer := LeaseAnswer{State: move, Resource: o.Resource, Key: key}
+	callbackMoved := false
 	err = b.Store.DecideLease(ctx, o.Resource, key, func(st store.LeaseState) (store.LeaseChange, error) {
 		var change store.LeaseChange
 		ev := func(kind string, body map[string]any) {
@@ -481,6 +489,7 @@ func (b *Broker) ownerMove(ctx context.Context, o LeaseOwner, move string) (Leas
 			if o.Phase != "" {
 				next.Phase = o.Phase
 			}
+			callbackMoved = h.CallbackTaskID != "" && next.Phase != h.Phase
 			change.SetHolder = &next
 			answer.LeaseID = h.LeaseID
 		case "released":
@@ -491,6 +500,7 @@ func (b *Broker) ownerMove(ctx context.Context, o LeaseOwner, move string) (Leas
 				for _, w := range st.Waiters {
 					if w.RequestID == o.RequestID {
 						// A waiter giving up before it was granted.
+						callbackMoved = w.CallbackTaskID != ""
 						change.DropWaiters = []string{w.RequestID}
 						ev("lease.cancelled", map[string]any{})
 						return change, nil
@@ -498,12 +508,14 @@ func (b *Broker) ownerMove(ctx context.Context, o LeaseOwner, move string) (Leas
 				}
 				return change, refuse(http.StatusForbidden, "not_holder", "Another request holds this lease.")
 			}
+			callbackMoved = h.CallbackTaskID != ""
 			change.ClearHolder = true
 			answer.LeaseID = h.LeaseID
 			ev("lease.released", map[string]any{"held_seconds": int(now.Sub(h.AcquiredAt) / time.Second)})
 		case "cancelled":
 			for _, w := range st.Waiters {
 				if w.RequestID == o.RequestID {
+					callbackMoved = w.CallbackTaskID != ""
 					change.DropWaiters = []string{w.RequestID}
 					ev("lease.cancelled", map[string]any{})
 					return change, nil
@@ -515,6 +527,9 @@ func (b *Broker) ownerMove(ctx context.Context, o LeaseOwner, move string) (Leas
 	})
 	if err != nil {
 		return LeaseAnswer{}, leaseStoreError(err)
+	}
+	if callbackMoved {
+		b.taskListChanged()
 	}
 	answer.View, _ = b.leaseView(ctx, o.Resource, key)
 	return answer, nil

@@ -15,9 +15,9 @@ The selected-machine and all-machines views are two scopes over the same Session
 
 ## Status line rule
 
-Every scope draws a row's status line from the row alone, through `stateLine` in `session/List.tsx`. No scope reads a task collection of its own to describe a Session: the Cloud lists do not have one, and a second source is how the selected-machine list once said `工作：<task title>` while the all-machines list said only `等待其他 Session` for the same Session. What a waiting Session waits for comes from the daemon's `waiting_for` (`docs/session-states.md`), which the compact `sessions.list` answer carries alongside the rest of the status; `session/waiting-for.ts` turns it into words for the list and the info sheet alike. A field a list needs that one scope cannot receive is added to the row, not computed differently per scope.
+Every scope draws a row's status line from the row alone, through `stateLine` in `session/List.tsx`. No scope reads a task collection of its own to describe a Session: the Cloud lists do not have one, and a second source is how the selected-machine list once said `Task: <task title>` while the all-machines list said only `Waiting for another Session` for the same Session. What a waiting Session waits for comes from the daemon's `waiting_for` (`docs/session-states.md`), which the compact `sessions.list` answer carries alongside the rest of the status; `session/waiting-for.ts` turns it into words for the list and the info sheet alike. A field a list needs that one scope cannot receive is added to the row, not computed differently per scope.
 
-The tree chips (`主 session · N`, the child marker) are still drawn from the local task collection and are therefore absent from the all-machines list. They are the remaining known seam.
+The tree chips (`Parent Session · N`, the child marker) are still drawn from the local task collection and are therefore absent from the all-machines list. They are the remaining known seam.
 
 ## Action rule
 

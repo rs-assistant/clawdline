@@ -4,6 +4,8 @@ func init() {
 	register(
 		// MARK: commands with a local capability
 
+		op{name: "direct-local-network-enable"},
+
 		op{name: "send"},
 
 		op{name: "answer", guard: answerNamesItsQuestion},
@@ -169,6 +171,9 @@ func init() {
 		// `local` — so a person's press from their phone and a script's write
 		// on this machine would share one receipt namespace. It opens nothing:
 		// the route needs a device that may send, which it needed anyway.
+		// Within that name each Cloud viewer files under its own
+		// (`viewerPrincipal`), so two phones naming the same request id are
+		// two requests.
 		op{name: "snippet-create"},
 
 		op{name: "snippet-update"},
@@ -184,8 +189,8 @@ func init() {
 		// read-level: the Swift bridge lists exactly these three beside the
 		// two diagnostics words in `readLevelCommandTypes`. The write switch
 		// is about typing into somebody's session, and asking to be told when
-		// one needs an answer is the reading half arriving by another road —
-		// a phone paired read-only is the device this feature exists for.
+		// one needs an answer is the reading half arriving by another road,
+		// so a phone keeps its notifications with the switch off.
 		//
 		// Each carries `X-Clawdline-Actor: device` for the reason the schedule
 		// writes do, said for a different door: `/v1/push/unsubscribe` exempts
@@ -194,18 +199,21 @@ func init() {
 		// cleans up after itself. A Cloud viewer reaches these routes in
 		// process holding exactly that token, so without this header a person
 		// on their phone would arrive wearing the script's exemption.
+		//
+		// Who owns a row is the viewer, not the credential. The bridge carries
+		// the envelope's verified sender to the route (`LocalRequest.Viewer`,
+		// read there as `cloud.CloudViewerOf`), and the route owns the row as
+		// `cloud:<viewer>`, so two phones keep a row each and neither can
+		// remove or test the other's, nor this machine's console's.
 		op{name: "push-subscribe", readLevel: true,
-			divergence: "every Cloud viewer is the same device here: an in-process Cloud " +
-				"request carries this machine's own local credential, and the store keeps " +
-				"one row per device, so a second Cloud browser asking to be notified takes " +
-				"the first one's place — where two devices paired to this machine's own " +
-				"network keep a row each. It needs the viewer's own identity to reach the " +
-				"route, which no word on this wire carries. Measured in " +
-				"internal/transport/http's `TestEveryCloudViewerIsTheSameDeviceHere`. " +
-				"The web-app origin stored beside it was this daemon's `http://127.0.0.1` " +
-				"for a while, which is what an iOS declarative notification resolved its " +
-				"address against and is why a notification that arrived opened nothing; " +
-				"it is now `cloud_app_origin`, carried to the route beside the credential",
+			divergence: "a subscription a Cloud viewer made before each viewer became its " +
+				"own device here (2026-10-19) is still owned by this machine's own console: " +
+				"it keeps being notified, but that viewer cannot remove or test it until it " +
+				"subscribes again, which replaces the row by its endpoint. Every subscription " +
+				"made since belongs to the viewer that made it, measured in " +
+				"internal/transport/http's `TestEachCloudViewerKeepsItsOwnSubscription`. " +
+				"The web-app origin stored beside it is `cloud_app_origin`, carried to the " +
+				"route beside the credential",
 			decode: func(b body) (plan, bool) {
 				// `cloud_subscription_id` is present when the browser
 				// subscribed with Clawdline Cloud's VAPID key rather than this

@@ -94,7 +94,13 @@ export const DOCUMENTS_ELEMENTS: Record<string, string> = {
   meta: "document-meta",
   body: "document-body",
   share: "document-share",
-  copy: "document-copy",
+  fullscreen: "document-fullscreen",
+  reveal: "document-reveal",
+  state: "document-state",
+  stateText: "document-state-text",
+  stateDetail: "document-state-detail",
+  retry: "document-retry",
+  others: "document-others",
   menu: "session-documents",
 }
 

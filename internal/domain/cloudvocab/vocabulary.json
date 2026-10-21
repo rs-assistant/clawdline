@@ -214,6 +214,7 @@
       ],
       "decode": {"reply": "action", "fields": {"report": {"type": "any"}}}
     },
+    {"op": "direct-local-network-enable", "kind": "command", "write_gate": true, "console": "carried", "console_route": "cloud-client.js enableSameNetwork", "console_seam": "client", "local": {"method": "POST", "local_exemption": true}, "example": {"request": "req-local-network", "session": "__clawdline_machine__"}, "shapes": [{"body": ["request", "session"], "path": "/v1/cloud/direct/local-network", "local_body": ["enabled"]}], "decode": {"reply": "action", "fields": {}, "route": {"path": "/v1/cloud/direct/local-network", "body": {"fields": {"enabled": {"const": true}}}}}},
     {
       "op": "dismiss-restorable",
       "kind": "command",
@@ -514,7 +515,7 @@
       "console": "carried",
       "console_route": "POST /v1/cloud/pairing/agent",
       "console_seam": "reader",
-      "local": {"method": "POST", "headers": ["Idempotency-Key"]},
+      "local": {"method": "POST", "local_exemption": true, "headers": ["Idempotency-Key"]},
       "example": {"machine_id": "mac_target", "machine_name": "Target", "offer": "opaque", "request": "req-pair-agent-start", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["machine_id", "machine_name", "offer", "request", "session"], "path": "/v1/cloud/pairing/agent", "local_body": ["machine_id", "machine_name", "offer"]}
@@ -528,7 +529,7 @@
       "console": "carried",
       "console_route": "GET /v1/cloud/pairing/agent/{task}",
       "console_seam": "reader",
-      "local": {"method": "GET"},
+      "local": {"method": "GET", "local_exemption": true},
       "example": {"request": "req-pair-status", "session": "__clawdline_machine__", "task_id": "7a000000-0000-4000-8000-000000000001"},
       "shapes": [
         {"body": ["request", "session", "task_id"], "path": "/v1/cloud/pairing/agent/{task_id}"}
@@ -543,11 +544,12 @@
       "console_route": "GET /v1/places/{id}/sessions[/{assistant}]",
       "console_seam": "writer",
       "local": {"method": "GET"},
-      "example": {"assistant": "codex", "place": "/Users/sean/code/clawdline-go", "request": "req-past", "session": "__clawdline_machine__"},
+      "example": {"cursor": "opaque-older-page", "assistant": "codex", "place": "/Users/sean/code/clawdline-go", "request": "req-past", "session": "__clawdline_machine__"},
       "shapes": [
+        {"body": ["assistant", "cursor", "place", "request", "session"], "path": "/v1/places/{place}/sessions/{assistant}", "query": ["cursor"]},
         {"body": ["assistant", "place", "request", "session"], "path": "/v1/places/{place}/sessions/{assistant}"}
       ],
-      "decode": {"reply": "machine", "fields": {"place": {"type": "string", "non_empty": true}, "assistant": {"type": "string"}}, "route": {"path": "/v1/places/{place}/sessions{/assistant?}"}}
+      "decode": {"reply": "machine", "fields": {"cursor": {"type": "string"}, "place": {"type": "string", "non_empty": true}, "assistant": {"type": "string"}}, "route": {"path": "/v1/places/{place}/sessions{/assistant?}", "query": {"cursor": {"from": "cursor", "omit_empty": true}}}}
     },
     {
       "op": "peer-control",
@@ -1753,6 +1755,23 @@
         {"body": ["id", "request", "session"], "path": "/v1/usage/items/{id}"}
       ],
       "decode": {"reply": "machine", "fields": {"id": {"type": "string", "checks": ["usage_id"]}}, "route": {"path": "/v1/usage/items/{id}"}}
+    },
+    {
+      "op": "usage.overview",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/usage/overview[?days=&project=]",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__", "days": "7", "project": "unattributed"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/usage/overview"},
+        {"body": ["days", "request", "session"], "path": "/v1/usage/overview", "query": ["days"]},
+        {"body": ["project", "request", "session"], "path": "/v1/usage/overview", "query": ["project"]},
+        {"body": ["days", "project", "request", "session"], "path": "/v1/usage/overview", "query": ["days", "project"]}
+      ],
+      "decode": {"reply": "machine", "fields": {"days": {"type": "string"}, "project": {"type": "string"}}, "route": {"path": "/v1/usage/overview", "query": {"days": {"from": "days"}, "project": {"from": "project"}}}}
     },
     {
       "op": "usage.session",

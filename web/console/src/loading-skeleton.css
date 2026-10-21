@@ -1,0 +1,14 @@
+@import "./page-skeleton.css";
+.loading-skeleton { width: 100%; min-width: 0; padding: 8px 0; box-sizing: border-box; }
+.loading-skeleton-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.loading-skeleton-row { display: flex; gap: 14px; align-items: center; min-width: 0; min-height: 72px; padding: 14px; box-sizing: border-box; border-bottom: 1px solid var(--line); }
+.loading-skeleton-row:last-child { border-bottom: 0; }
+.loading-skeleton .loading-skeleton-mark { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 7px; }
+.loading-skeleton-copy { flex: 1; min-width: 0; display: grid; gap: 12px; }
+.loading-skeleton-copy > :last-child { width: 38%; height: 9px; }
+.loading-skeleton-cards .loading-skeleton-row { margin-bottom: 12px; min-height: 104px; border: 1px solid var(--line); border-radius: 14px; }
+.loading-skeleton-text .loading-skeleton-mark, .loading-skeleton-detail .loading-skeleton-mark { display: none; }
+.loading-skeleton-text .loading-skeleton-row { min-height: 26px; padding: 6px 12px; border: 0; }
+.loading-skeleton-text .loading-skeleton-copy > :last-child { display: none; }
+.loading-skeleton-detail .loading-skeleton-row { min-height: 62px; }
+@media (max-width: 600px) { .loading-skeleton-row { gap: 10px; padding: 12px 8px; } }

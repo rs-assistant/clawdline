@@ -1211,3 +1211,39 @@ test("a renewed client carries the descriptor it will not ask for again", () => 
   assert.equal(next._holdsOrchestrator("linux-b"), false, "a schedules entry is still not a descriptor")
   assert.equal(next.orchestratorSnapshots.has("linux-b"), false)
 })
+
+test("the selected classic Session stays subscribed after recovery, including an already held row", () => {
+  for (const cached of [false, true]) {
+    const client = Object.create(StatusCloudClient.prototype)
+    client.statusSnapshots = new Map([
+      [JSON.stringify(["m", "__clawdline_inventory_v1__"]), { payload: {
+        complete: true, snapshot_generation: genA, inventory: { version: 1, sessions: ["s"] } } }],
+      [JSON.stringify(["m", "s"]), { payload: { snapshot_generation: genA, execution_generation: genA } }],
+    ])
+    client.sessionSnapshots = new Map(cached ? [["m\u0000s", { execution_generation: genA }]] : [])
+    client.classicSessionReads = new Map()
+    client.classicSessionAttempted = new Map()
+    client.pendingSubscriptions = new Set()
+    client.socketSubscriptions = new Map()
+    client.subscriptionHolds = new Map()
+    client.resubscribes = new Map()
+    client.openedDetails = new Set()
+    client.detailSnapshots = new Map()
+    client.listeners = new Set()
+    client.subscriptionLimit = 8
+    client.ready = true
+    client.now = () => 100
+    client.setTimeout = () => 1
+    client.clearTimeout = () => {}
+    const frames = []
+    client._sendSubscriptionFrame = (type, channels) => frames.push({ type, channels })
+    client.enableClassicSessionView("m", "s")
+    assert.equal(client.subscriptionHolds.get("s/m/s"), 1)
+    client._emit({ type: "sessions", identity: { machine: "m", session: "s" } })
+    assert.equal(client.socketSubscriptions.has("s/m/s"), true, "the Effort event still has a receiver")
+    assert.equal(frames.some((frame) => frame.type === "unsubscribe"), false)
+    client.disableClassicSessionView()
+    assert.equal(client.subscriptionHolds.has("s/m/s"), false)
+    assert.equal(client.socketSubscriptions.has("s/m/s"), false)
+  }
+})

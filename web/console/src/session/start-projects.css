@@ -22,3 +22,10 @@
 .start-project-remove svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .start-project-remove:disabled { opacity: .4; cursor: default; }
 @media (hover: hover) { .start-project-remove:hover:not(:disabled) { color: var(--ink); background: var(--card-hi); } }
+
+/* No project yet: the labelled primary action under the sentence that asks for one. */
+#start-sheet .chip.start-add-first {
+    min-height: 48px; margin-top: 10px; border-color: var(--accent); background: var(--accent);
+    color: #17110e; font-weight: 600;
+}
+#start-sheet .chip.start-add-first:disabled { opacity: 0.45; }

@@ -8,6 +8,115 @@ import (
 // (capacity.AreaOf), one reading per row.
 func (s *Server) consoleCapacityMeasures() map[string]func() capacity.Reading {
 	return map[string]func() capacity.Reading{
+		// The connection-health page's bounds live in each open operator tab.
+		capacity.ConsoleHealthUIRequestSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIBudgetSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIRefreshSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIParallelReads: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIReadsPerLoad: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIBodyBytes: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIPageRows: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIEventPages: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIExportBytes: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIIDCharacters: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIIncidentPages: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIProbeTargets: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIProbeHosts: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIProbeClaims: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUITrendLanes: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUITrendSignals: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIIncidentRows: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIIncidentExportBytes: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIIncidentWindowSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		// The browser connection-health producer's bounds live in each signed-in page that turned
+		// it on; the page counts its own drops (ViewerHealthProducer.status), the daemon sees none.
+		capacity.ConsoleViewerHealthBodyBytes: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthBatchRows: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthBufferRows: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthSendEverySeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthCoalesceSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthHourlyRequests: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthHourlyBytes: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthAttempts: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthBackoffSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthRetryAfterSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthRequestSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthElapsedSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		capacity.ConsoleViewerHealthCountRows: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+		},
+		// Settings → Remote's owner-diagnostics block reads on its own cadence in each open window.
+		capacity.ConsoleOwnerRetentionPollSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Settings window cadence; daemon cannot measure live browser timers"}
+		},
+		capacity.ConsoleOwnerRetentionRequestSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Settings window read deadline; daemon cannot measure another window's wait"}
+		},
+		capacity.ConsoleExecutionRecoveryAttempts: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console opening recovery guard; daemon cannot measure another device's recovery attempts"}
+		},
 		// The console's transcript cadence lives in each open tab; the
 		// daemon serves the reads and cannot count a tab's timers.
 		capacity.ConsoleTranscriptSafetySeconds: func() capacity.Reading {
@@ -60,6 +169,15 @@ func (s *Server) consoleCapacityMeasures() map[string]func() capacity.Reading {
 		},
 		capacity.ConsoleOpenedRowQuiet: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console tab wait before the pane says the row has not come; daemon cannot measure live browser timers"}
+		},
+		capacity.ConsoleDirectHistoryHours: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser direct-attempt record in that browser's storage; daemon cannot read another device's storage"}
+		},
+		capacity.ConsoleDirectHistoryMachines: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser direct-attempt record in that browser's storage; daemon cannot read another device's storage"}
+		},
+		capacity.ConsoleMachineListPoll: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console tab cadence; daemon cannot measure live browser timers"}
 		},
 	}
 }

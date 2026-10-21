@@ -2939,14 +2939,15 @@ const (
 // HealthReasonValues is every value the contract allows, in contract order.
 var HealthReasonValues = []HealthReason{HealthReasonBrokerBeatStalled, HealthReasonCapacityExhausted, HealthReasonCapacityBeatStalled, HealthReasonWorkSweepStalled}
 
-// A project's mark: rows of `#RRGGBB`, with null for transparent. It is derived
-// from the project path and the machine's icon registry by the same rules the
-// Swift app uses, so both apps draw the same creature — a mark somebody
-// recognises by colour and shape is not recognisable if the second app draws it
-// differently, and near-identical is worse than obviously different.
+// A project mark with an RGB accent and either bounded colour cells (null is
+// transparent) or a self-contained static SVG with empty cells. Both render
+// proportionally inside the existing icon slot.
 type Icon struct {
 	Accent string      `json:"accent"`
 	Cells  [][]*string `json:"cells"`
+
+	// Optional self-contained SVG; cells is empty when present.
+	Svg string `json:"svg,omitempty"`
 }
 
 // How a running process was tied to the conversation it is having, or — when
@@ -3608,16 +3609,20 @@ type PastSession struct {
 }
 
 // GET /v1/places/{id}/sessions[/{assistant}]: what that assistant has recorded
-// in the place, newest first, at most two hundred. Dispatched children and `-p`
-// runs are not conversations and are left out.
+// in the place, newest first. Codex returns one provider page of twenty with an
+// opaque next_cursor; other assistants return at most two hundred. Dispatched
+// children and `-p` runs are not conversations and are left out.
 type PastSessionList struct {
 	Assistant string `json:"assistant"`
 	At        int64  `json:"at"`
 
 	// The list stopped at its cap and there were more.
-	More     bool          `json:"more"`
-	Place    string        `json:"place"`
-	Sessions []PastSession `json:"sessions"`
+	More bool `json:"more"`
+
+	// Opaque continuation for the next Codex page; omitted at the end.
+	NextCursor string        `json:"next_cursor,omitempty"`
+	Place      string        `json:"place"`
+	Sessions   []PastSession `json:"sessions"`
 }
 
 // One persona. `id` is what a start or resume path ends `/as/{id}` with, what a
@@ -3685,11 +3690,12 @@ type PersonaSuggestionRequest struct {
 	ExpectedVersion int64 `json:"expected_version"`
 }
 
-// A refusal from the start, resume and history routes: not_found, forbidden,
-// bad_request, invalid_launch, terminal_closed, terminal_unsupported,
-// terminal_io_failed, iterm_attention_required, capability_unavailable,
-// terminal_busy, unknown_persona (a start or resume ending `/as/{persona}` that
-// names no persona in GET /v1/personas).
+// A refusal from the start, resume and history routes: codex_unavailable (503;
+// provider read failed, retryable and never evidence of absence), not_found,
+// forbidden, bad_request, invalid_launch, terminal_closed,
+// terminal_unsupported, terminal_io_failed, iterm_attention_required,
+// capability_unavailable, terminal_busy, unknown_persona (a start or resume
+// ending `/as/{persona}` that names no persona in GET /v1/personas).
 type PlaceError struct {
 	// The terminal the refusal is about, on terminal_closed and
 	// iterm_attention_required, so a page can name it in its own language.
@@ -4974,17 +4980,18 @@ type ScheduleRecord struct {
 
 // The body POST /v1/orchestrator/schedules and PATCH
 // /v1/orchestrator/schedules/:id take — the form's fields, flattened.
-// `place_id` is an id from GET /v1/places, never a path. Either `at` with
-// exactly one of `days` and `on` (`days` is not defaulted), or `trigger_only:
-// true` with none of `at`, `days` and `on` — a schedule the clock never
-// fires, run only by hand or by webhook. schedule_id, created_at,
-// when_changed_at, fired_at and project_dir are the machine's and are refused
-// as unknown fields. Writes need an Idempotency-Key and either a device that
-// may send or, for a schedule that runs once, this machine's orchestrator
-// token. A session carrying a person's recent instruction may write a repeating
-// schedule by sending both `session_id` and `via.run`; the run must have been
-// issued for a message to that conversation. Those proof fields are audit
-// evidence and are not stored in the schedule.
+// `place_id` is an id from GET /v1/places, never a path. Either `at` with one
+// of `days`, `on`, or the pair `every_days` and `start` (`days` is not
+// defaulted), or `trigger_only: true` with none of `at`, `days`, `on`,
+// `every_days` and `start` — a schedule the clock never fires, run only by
+// hand or by webhook. schedule_id, created_at, when_changed_at, fired_at and
+// project_dir are the machine's and are refused as unknown fields. Writes need
+// an Idempotency-Key and either a device that may send or, for a schedule that
+// runs once, this machine's orchestrator token. A session carrying a person's
+// recent instruction may write a repeating schedule by sending both
+// `session_id` and `via.run`; the run must have been issued for a message to
+// that conversation. Those proof fields are audit evidence and are not stored
+// in the schedule.
 type ScheduleRequest struct {
 	Assistant    string   `json:"assistant"`
 	At           string   `json:"at,omitempty"`
@@ -4992,7 +4999,11 @@ type ScheduleRequest struct {
 	CloseTab     string   `json:"close_tab,omitempty"`
 	Days         []string `json:"days,omitempty"`
 	Enabled      bool     `json:"enabled,omitempty"`
-	Instructions string   `json:"instructions"`
+
+	// Positive calendar-day interval, paired with start and at; excludes days, on and
+	// trigger_only.
+	EveryDays    int64  `json:"every_days,omitempty"`
+	Instructions string `json:"instructions"`
 
 	// No key leaves the model alone; an empty string takes it off.
 	Model           string `json:"model,omitempty"`
@@ -5012,8 +5023,11 @@ type ScheduleRequest struct {
 
 	// The conversation the person's message was sent to. Required with via for a
 	// session-authorized repeating write.
-	SessionID string            `json:"session_id,omitempty"`
-	Template  *ScheduleTemplate `json:"template,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+
+	// Inclusive anchor date, YYYY-MM-DD, for every_days. Manual runs do not move it.
+	Start    string            `json:"start,omitempty"`
+	Template *ScheduleTemplate `json:"template,omitempty"`
 
 	// The IANA zone whose wall clock at names. New console schedules use the browser's
 	// zone.
@@ -5067,7 +5081,8 @@ type ScheduleRow struct {
 
 	// Present and true for a schedule with no time (`when.trigger_only`): the clock
 	// never fires it, and it runs only by hand or by webhook. It never has next_fire.
-	TriggerOnly bool `json:"trigger_only,omitempty"`
+	TriggerOnly bool          `json:"trigger_only,omitempty"`
+	When        *ScheduleWhen `json:"when,omitempty"`
 }
 
 // One task a schedule made, newest first in the detail. `summary` is what the
@@ -5152,13 +5167,21 @@ type ScheduleUserAuthorization struct {
 
 // `when` in the file's own spelling: `at` (HH:MM, local time) and exactly one
 // of `days` (`daily`, or weekday names sun…sat) or `on` (YYYY-MM-DD, a
-// schedule that runs once) — or, alone, `trigger_only: true`, a schedule with
+// schedule that runs once), or `every_days` with `start` (an anchored
+// calendar-day interval) — or, alone, `trigger_only: true`, a schedule with
 // no time that runs only by hand or by webhook.
 type ScheduleWhen struct {
-	At          string   `json:"at,omitempty"`
-	Days        []string `json:"days,omitempty"`
-	On          string   `json:"on,omitempty"`
-	TriggerOnly bool     `json:"trigger_only,omitempty"`
+	At   string   `json:"at,omitempty"`
+	Days []string `json:"days,omitempty"`
+
+	// Positive calendar-day interval, paired with start and at; excludes days, on and
+	// trigger_only.
+	EveryDays int64  `json:"every_days,omitempty"`
+	On        string `json:"on,omitempty"`
+
+	// Inclusive anchor date, YYYY-MM-DD, for every_days. Manual runs do not move it.
+	Start       string `json:"start,omitempty"`
+	TriggerOnly bool   `json:"trigger_only,omitempty"`
 }
 
 // What the clock says about its own last pass. A pass that fired nothing and a
@@ -5808,11 +5831,11 @@ type SessionRow struct {
 	State  SessionState    `json:"state"`
 	TTY    string          `json:"tty,omitempty"`
 
-	// The live broker work that makes a broker-projected `waiting_session` row wait,
-	// collected by the same pass that decided the state. Present only on such rows; at
-	// most `session.waiting_for` entries, with `waiting_for_omitted` counting the
-	// rest. Both Cloud list scopes and the local list describe a wait from this field
-	// alone.
+	// The live broker work owned by this Session, collected by the same pass that
+	// decided the work state. Independent of the terminal state, so working and
+	// unknown rows can also name outstanding work; at most `session.waiting_for`
+	// entries, with `waiting_for_omitted` counting the rest. Both Cloud list scopes
+	// and the local list describe a wait from this field alone.
 	WaitingFor []SessionWaitTarget `json:"waiting_for,omitempty"`
 
 	// Live waited-on tasks left out of `waiting_for` by its bound.
@@ -6067,6 +6090,22 @@ type SettingsRequest struct {
 	// Empty, or a Claude Code model name used when a new Session does not name one.
 	ClaudeDefaultModel *string `json:"claude_default_model"`
 
+	// Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+	// as ciphertext only paired owner devices can open. Separate from
+	// cloud_health_upload, which never permits it. Absent or false means off, and off
+	// makes no request. Only the local token may change it.
+	CloudHealthOwnerRetention *bool `json:"cloud_health_owner_retention"`
+
+	// Whether this daemon uploads its connection-health records to Cloud. Absent or
+	// false means off, and off makes no request. Only the local token may change it.
+	// Owner diagnostics (location, age, deadline) are never sent.
+	CloudHealthUpload *bool `json:"cloud_health_upload"`
+
+	// Only `false`: dismisses the retired Cloudflare tunnel notice by removing that
+	// tunnel's old keys from the file. The old keys themselves are refused as
+	// `retired_setting`.
+	CloudflareTunnelRetired *bool `json:"cloudflare_tunnel_retired"`
+
 	// Whether a new session is named by an assistant.
 	CodexAutoName *bool `json:"codex_auto_name"`
 
@@ -6179,12 +6218,6 @@ type SettingsRequest struct {
 	// Whether anything but this Mac may read the session list.
 	Remote *bool `json:"remote"`
 
-	// A hostname, or empty.
-	RemoteHostname *string `json:"remote_hostname"`
-
-	// `off`, `quick` or `named`.
-	RemoteTunnel *string `json:"remote_tunnel"`
-
 	// Whether the bar comes back with the terminal.
 	ReopenOnReturn *bool `json:"reopen_on_return"`
 
@@ -6193,6 +6226,9 @@ type SettingsRequest struct {
 
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
+
+	// A full Tailscale name ending in `.ts.net`, or empty.
+	TailscaleHostname *string `json:"tailscale_hostname"`
 
 	// `auto`, `iterm`, `iterm_native` or `tmux`.
 	Terminal *string `json:"terminal"`
@@ -6244,6 +6280,23 @@ type SettingsSnapshot struct {
 	// The model used for a new Claude Code session when that launch does not name one.
 	// Empty leaves the choice to Claude Code.
 	ClaudeDefaultModel *string `json:"claude_default_model"`
+
+	// Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+	// as ciphertext only paired owner devices can open. Separate from
+	// cloud_health_upload, which never permits it. Absent or false means off, and off
+	// makes no request. Only the local token may change it.
+	CloudHealthOwnerRetention *bool `json:"cloud_health_owner_retention"`
+
+	// Whether this daemon uploads its connection-health records to Cloud. Absent or
+	// false means off, and off makes no request. Only the local token may change it.
+	// Owner diagnostics (location, age, deadline) are never sent.
+	CloudHealthUpload *bool `json:"cloud_health_upload"`
+
+	// True while the file still holds the built-in Cloudflare tunnel's settings
+	// (`remote_tunnel`, `remote_tunnel_name`, `remote_hostname`, `cloudflared_path`),
+	// removed on 2026-10-20. They start nothing; the settings page explains once, and
+	// writing `cloudflare_tunnel_retired: false` takes them out of the file.
+	CloudflareTunnelRetired bool `json:"cloudflare_tunnel_retired,omitempty"`
 
 	// Whether a new session is named by an assistant. The Swift app's spelling, kept
 	// so a line copied between the two files means the same thing.
@@ -6376,12 +6429,6 @@ type SettingsSnapshot struct {
 	// Whether anything but this Mac may read the session list.
 	Remote *bool `json:"remote"`
 
-	// The hostname a named tunnel answers on.
-	RemoteHostname *string `json:"remote_hostname"`
-
-	// `off`, `quick` or `named`.
-	RemoteTunnel *string `json:"remote_tunnel"`
-
 	// Whether the bar comes back with the terminal.
 	ReopenOnReturn *bool `json:"reopen_on_return"`
 
@@ -6391,6 +6438,10 @@ type SettingsSnapshot struct {
 
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
+
+	// This machine's full Tailscale name (`<machine>.<tailnet>.ts.net`) that Tailscale
+	// Serve answers on; accepted only while `remote` is on.
+	TailscaleHostname *string `json:"tailscale_hostname"`
 
 	// Where a new session opens: `auto`, `iterm`, `iterm_native` or `tmux`. With tmux
 	// installed, `auto` and `iterm` run the session in tmux and show it in an iTerm2
@@ -6597,6 +6648,8 @@ type SquadEffectivePersona struct {
 }
 
 type SquadEffectiveSettings struct {
+	AutoDispatch          SquadFieldBool          `json:"auto_dispatch"`
+	AutoDispatchVersion   int64                   `json:"auto_dispatch_version"`
 	Motion                SquadFieldBool          `json:"motion"`
 	MotionSettingsVersion int64                   `json:"motion_settings_version"`
 	Personas              []SquadEffectivePersona `json:"personas"`
@@ -6685,10 +6738,11 @@ type SquadInputText struct {
 }
 
 type SquadMotionRequest struct {
-	ExpectedVersion int64          `json:"expected_version"`
-	Motion          SquadInputBool `json:"motion"`
-	PlaceID         string         `json:"place_id,omitempty"`
-	ScopeID         string         `json:"scope_id,omitempty"`
+	AutoDispatch    *SquadInputBool `json:"auto_dispatch,omitempty"`
+	ExpectedVersion int64           `json:"expected_version"`
+	Motion          *SquadInputBool `json:"motion,omitempty"`
+	PlaceID         string          `json:"place_id,omitempty"`
+	ScopeID         string          `json:"scope_id,omitempty"`
 }
 
 type SquadNames struct {
@@ -7554,70 +7608,6 @@ type TranscriptUnread struct {
 	WindowBytes int64 `json:"windowBytes"`
 }
 
-// `off`; `quick`, an address made up per run under trycloudflare.com; `named`,
-// the person's own tunnel (`remote_tunnel_name`) and hostname
-// (`remote_hostname`).
-type TunnelMode string
-
-const (
-	TunnelModeOff   TunnelMode = "off"
-	TunnelModeQuick TunnelMode = "quick"
-	TunnelModeNamed TunnelMode = "named"
-)
-
-// TunnelModeValues is every value the contract allows, in contract order.
-var TunnelModeValues = []TunnelMode{TunnelModeOff, TunnelModeQuick, TunnelModeNamed}
-
-// `off`; `starting`, launched or waiting to retry and not yet registered with
-// the edge; `up`; `failed`, with a reason — including a refusal to start.
-type TunnelState string
-
-const (
-	TunnelStateOff      TunnelState = "off"
-	TunnelStateStarting TunnelState = "starting"
-	TunnelStateUp       TunnelState = "up"
-	TunnelStateFailed   TunnelState = "failed"
-)
-
-// TunnelStateValues is every value the contract allows, in contract order.
-var TunnelStateValues = []TunnelState{TunnelStateOff, TunnelStateStarting, TunnelStateUp, TunnelStateFailed}
-
-// One reading of the tunnel.
-type TunnelStatus struct {
-	At int64 `json:"at"`
-
-	// Launches in a row that have died, while it is retrying; absent when none have.
-	Attempts int64 `json:"attempts,omitempty"`
-
-	// The cloudflared the next launch would run: `cloudflared_path` when it is set and
-	// executable, else where a package manager puts it, else PATH. Absent when there
-	// is none.
-	Binary string `json:"binary,omitempty"`
-
-	// When state, url or reason last moved.
-	Changed int64 `json:"changed"`
-
-	// The command line of the child that is running or was last started, binary first.
-	// It always carries `--config` and this daemon's own file, never the person's
-	// ~/.cloudflared/config.yml.
-	Command []string `json:"command,omitempty"`
-
-	// The configuration file cloudflared is pointed at, in this daemon's state
-	// directory.
-	Config    string     `json:"config"`
-	Installed bool       `json:"installed"`
-	Mode      TunnelMode `json:"mode"`
-
-	// Why it failed or refused, in the tunnel's own sentence. Present when state is
-	// failed.
-	Reason string      `json:"reason,omitempty"`
-	State  TunnelState `json:"state"`
-
-	// The address, once a connection to Cloudflare's edge is registered. Present when
-	// state is up.
-	URL string `json:"url,omitempty"`
-}
-
 // The last update of a release install, as the updater recorded it in the state
 // directory.
 type UpdateApply struct {
@@ -8071,6 +8061,79 @@ type UsageItemOwner struct {
 type UsageNamedSize struct {
 	Name   string  `json:"name"`
 	Tokens float64 `json:"tokens"`
+}
+
+type UsageOverview struct {
+	At             int64                        `json:"at"`
+	Coverage       UsageOverviewCoverage        `json:"coverage"`
+	Daily          []UsageOverviewDay           `json:"daily"`
+	Days           int64                        `json:"days"`
+	PreviousDaily  []UsageOverviewDay           `json:"previous_daily"`
+	PreviousSince  int64                        `json:"previous_since"`
+	PreviousTotals UsageOverviewTotals          `json:"previous_totals"`
+	PreviousUntil  int64                        `json:"previous_until"`
+	Project        string                       `json:"project"`
+	ProjectOptions []UsageOverviewProjectOption `json:"project_options"`
+	Projects       []UsageOverviewProject       `json:"projects"`
+	Since          int64                        `json:"since"`
+	Timezone       string                       `json:"timezone"`
+	Totals         UsageOverviewTotals          `json:"totals"`
+	Until          int64                        `json:"until"`
+}
+
+type UsageOverviewCoverage struct {
+	HistoryFrom    int64                      `json:"history_from"`
+	SessionsRead   int64                      `json:"sessions_read"`
+	SessionsTotal  int64                      `json:"sessions_total"`
+	State          UsageOverviewCoverageState `json:"state"`
+	TasksTruncated bool                       `json:"tasks_truncated,omitempty"`
+	Truncated      bool                       `json:"truncated"`
+}
+
+type UsageOverviewCoverageState string
+
+const (
+	UsageOverviewCoverageStateMissing  UsageOverviewCoverageState = "missing"
+	UsageOverviewCoverageStatePartial  UsageOverviewCoverageState = "partial"
+	UsageOverviewCoverageStateComplete UsageOverviewCoverageState = "complete"
+)
+
+// UsageOverviewCoverageStateValues is every value the contract allows, in contract order.
+var UsageOverviewCoverageStateValues = []UsageOverviewCoverageState{UsageOverviewCoverageStateMissing, UsageOverviewCoverageStatePartial, UsageOverviewCoverageStateComplete}
+
+type UsageOverviewDay struct {
+	Coverage              UsageOverviewCoverageState `json:"coverage"`
+	Date                  string                     `json:"date"`
+	Dispatches            int64                      `json:"dispatches"`
+	DurationMedianSeconds *float64                   `json:"duration_median_seconds"`
+	DurationSamples       int64                      `json:"duration_samples"`
+	Tokens                *float64                   `json:"tokens"`
+}
+
+type UsageOverviewParts struct {
+	CacheRead  float64 `json:"cache_read"`
+	CacheWrite float64 `json:"cache_write"`
+	Input      float64 `json:"input"`
+	Output     float64 `json:"output"`
+}
+
+type UsageOverviewProject struct {
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	Tokens float64 `json:"tokens"`
+}
+
+type UsageOverviewProjectOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type UsageOverviewTotals struct {
+	Dispatches            int64              `json:"dispatches"`
+	DurationMedianSeconds *float64           `json:"duration_median_seconds"`
+	DurationSamples       int64              `json:"duration_samples"`
+	Parts                 UsageOverviewParts `json:"parts"`
+	Tokens                *float64           `json:"tokens"`
 }
 
 // Why a reading is not current. `not_yet_read`: the ledger has no reading of it

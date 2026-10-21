@@ -192,3 +192,29 @@ func TestAnAskedRowLooksAtItsScreenBeforeItsFreshRead(t *testing.T) {
 	cancel()
 	<-done
 }
+
+func TestATaskChangePublishesSessionWorkBeforeThePollingPass(t *testing.T) {
+	out := &collector{}
+	before := scanBody(t, true, map[string]bool{"tmux": true}, scanRow{id: "%19", tty: "ttys001", backend: "tmux"})
+	after := scanBody(t, true, map[string]bool{"tmux": true}, scanRow{id: "%19", tty: "ttys001", backend: "tmux"}, scanRow{id: "%20", tty: "ttys002", backend: "tmux"})
+	p := newPublisher(&fixedRouter{body: before}, out)
+	p.Every = time.Hour
+	var reads atomic.Int32
+	p.Fresh = func(context.Context) ([]byte, bool) { reads.Add(1); return []byte(after), true }
+	link := &Link{publisher: p}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { _ = p.Run(ctx); close(done) }()
+	defer func() { cancel(); <-done }()
+	waitFor(t, "initial publication", func() bool { return len(legacyChannels(out.channels())) >= 3 })
+	if reads.Load() != 0 {
+		t.Fatal("control: an unchanged list was refreshed")
+	}
+	out.reset()
+	link.TaskListChanged()
+	link.TaskListChanged()
+	waitFor(t, "task change publication", func() bool { return strings.Contains(strings.Join(out.channels(), " "), "s/mac-01/%2520") })
+	if !link.takeTaskListMoved() {
+		t.Fatal("task list dirty signal was lost")
+	}
+}

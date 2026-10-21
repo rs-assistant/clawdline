@@ -6,7 +6,7 @@ is where it gets lost — a reminder in a session's head does not outlive the se
 record keeps it: **why** the change was made, **when** to look again, **what would count as it
 holding**, and **the data it is judged by**, read at the moment someone looks.
 
-It is reached three ways: the sidebar's **驗收** page, `clawdline verify`, and
+It is reached three ways: the sidebar's **Verify** page, `clawdline verify`, and
 `/v1/verifications`. A scheduled task that reads the data for it writes its readout onto the record
 with its own task secret.
 
@@ -92,12 +92,12 @@ asked. `show` prints the comparison exactly as `clawdline usage --compare-compac
 
 ## The page
 
-驗收 in the sidebar lists the open records with how long is left (red once overdue) and how many
+Verify in the sidebar lists the open records with how long is left (red once overdue) and how many
 criteria are marked; closed ones fold under a button. A record shows why, each criterion with its
 state and the presses to change it, the data (the comparison as a table, with the same cells and
 footnotes the terminal prints), the notes and a box to add one, accept/reject with a required reason,
 and delete behind a second press that says whether the record is still open. The words are in
-`pages/verify/words.ts`, in English and 繁體中文.
+`pages/verify/words.ts`, in English and Traditional Chinese.
 
 It is measured at 390px by `web/console/src/pages/verify/verify.e2e.ts`, which loads the built console
 in headless Chrome at 390×844 against a stand-in daemon: nothing on the list or a record reaches past
@@ -112,10 +112,10 @@ id (`app.CompactionScheduleDigest`): a real schedule's id belongs to one machine
 is public. The daemon hashes the ids it holds (`Store.ScheduleIDs`, which, unlike `ScheduleFiles`,
 stamps nothing) and plants the record only on a match. On any other machine it does nothing.
 
-- 壓縮門檻實驗（300000）, started 2026-09-26, due 2026-10-03 09:00 (the machine's zone)
+- Compaction-threshold experiment (300000), started 2026-09-26, due 2026-10-03 09:00 (the machine's zone)
 - data: `compaction_compare` since `14d`; linked to that schedule
-- criteria: 300000 組每個 task 成本明顯低於 before-setting · 成功率沒有下降、stalled 與重派沒有增加 ·
-  抽查 3–5 個壓縮過的 task：沒有遺失指示或重做
+- criteria: the 300000 group has clearly lower per-task cost than before-setting; success rate has not declined; stalled and redispatched tasks have not increased;
+  inspect 3–5 compacted tasks for lost instructions or repeated work
 
 The seed's key is written in `verification_seeds` in the same transaction as the record, and it is
 never removed: planting again writes nothing, and **deleting the record does not bring it back**. A

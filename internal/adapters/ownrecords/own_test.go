@@ -140,9 +140,8 @@ func TestARootsOwnCallbackDoesNotHoldItOpen(t *testing.T) {
 	}
 }
 
-// The tasks a waiting row names are the ones that made it wait: every live
-// task it counted, and none it did not. A row that is not waiting on tasks
-// names nothing, so no list can show a wait the state does not have.
+// Outstanding work remains visible independently of the terminal state;
+// finished tasks and another conversation never leak into the row.
 func TestAWaitingRootNamesExactlyTheTasksItCounted(t *testing.T) {
 	base := Snapshot{}
 	heavy := Task{ID: "heavy1", State: "queued", Kind: "callback", Title: "Queued heavy command finished",
@@ -162,8 +161,15 @@ func TestAWaitingRootNamesExactlyTheTasksItCounted(t *testing.T) {
 	if w.State != "waiting_session" || strings.Join(ids, ",") != "heavy1,child1" {
 		t.Fatalf("waiting root: state %s, names %v", w.State, ids)
 	}
-	if w := snap.Work(ownRootLive, "working"); w.Waiting != nil {
-		t.Fatalf("a working root names waits: %v", w.Waiting)
+	for _, state := range []string{"working", "unknown", "waiting"} {
+		w := snap.Work(ownRootLive, state)
+		want := state
+		if state == "waiting" {
+			want = "waiting_you"
+		}
+		if w.State != want || len(w.Waiting) != 2 || w.Waiting[0].ID != "heavy1" || w.Waiting[1].ID != "child1" {
+			t.Fatalf("%s terminal: %+v", state, w)
+		}
 	}
 	if w := base.With(Own{Tasks: []Task{done, other}}).Work(ownRootLive, "idle"); w.Waiting != nil || w.State == "waiting_session" {
 		t.Fatalf("control: a root with nothing live reads %s and names %v", w.State, w.Waiting)

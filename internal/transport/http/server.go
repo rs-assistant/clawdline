@@ -20,6 +20,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/artifacts"
 	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
+	"github.com/sainteye/clawdline/internal/adapters/healthupload"
 	"github.com/sainteye/clawdline/internal/adapters/logs"
 	"github.com/sainteye/clawdline/internal/adapters/machineusage"
 	"github.com/sainteye/clawdline/internal/adapters/planner"
@@ -41,6 +42,7 @@ import (
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	"github.com/sainteye/clawdline/internal/domain/icon"
 	"github.com/sainteye/clawdline/internal/domain/projectsync"
 	"github.com/sainteye/clawdline/internal/domain/session"
@@ -62,6 +64,14 @@ type Server struct {
 	cloudReload  func() error
 	cloudLoginMu sync.Mutex
 	cloudLogin   cloudLoginAttempt
+	// connectionHealth is the daemon's per-boot connection-health runtime
+	// (connection_health.go); nil when monitoring is off.
+	connectionHealth *connectionhealth.Runtime
+	// connectionHealthStore is the durable copy of its journal, once opened
+	// off the startup path (connection_health.go); nil before.
+	connectionHealthStore atomic.Pointer[durableHealth]
+	// connectionHealthUpload reads the health uploader's status, once set.
+	connectionHealthUpload atomic.Pointer[func() healthupload.Status]
 	// version is this build as `clawdline version` prints it, for /v1/health
 	// (SetVersion). Empty leaves `version` out of the answer.
 	version        string
@@ -420,6 +430,9 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/health"}, s.health},
 		{Route{"*", "/v1/diagnostics"}, s.diagnostics},
 		{Route{"*", "/v1/capacity"}, s.capacityRoute},
+		// What the connection-health watchdog sees now and its journal
+		// (connection_health.go). This machine's own token, never via Cloud.
+		{Route{"*", "/v1/connection-health/"}, s.connectionHealthRoute},
 		// The dashboard behind the session counts: this machine's CPU and memory and
 		// each session's share (machine_usage.go). Any paired device, as /v1/capacity.
 		{Route{"*", "/v1/machine/usage"}, s.machineUsageRoute},
@@ -464,14 +477,12 @@ func (s *Server) routeTable() []route {
 		// hands over the account key.
 		{Route{"*", "/v1/cloud/pairing"}, s.cloudPairingRoute},
 		{Route{"*", "/v1/cloud/pairing/offer"}, s.cloudPairingOfferRoute},
+		{Route{"*", "/v1/cloud/pairing/identity"}, s.cloudIdentityPairingRoute},
+		{Route{"*", "/v1/cloud/pairing/identity/decision"}, s.cloudIdentityPairingDecisionRoute},
 		{Route{"*", "/v1/cloud/pairing/agent"}, s.cloudPairingAgentRoute},
 		{Route{"*", "/v1/cloud/pairing/agent/"}, s.cloudPairingAgentTaskRoute},
 		{Route{"*", "/v1/cloud/devices/revoke"}, s.cloudDeviceRoute},
 		{Route{"*", "/v1/cloud/keys/rotate"}, s.cloudRotateRoute},
-		// The account-free way in from outside: what this daemon's cloudflared is
-		// doing (tunnel.go). This machine's own token only — a quick tunnel's
-		// address is its secret.
-		{Route{"*", "/v1/tunnel"}, s.tunnelRoute},
 		{Route{"*", "/v1/sessions"}, s.sessions},
 		// Everything under a session id is about that session: its info, which is
 		// a read, and otherwise an action on it. One handler rather than a route
@@ -836,9 +847,7 @@ func (s *Server) notImplemented(w http.ResponseWriter, r *http.Request) { writeN
 // Listen binds the daemon's address, and is the first thing `serve` does.
 //
 // Binding used to be the last. Everything before it had already run: the
-// broker's beat, the cloud line, the tunnel's Reclaim — which stops whatever
-// cloudflared the state directory's pid file names, the running daemon's own
-// included — and a `listening` line in the shared log from a daemon that was
+// broker's beat, the cloud line, and a `listening` line in the shared log from a daemon that was
 // about to fail to listen. On 2026-09-21 that line was written at 10:52:13 by a
 // daemon that never held the port. A daemon that cannot have the port now
 // finds out before it has done anything else.

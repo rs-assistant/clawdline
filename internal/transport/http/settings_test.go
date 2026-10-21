@@ -110,7 +110,7 @@ func TestNotificationSettingsAreIndependentOfThisBrowser(t *testing.T) {
 	if len(got) != 1 || got["push_on_waiting"] != false {
 		t.Fatalf("notification-only answer: %v", got)
 	}
-	for _, body := range []string{`{"remote_hostname":"example.invalid"}`, `{"push_on_waiting":"false"}`} {
+	for _, body := range []string{`{"tailscale_hostname":"example.invalid"}`, `{"push_on_waiting":"false"}`} {
 		if rec := call(http.MethodPost, body); rec.Code != http.StatusBadRequest {
 			t.Errorf("accepted %s: %d %s", body, rec.Code, rec.Body)
 		}
@@ -348,8 +348,8 @@ func TestSettingsEveryWindowRow(t *testing.T) {
 				sent[key.Name] = "com.googlecode.iterm2,com.apple.Terminal"
 			case key.Name == "output_font":
 				sent[key.Name] = "Menlo"
-			case key.Name == "remote_hostname":
-				sent[key.Name] = "mac.example.com"
+			case key.Name == "tailscale_hostname":
+				sent[key.Name] = "mac.tailnet-example.ts.net"
 			default:
 				sent[key.Name] = "clawd"
 			}

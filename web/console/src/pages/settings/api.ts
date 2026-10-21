@@ -39,19 +39,30 @@ export function defaultModelOptions(
  * page's and nobody else's; the request and its failures are the client's own
  * shape all the same, so `failureSentence` reads them the way it reads any
  * other refusal.
+ *
+ * The deadline covers the whole exchange, the body included: a daemon that sends headers and then
+ * stalls is a timeout, not a read that never ends. A caller's `signal` (an unmounted page, a read
+ * made obsolete) aborts the same request; it never starts a second one.
  */
-async function call(init: RequestInit, path = "/v1/settings"): Promise<SettingsSnapshot> {
+async function call(init: RequestInit, path = "/v1/settings", signal?: AbortSignal): Promise<SettingsSnapshot> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 10_000)
+  const forward = () => controller.abort()
+  if (signal?.aborted) controller.abort()
+  else signal?.addEventListener("abort", forward, { once: true })
   let res: Response
+  let text: string
   try {
-    res = await fetch(client.url(path), { ...init, signal: controller.signal })
-  } catch (cause) {
-    throw new TransportError(`${init.method ?? "GET"} ${path} did not complete`, cause)
+    try {
+      res = await fetch(client.url(path), { ...init, signal: controller.signal })
+      text = await res.text()
+    } catch (cause) {
+      throw new TransportError(`${init.method ?? "GET"} ${path} did not complete`, cause)
+    }
   } finally {
     clearTimeout(timer)
+    signal?.removeEventListener("abort", forward)
   }
-  const text = await res.text()
   let parsed: unknown
   try {
     parsed = text ? JSON.parse(text) : null
@@ -65,8 +76,8 @@ async function call(init: RequestInit, path = "/v1/settings"): Promise<SettingsS
   return parsed as SettingsSnapshot
 }
 
-export function readSettings(): Promise<SettingsSnapshot> {
-  return call({ method: "GET" })
+export function readSettings(options: { signal?: AbortSignal } = {}): Promise<SettingsSnapshot> {
+  return call({ method: "GET" }, "/v1/settings", options.signal)
 }
 
 /** The daemon console's paired-browser surface excludes native input-bar keys. */

@@ -35,8 +35,8 @@ preserve in a wrong number. The wire is
 A piece of text you wrote once and press instead of typing again. Two real ones, which are the
 request this design came from:
 
-- *"commit（逐檔指名，不要 git add -A）、push、deploy。"*
-- *"回報你剛剛做了什麼、什麼還沒做、接下來要做什麼。"*
+- *"Commit (stage files by name; do not use git add -A), push, and deploy."*
+- *"Report what you just did, what remains, and what comes next."*
 
 Both get typed several times a day, into a phone, one thumb at a time.
 
@@ -54,7 +54,7 @@ Three entrances, one list behind them.
 |---|---|
 | **The project mark in the session header** | The shortcut. It is already the most identifiable thing on the phone's header, it already means *this project*, and pressing it costs nothing to reach. |
 | **`⋯` → Snippets** | The discoverable one. A shortcut nobody can find is a shortcut nobody uses, and the overflow menu is where this app has put every other session-scoped action. |
-| **The sheet's own `＋` and `編輯`** | Making and changing them, in the place where you are already looking at them. |
+| **The sheet's own `＋` and `Edit`** | Making and changing them, in the place where you are already looking at them. |
 
 **The mark has to become a button of its own, and that is a real change to a header that works
 today.** Right now `#detail-mark` is a `<canvas>` *inside* `#detail-info`, and the whole identity
@@ -107,11 +107,11 @@ with one space, keeps the undo stack, re-renders the composer, tells the skill p
 changed, and scrolls to the end. Dictation uses it. Snippets use the same one; no second insertion
 path.
 
-Sending is the second press, on the button that already says 送出. That is one more tap than "one
+Sending is the second press, on the button that already says Send. That is one more tap than "one
 tap sends it", and it buys:
 
 - a mis-tap on a phone in a pocket cannot run `commit, push, deploy` in the wrong session;
-- the ordinary case of *snippet plus one sentence* — "…, 但先跑測試" — needs no separate feature;
+- the ordinary case of *snippet plus one sentence* — "…, but run the tests first" — needs no separate feature;
 - the write gates stay where they are. The composer's send is the only thing that types into a
   session, and it is already the thing the remote write switch, the device capability and the
   `Idempotency-Key` are wrapped around.
@@ -136,7 +136,7 @@ because the icon is the button:
 3. otherwise the session's `cwd`.
 
 `GET /v1/snippets?session=<id>` answers the resolved key beside the list, so the editor can say
-*"只在 clawdline 這個專案"* using the same words the header uses.
+*"Only in the clawdline project"* using the same words the header uses.
 
 Order in the sheet: **this project first, then global**, each in the order the person put them in.
 Ranking by recent use is not in v1 — see the last section for why counting is not free.
@@ -163,7 +163,7 @@ here blocks it; see the last section.
 {
   "id": "c6000003-0000-4000-8000-000000000003",
   "title": "Commit, push, deploy",
-  "body": "commit（逐檔指名，不要 git add -A）、push、deploy。",
+  "body": "Commit (stage files by name; do not use git add -A), push, and deploy.",
   "scope": "project",
   "project": "/Users/you/code/clawdline",
   "position": 300,
@@ -217,8 +217,8 @@ here blocks it; see the last section.
 Reads take the ordinary read gate. **Writes take all three write gates in order** — the remote write
 switch, this device's `send` capability, a non-empty `Idempotency-Key` — and land a line in
 `remote-audit.jsonl` like every other write. That is deliberately the same bar as typing into a
-session: both change what is on this Mac, and a device that may only read must not be able to
-rewrite the owner's snippets. A brake of ten writes in ten minutes, copied from
+session: both change what is on this Mac, so a snippet write passes the same switch and the
+same idempotency check as a typed message. A brake of ten writes in ten minutes, copied from
 `POST /v1/orchestrator/schedules`, keeps a looping client off the disk.
 
 `docs/api.md` carries one section for the set, beside
@@ -272,14 +272,14 @@ Two things follow, and the second is the reason to do it this way:
 | `index.html` | the mark comes out of `#detail-info` into `#detail-snippets`. |
 | `app/css/detail.css` | the two buttons read as one block; the new button gets its 44px box and its no-mark placeholder. |
 | `app/js/view/transcript.js` | `renderDetailHead` sets `disabled`, `title` and `aria-label` on the new button the way it does for the two it already owns. |
-| `app/js/net/live.js` | `snippets()`, `createSnippet()`, `updateSnippet()`, `deleteSnippet()`, `orderSnippets()`, on `LocalClient`. **Not** added to `ClawdlineClient.methods` in `net/client.js`, which is the contract every transport must satisfy. ⚠ This row said `net/client.js`; that file is the contract, and the direct transport is `net/live.js`. |
+| `app/js/net/live.js` | `snippets()`, `createSnippet()`, `updateSnippet()`, `deleteSnippet()`, `orderSnippets()`, on `LocalClient`. At the time, these methods were not added to the `ClawdlineClient.methods` compatibility list in `net/client.js`; that unused list has since been removed. ⚠ This row originally said `net/client.js`; the direct transport was `net/live.js`. |
 | `app/js/net/cloud-client.js` | `snippets()` from published rows plus four machine-routed mutation commands. |
 | `app/js/net/mock.js` | a fixture: a couple of global snippets and one project-scoped, so `?mock=1` exercises the sheet, the grouping and the empty state without a Mac. |
 | `app/js/view/project-mark.js` | new, and not in this table until the correction round. `generatedMark(key)` and `markForSession(session, projectKey)` — the mark a project has until somebody draws it one. Pure, importable into a bare Node process, and read by `Tests/web-snippets.mjs`. |
 | `app/js/view/snippets-data.js` | new. The sheet's arithmetic with no document in it, plus the one thing the header borrows: the project the Mac last resolved for the open session. |
 
 The sheet itself: a row is the title in the accent colour with the first line of the body under it;
-pressing it inserts and closes. A row's own `⋯` gives 編輯 / 刪除 / 改成全域 / 上移 / 下移 — buttons
+pressing it inserts and closes. A row's own `⋯` gives Edit / Delete / Make global / Move up / Move down — buttons
 rather than drag, because dragging inside a scrolling sheet on a phone is a fight nobody wins. The
 editor is one more sheet: title, body, a two-way scope control, Save, Delete.
 
@@ -288,8 +288,8 @@ Two small things worth building on the first pass rather than later:
 - **The empty state offers the two snippets this design was written for**, as one-press starters. It
   is the cheapest possible answer to "what is this for", and it is the exact text the person already
   types.
-- **`用上一則訊息新增`** — prefill the editor from the newest message you sent. `view/user-messages-data.js`
-  already computes that list for the 我傳出的訊息 sheet, so it is a call, not a feature.
+- **`From my last message`** — prefill the editor from the newest message you sent. `view/user-messages-data.js`
+  already computes that list for the My messages sheet, so it is a call, not a feature.
 
 Snippet insertion follows the Session composer's current send permission. A
 paired device does not have a separate read-only product mode.
@@ -299,7 +299,7 @@ paired device does not have a separate read-only product mode.
 ⚠ **Twenty-seven, not the twelve this said**, and they add up: the `⋯` row and the sheet's title,
 one word between them (1); the two scope headings (3); the two empty states (5); the read-only
 reason (6); the editor's two headings (8) and its three field labels (11); Save (12);
-用上一則訊息新增 (13); the "needs a title and some text" refusal (14) and the "too long" one that
+From my last message (13); the "needs a title and some text" refusal (14) and the "too long" one that
 used to share its sentence (15); a row's own `⋯` label (16) and the six actions behind it (22);
 the second press that confirms a delete (23); and the two starters, which are four strings because
 each has a title and a body (27). The twelve was an estimate made before the editor and the empty
@@ -379,7 +379,7 @@ Six pieces, each verifiable on its own, in this order — all six landed:
 2. **The snapshot field and the transports**, including the mock fixture.
 3. **The sheet and the `⋯` row** — inserting works end to end; the editor is not there yet.
 4. **The mark as a shortcut** — the header split, the tap target, the no-mark box.
-5. **The editor** — create, edit, delete, reorder, the empty-state starters, `用上一則訊息新增`.
+5. **The editor** — create, edit, delete, reorder, the empty-state starters, `From my last message`.
 6. **The words and the pages** — the fourteen languages, `docs/api.md`, `docs/interface.md`, both
    READMEs, `CHANGELOG.md`.
 

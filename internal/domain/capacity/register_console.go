@@ -2,7 +2,15 @@ package capacity
 
 // consoleBounds is every registered row named console.*.
 func consoleBounds() []Entry {
-	return []Entry{
+	return append(append(append(connectionHealthUIBounds(), viewerHealthBounds()...), ownerRetentionBounds()...), []Entry{
+		{
+			// Both opened-detail readers share one automatic recovery per
+			// user opening (SessionExecutionRecovery). At the limit the
+			// existing failure and manual recovery action remain visible.
+			Name: ConsoleExecutionRecoveryAttempts, Class: Buffer, Unit: Rows,
+			Limit: 1, AtLimit: Refuse,
+			Told: []Channel{Sender, Diagnostics}, EvictedBy: Daemon,
+		},
 		{
 			// The transcript pane reads the whole newest page at least this
 			// often (SAFETY_MS); between, it reads only what was appended, when
@@ -29,6 +37,29 @@ func consoleBounds() []Entry {
 			// the next read is a whole one, which starts again at 200.
 			Name: ConsoleTranscriptMergedRows, Class: Cache, Unit: Rows,
 			Limit: 1000, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// Hours of direct-attempt counts one browser keeps per machine
+			// (HISTORY_HOURS, web/console/src/cloud/direct-history.ts). An hour
+			// older than the window is dropped on the next write.
+			Name: ConsoleDirectHistoryHours, Class: Observation, Unit: Rows,
+			Limit: 24, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// Machines one browser keeps a direct record for (HISTORY_MACHINES).
+			// Past it, the machine whose newest hour is oldest goes.
+			Name: ConsoleDirectHistoryMachines, Class: Observation, Unit: Rows,
+			Limit: 32, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// The open machine list re-reads the account's machines at this
+			// pace (MACHINE_LIST_POLL_MS, pages/devices/AccountMachines.tsx),
+			// because which road a machine's reads take changes with no event.
+			Name: ConsoleMachineListPoll, Class: Cache, Unit: Seconds,
+			Limit: 5, AtLimit: Expire,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
 		{
@@ -170,5 +201,5 @@ func consoleBounds() []Entry {
 			Limit: 60, AtLimit: Expire,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
-	}
+	}...)
 }

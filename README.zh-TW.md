@@ -7,9 +7,9 @@
 
 **透過 Clawdline Cloud，在手機同一份清單查看多台機器的 Claude Code 和 Codex Session，點開就能回覆或留待辦。**
 
-使用示意資料錄製的連續操作：
+使用示意資料錄製的真實主控台連續操作：
 
-<img src="docs/assets/cloud-sessions-demo-zh-Hant.gif" width="390" alt="手機主控台操作錄影：Studio Mac 與 Build Linux 的 Pixel 圖示 Session 列在同一頁；點開等待中的 Session，查看待辦與 Agent 傳來的地圖網頁截圖，並放大圖片。">
+<img src="docs/assets/cloud-sessions-demo-zh-Hant.gif" width="390" alt="真實手機主控台連續錄影：從多台機器的 Session 清單點開工作面板設計，查看 Codex 傳來的小張設計圖，展開待辦並送出「請把新增專案按鈕加大」，最後顯示已傳送。">
 
 [Herdr](https://github.com/herdrdev/herdr/blob/master/docs/versions/0.9.1/website/src/content/docs/connecting-machines.mdx) 也能在 SSH 的 TUI 視窗列出多台機器的 Agent；[T3 Code](https://github.com/pingdotgg/t3code/blob/main/docs/user/remote-access.md) 可連接多個環境。Clawdline Cloud 則在手機瀏覽器將 Session 依機器列在同一頁，並直接開啟對話、待辦與圖片。
 
@@ -60,7 +60,7 @@ curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh 
 
 ## 指南
 
-[使用指南](docs/user/README.md)・[Agent 指南](docs/agent-contract.md)・[從原始碼建置](docs/user/install.md)・[疑難排解](docs/user/troubleshooting.md)・[開發文件](docs/README.md)
+[使用指南](docs/user/README.md)・[Agent 指南](docs/agent-contract.md)・[從原始碼建置](docs/user/install.md)・[疑難排解](docs/user/troubleshooting.md)・[開發文件](docs/README.md)・[UI 動畫編號表](docs/ui-motion-catalog.md)・[靜態 HTML 成果頁](docs/html-artifacts.md)
 
 使用指南目前只有英文版。
 

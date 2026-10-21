@@ -1,5 +1,7 @@
+// @ts-expect-error -- Node's strip-types runner needs the source extension.
+import { builtinDisplay, builtinTeamDisplay } from "../../builtin-display.ts"
 // @ts-expect-error -- Node's strip-types test runner needs the source extension.
-import { catalogWord, currentCatalogTag } from "../../catalog.ts"
+import { catalogWord } from "../../catalog.ts"
 import type { Icon } from "@clawdline/contract"
 import type { Effective, SquadPersona, SquadProject, SquadSkill, SquadView } from "./model.js"
 
@@ -25,10 +27,12 @@ export interface WireEffectivePersona {
 }
 export interface WireSettings {
   scope_id: string; scope_kind: "global" | "repo" | "place"; place_id?: string
-  motion: WireField<boolean>; motion_settings_version: number; personas: WireEffectivePersona[]
+  motion: WireField<boolean>; motion_settings_version: number
+  auto_dispatch?: WireField<boolean>; auto_dispatch_version?: number; personas: WireEffectivePersona[]
 }
 
-function name(words: WireNames): string { return currentCatalogTag() === "zh-Hant" ? words["zh-Hant"] || words.en : words.en || words["zh-Hant"] }
+const personaDisplay = (entry: WireDefinition) => builtinDisplay("persona", entry.definition_id, entry.name, entry.summary)
+const skillDisplay = (entry: WireSkill) => builtinDisplay("skill", entry.skill_id, entry.name, entry.purpose)
 
 function effective<T>(field: WireField<T>, global: T): Effective<T> {
   return { value: field.value, global, source: field.source, present: field.present, version: field.version }
@@ -50,8 +54,8 @@ export function squadView(
     const skills: SquadSkill[] = entry.skills.value.map((choice, index) => {
       const found = skillByKey.get(`${choice.id}\u0000${choice.version}`)
       return {
-        id: choice.id, name: found ? name(found.name) : choice.id,
-        purpose: found ? name(found.purpose) : catalogWord("literal", "feba2f8d9bcd"),
+        id: choice.id, name: found ? skillDisplay(found).name : choice.id,
+        purpose: found ? skillDisplay(found).detail : catalogWord("literal", "feba2f8d9bcd"),
         body: found?.content ?? "", folder: found?.folder, files: found?.files, source: found?.source ?? catalogWord("literal", "2316613f030f"), version: choice.version,
         license: found?.license ?? "", icon: found?.icon, status: found ? "available" : "unavailable",
         enabled: effective({ ...entry.skills, value: choice.enabled }, globalChoices.find((row) => row.id === choice.id)?.enabled ?? false),
@@ -59,8 +63,8 @@ export function squadView(
       }
     })
     return {
-      id: definition.definition_id, shortId: definition.short_id, name: name(definition.name),
-      subtitle: definition.short_id ?? definition.definition_id, summary: name(definition.summary),
+      id: definition.definition_id, shortId: definition.short_id, name: personaDisplay(definition).name,
+      subtitle: definition.short_id ?? definition.definition_id, summary: personaDisplay(definition).detail,
       body: definition.body, source: definition.source, version: definition.version, icon: definition.icon,
       teamIds: definition.teams.map((team) => team.id), settingsVersion: entry.settings_version,
       enabled: effective(entry.auto_assign, globalEntry.auto_assign.value),
@@ -71,13 +75,16 @@ export function squadView(
   return {
     scopeId: current.scope_id,
     project: projects.find((row) => row.id === current.scope_id) ?? null, projects,
-    teams: catalog.teams.map((team) => ({ id: team.team_id, name: name(team.name) })), personas,
+    teams: catalog.teams.map((team) => ({ id: team.team_id, name: builtinTeamDisplay(team.team_id, team.name) })), personas,
     catalogSkills: catalog.skills.map((skill) => ({
-      id: skill.skill_id, name: name(skill.name), purpose: name(skill.purpose), body: skill.content, folder: skill.folder, files: skill.files,
+      id: skill.skill_id, name: skillDisplay(skill).name, purpose: skillDisplay(skill).detail, body: skill.content, folder: skill.folder, files: skill.files,
       source: skill.source, version: skill.version, license: skill.license, icon: skill.icon,
     })), sessions,
     motion: effective(current.motion, global.motion.value),
     motionSettingsVersion: current.motion_settings_version,
+    autoDispatch: effective(global.auto_dispatch ?? { value: true, source: "default", present: false, version: 0 }, true),
+    autoDispatchVersion: global.auto_dispatch_version ?? 0,
+    autoDispatchSupported: !!global.auto_dispatch,
     catalogVersion: catalog.catalog_version, canWrite, partial: false,
   }
 }

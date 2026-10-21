@@ -42,6 +42,18 @@ export interface MachineListPresentation extends SessionListPresentation {
   projection?: ProjectedSession
 }
 
+/** Retain display facts only from the same execution's keyed list cache. */
+export function mergeListPresentation(row: SessionListPresentation,
+  previous?: SessionListPresentation): SessionListPresentation {
+  return {
+    title: row.title,
+    assistant: row.assistant ?? previous?.assistant,
+    icon: row.icon ?? previous?.icon, cwd: row.cwd ?? previous?.cwd,
+    status: row.status ?? previous?.status,
+    observedAt: row.status ? row.observedAt : previous?.observedAt,
+  }
+}
+
 /** A status projection contains no name; never present its routing id as one. */
 export function fleetRowTitle(row: ProjectedSession, presentation: SessionListPresentation | undefined,
   unavailableWord: string, confirmedTitle?: string): string {
@@ -187,7 +199,7 @@ export type SessionOlderPage =
 
 export interface SessionProjectionSource {
   /** Must settle or reject; each machine is requested independently. */
-  readMachine(machineID: string, signal: AbortSignal): Promise<MachineSessionProjection>
+  readMachine(machineID: string, signal: AbortSignal, fresh?: boolean): Promise<MachineSessionProjection>
   /** Request a fresh machine observation of the opened Session. Published status arrives through subscribe. */
   refreshSessionStatus?(destination: SessionDestination, signal: AbortSignal): Promise<void>
   /** One read_transcript-authorized display snapshot per machine; each row is joined by execution. */
@@ -285,6 +297,31 @@ export function supersedingDestination(destination: SessionDestination,
     row.destination.sessionID === destination.sessionID &&
     row.freshness === "current")
   return rows.length === 1 ? rows[0].destination : null
+}
+
+/** One automatic recovery per user opening, shared by both detail readers. */
+export class SessionExecutionRecovery {
+  private attempted = false
+  private opening = {}
+
+  reset(): void { this.attempted = false; this.opening = {} }
+
+  async recover(target: SessionDestination, read: () => Promise<MachineSessionProjection>,
+    current: () => SessionDestination | null, adopt: (next: SessionDestination) => void): Promise<boolean> {
+    if (this.attempted) return false
+    this.attempted = true
+    const opening = this.opening
+    try {
+      const projection = await read()
+      const selected = current()
+      if (opening !== this.opening || !selected || destinationKey(selected) !== destinationKey(target)) return false
+      const next = supersedingDestination(target, projection) ??
+        (destinationAvailable(target, projection) === "ready" ? target : null)
+      if (!next) return false
+      adopt(next)
+      return true
+    } catch { return false }
+  }
 }
 
 export function afterEventGap(before: MachineSessionProjection | undefined, retryAt?: number,

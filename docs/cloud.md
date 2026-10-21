@@ -32,6 +32,12 @@ An Agent-owned cross-machine task also needs a machine-targeted start before a t
 
 The hosted Console's **Cross-machine access** sidebar page lists the machines and one switch per machine pair. Turning it on establishes signed pairs in both directions, allowing all current Sessions on those two machines to exchange Agent messages and hand off work. Turning it off revokes both directions. The page reads both machines and shows a connection only when their fresh, locally pinned records agree; a partial result has a recovery action. An offline, unpaired, unreadable, or write-disabled machine cannot be changed from the page. Pairing this browser as a viewer remains a separate prerequisite in the machine switcher. Legacy Session grants are retained for in-flight compatibility but are not part of this setting flow.
 
+Measured internal queue costs and the unchanged delivery contract are recorded in [live spool sorting](performance/cloud-spool-sorting.md).
+
+The [independent-reader baseline](performance/cloud-independent-reads.md) separates per-viewer reads from same-reader coalescing and documents its local-only measurement boundary.
+
+The [Go CPU attribution](performance/cloud-read-cpu.md) measures the parser and independent-reader cost separately from Node and network waiting.
+
 ## Publications, reads and commands
 
 The publisher sends a machine descriptor on `orch/<machine>`, one complete row per session on `s/<machine>/<session>`, a content-free status projection on `ss/<machine>/<session>`, and an inventory marker after the rows. It polls the daemon's local routes, skips unchanged session content row by row on both channels, and periodically restates values so an idle machine does not appear stale. A `sessions.snapshot` request can ask the machine to restate rows after a reconnect. The publisher preserves previously known rows when a partial local scan cannot prove they disappeared. The descriptor includes the supported command words. See [`publish.go`](../internal/transport/cloud/publish.go) for current timing, freshness and inventory rules.
@@ -39,6 +45,18 @@ The publisher sends a machine descriptor on `orch/<machine>`, one complete row p
 **The row under an opened Session is asked for, not waited for.** Opening a Session needs two things: the conversation, which the `r/` read answers in about 130 ms, and that Session's own complete `s/` row, which carries the name, the work line and the execution the composer writes to. The row arrives only when the machine publishes it, so a page that holds the status projection but not the row had nothing to draw and kept saying it was reading the conversation for as long as the row took. Measured on 2026-10-11: one row recovered from the relay's retained channel took 19.6 seconds, while the conversation in that same open answered in 131 ms. The page now sends `sessions.snapshot` to that one machine as soon as it sees the row missing — the row came back one second after the ask — no more often than `console.opened_row_restate_seconds`, and only while the status row names the same execution, because a different one is a replaced execution that the detail read already refuses as changed. A row still missing after `console.opened_row_quiet_seconds` is news rather than a longer wait: the pane names the machine that has not sent it and offers the press that asks again (`askForOpenedRow` in [`relay-reader.ts`](../web/console/src/cloud/relay-reader.ts) and [`opened-row.ts`](../web/console/src/cloud/opened-row.ts)).
 
 **The status row a read is pinned to is asked for too.** Before a pinned read is sent, the page checks this machine's `ss/` marker and that Session's own status row, and refuses the read itself when they do not agree; the refusal names which check failed (`pinnedSession`). One of those conditions is not a disagreement at all: `no_row`, the marker listing the Session while its row is not held, is a row the relay retains and the page can ask for, exactly as the list already asks for one that a gap in its own pass left out. It now does, once, and pins again; a row that still does not come is the refusal it always was. Measured on one machine's log for 2026-10-11, that condition was the commonest read failure of the day — 23 of them, each shown to the person as an execution that was no longer current, when nothing had changed but this page's hold on one retained row.
+
+**An expired push destination recovers in place.** A transcript generation refusal or a detail
+reported as changed asks the original machine for a fresh authenticated Session list, even if the
+retained status set still looks current. The page follows only one unique, current row for the
+same machine and Session; it can also reread the same execution when the problem was stale
+status. Both readers share one automatic attempt per user opening
+(`console.execution_recovery_attempts`). Navigation, closure, reconnection and a newer opening
+invalidate a late recovery. Missing, ambiguous or unavailable rows retain the existing failure
+and manual action. The URL is updated to the verified execution; detail state is rebuilt, while
+only unsent editor text and attached images cross that boundary. Messages, answers and close
+operations are never replayed automatically. The existing `cloud.read.failed` diagnostic retains
+the original refusal condition.
 
 `ss/` contains only machine and terminal ids, `execution_generation`, `snapshot_generation`, assistant, backend, state, source provenance and observation time, freshness, scan completeness, projection time, last record movement time, the registered no-movement threshold, and narrow acceptance, attention, close-blocked, or failed-agent facts. `completed_unconfirmed` requires an unviewed Board item in phase `done`; a `deploying` item is not called complete. `close_blocked` is a measured true or false only with current closeability evidence. `failed_agent_count` is a measured count, including zero, only with a complete, untruncated provider-native agent reading. Absence means unknown; neither field asserts that the Session's work failed. It contains no label, transcript, screen, menu, shell, Git data, working directory, or content-derived summary. Record movement means new bytes in the assistant's own record; it is not a claim of task progress. A carried row without a fresh source loses its execution generation and these status facts. The old `s/` publication remains for compatibility; it still contains the full row and must retain content-level authorization. The private relay's compatible `ss/` support is deployed. The hosted console must adopt `ss/` for the list before the relay's prepared `s/` restriction to `read_transcript` can deploy. The public daemon alone cannot enforce those relay capabilities.
 
@@ -93,7 +111,17 @@ direct connections are on, `clawdline cloud direct local on|off`, or the local-o
 `POST /v1/cloud/direct/local-network`) lets the direct carrier use RFC 1918 IPv4 host addresses so a
 phone on the same network connects without hairpinning through the router; on macOS its first use
 shows the Local Network permission prompt once, and a denial leaves the public path or the relay
-([terminal-direct-path.md](terminal-direct-path.md)). An EC2 instance can additionally set `cloud_direct_udp_port` and
+([terminal-direct-path.md](terminal-direct-path.md)). The hosted Devices connection sheet offers
+**Enable same-network connections** after a failed direct negotiation when both encrypted SDPs
+contain the same public IPv4 server-reflexive address and the machine reports the opt-in is off.
+It says **Possibly on the same network**: sharing a public exit does not prove a shared LAN.
+Only a paired viewer with operation permission can enable this one setting through
+`direct-local-network-enable`; it cannot disable it or change other Cloud settings. The machine
+persists the opt-in without replacing the relay, so the successful setting receipt arrives before
+the browser retries direct ICE. Each candidate exchange reads the persisted policy. The prompt
+explains that macOS may ask for Local Network access on the target machine. A successful setting
+change and a successful direct connection are reported separately; denying system permission
+still leaves the encrypted relay available. An EC2 instance can additionally set `cloud_direct_udp_port` and
 `cloud_direct_public_ip` together to multiplex direct ICE on one inbound UDP port; see
 [Linux setup](linux.md#let-a-cloud-browser-connect-directly-to-ec2).
 
@@ -142,6 +170,13 @@ The hosted console also records a content-free `cloud.write.failed` viewer event
 The browser's Cloud line reconnects in the background after a temporary failure. Reaching the consecutive-attempt limit changes it to one probe per maximum backoff interval; it does not leave an open Session waiting indefinitely for a visibility or network event. Returning to the page or regaining network can advance the probe, subject to the minimum spacing between attempts. A person's retry on a retained message card also wakes the line before the card reads the transcript and considers resending. The card still preserves its request key and checks for an already visible turn, so reconnection never licenses a blind duplicate. Permanent protocol and authorization refusals keep their terminal handling; repeated relay `forbidden` refusals remain bounded rather than being probed continuously.
 
 ## Which machine the hosted console is on
+
+The header machine menu opens and closes around its top-right origin in 200 ms. Fleet machine
+groups expand and collapse their intrinsic content height in 220 ms, keeping Session text at its
+normal size. Both transitions reverse on repeated presses and become immediate under reduced
+motion. Closed content is inert and hidden from accessibility immediately; menu focus returns to
+the trigger when it was inside the menu. Collapsed groups stay current but do not register their
+spinner canvases with the drawing clock.
 
 An account with more than one readable machine opens on **all of them**: the fleet list is the
 way in, and the machine list — which is where pairing, renaming and forgetting live — is one press
@@ -216,6 +251,8 @@ each row on both the local and Cloud console; it hides that directory from the P
 lists without deleting files or sessions. Re-adding it restores visibility.
 The Project list refreshes as soon as removal succeeds; an open session start sheet refreshes automatically.
 
+The proposed [connection health administration](admin-connection-health.md) covers durable cross-source timelines, independent stall capture and agent investigation evidence. It is a product plan, not a shipped monitoring capability.
+
 For a machine that appears offline, inspect `clawdline cloud status` or the local status route first: the switch, identity, connection state, last error and publication counters narrow down which side has evidence. Then inspect the hosted build using [hosted-console.md](hosted-console.md). The status route and logs expose this machine's observations; they do not prove that a particular browser decrypted or displayed a frame. [cloud-cutover.md](cloud-cutover.md) records local preflight and stand-in tests, not a fresh production validation.
 
 ## Limits of this overview
@@ -226,3 +263,21 @@ For a machine that appears offline, inspect `clawdline cloud status` or the loca
 - The hosted console only carries operations present in the machine's advertised vocabulary. Version gaps can leave a request unsupported or waiting for its timeout; check both builds before assuming a feature is available.
 
 For the wider system layout, see [architecture.md](architecture.md). For user-facing setup and alternatives, see [remote access](user/remote-access.md). Historical Swift implementation details remain in dated records and the archive, not in this current overview.
+
+### Following model picker transitions
+
+A selected Session keeps its exact rich-row subscription after the first row arrives;
+list recovery must not unsubscribe that live view. Closing the view releases its hold.
+Opening Codex's model picker, answering its model step, and encountering an unread
+waiting menu also start a bounded read follow-up. The follow-up uses the registered
+transcript follow policy (two seconds initially, then four seconds, for at most ninety
+seconds), permits one read at a time, and pauses reads while the page is hidden.
+
+A successful read confirms a request, not the arrival of the next menu. The page follows
+until a different menu is observed, retaining Read again across a temporary idle gap.
+After the automatic window expires, the manual read remains available. Stale model
+options stay disabled during that gap, including after the ordinary press hold expires.
+No follow-up replays an answer key. Switching Session or execution cancels the old
+follow-up; ordinary unread questions stop following when the Session resumes.
+
+The [static HTML report reader](html-artifacts.md) describes the document format, isolation, compatibility and measurement boundary for self-contained artifacts.

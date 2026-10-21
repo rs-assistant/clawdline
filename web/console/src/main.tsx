@@ -1,3 +1,4 @@
+import "./loading-skeleton.css"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { DoorGate } from "./door/Door.js"
@@ -41,6 +42,8 @@ import "./side-border-overrides.css"
 
 import "./shell.css"
 import "./sidebar-scroll.css"
+import "./ui/disclosure-motion.css"
+import "./brand-handle.css"
 import "./font-scale.css"
 
 import { restoreFontScale } from "./font-scale.js"

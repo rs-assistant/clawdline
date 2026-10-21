@@ -11,62 +11,8 @@ import { createVisibleInterval } from "./visibility.js";
 
 function dpr() { return Math.max(1, Math.min(3, window.devicePixelRatio || 1)); }
 
-/**
- * Draw `icon.cells` — rows of "#RRGGBB" or null — at `cellPx` logical pixels a cell.
- * The backing store is exactly cells × whole device pixels and the CSS size is that
- * divided back down, which is what keeps the edges hard at any scale factor.
- */
-export function drawIcon(canvas, icon, cellPx) {
-    var cells = icon && icon.cells;
-    if (!cells || !cells.length) {
-        // The inline sizes go too, not to zero: a row with no mark falls back to a CSS
-        // placeholder, and an inline width would win over it.
-        canvas.width = canvas.height = 0;
-        canvas.style.width = canvas.style.height = "";
-        return false;
-    }
-    var ratio = dpr();
-    var unit = Math.max(1, Math.round(cellPx * ratio));
-    var rows = cells.length, cols = 0;
-    for (var r = 0; r < rows; r++) cols = Math.max(cols, (cells[r] || []).length);
-    if (!cols) return false;
-
-    canvas.width = cols * unit;
-    canvas.height = rows * unit;
-    canvas.style.width = (cols * unit / ratio) + "px";
-    canvas.style.height = (rows * unit / ratio) + "px";
-
-    var g = canvas.getContext("2d");
-    g.imageSmoothingEnabled = false;
-    g.clearRect(0, 0, canvas.width, canvas.height);
-    for (var y = 0; y < rows; y++) {
-        var row = cells[y] || [];
-        for (var x = 0; x < row.length; x++) {
-            if (!row[x]) continue;                 // null is transparent, and stays transparent
-            g.fillStyle = row[x];
-            g.fillRect(x * unit, y * unit, unit, unit);
-        }
-    }
-    return true;
-}
-
-/**
- * `drawIcon`, skipped when this canvas already shows exactly this icon at this size and scale.
- *
- * Writing `canvas.width` clears the backing store even when the number is the same, so every list
- * render used to wipe and repaint every row's mark and the header's. The answer `drawIcon` gave
- * is kept with the key, so a caller that toggles a class on it gets the same answer back.
- */
-export function drawIconOnce(canvas, icon, cellPx) {
-    var key;
-    try { key = JSON.stringify([icon && icon.cells || null, cellPx, dpr()]); }
-    catch (e) { key = null; }
-    if (key !== null && canvas._iconKey === key) return canvas._iconDrawn;
-    var drew = drawIcon(canvas, icon, cellPx);
-    canvas._iconKey = key;
-    canvas._iconDrawn = drew;
-    return drew;
-}
+// Project images share one bounded renderer across legacy and React views.
+export { drawIcon, drawIconOnce } from "./project-icon.js";
 
 /* The same two product marks as AssistantLogo.swift. Kept inline so the list and transcript
    never wait on another request, and so the marks inherit their exact row-sized geometry. */

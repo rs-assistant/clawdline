@@ -49,6 +49,7 @@ import (
 	peercontract "github.com/sainteye/clawdline/internal/domain/agenthandoff"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	"github.com/sainteye/clawdline/internal/domain/schedulewebhook"
 	"github.com/sainteye/clawdline/internal/domain/terminal"
 )
@@ -232,6 +233,9 @@ type LinkOptions struct {
 	// lower a bound, as it may for the two above.
 	SpoolChannelBytes int
 	SpoolReceipts     int
+	// Health is the daemon's connection-health tracker, handed to the
+	// transport and used by the lanes. Nil records nothing.
+	Health *connectionhealth.Tracker
 }
 
 // Link is one machine's Cloud line.
@@ -240,11 +244,12 @@ type Link struct {
 	file     *nextconfig.File
 	settings adaptercloud.Settings
 
-	identity adaptercloud.Identity
-	keys     *cloudkeys.Files
-	deviceID string
-	pinned   *adaptercloud.PinnedStore
-	pairing  *Pairing
+	identity        adaptercloud.Identity
+	keys            *cloudkeys.Files
+	deviceID        string
+	pinned          *adaptercloud.PinnedStore
+	pairing         *Pairing
+	identityPairing *IdentityPairing
 
 	transport *adaptercloud.Transport
 	relay     *Relay
@@ -660,6 +665,18 @@ func Open(opts LinkOptions) (*Link, error) {
 		Now:      opts.Now,
 		Log:      opts.Log,
 	}
+	// The identity pairing hands the master secret over with a recorded
+	// content-key epoch; its epoch record sits beside the key files.
+	link.identityPairing = &IdentityPairing{
+		AccountID: identity.AccountID,
+		AppOrigin: settings.AppOrigin,
+		Client: &adaptercloud.IdentityClient{BaseURL: settings.APIBase,
+			Credential: func(context.Context) (string, error) { return identity.MachineCredential, nil }},
+		Keys:   link.pairingKeys,
+		Epochs: adaptercloud.ContentEpochStore{Dir: keys.Dir()},
+		Now:    opts.Now,
+		Log:    opts.Log,
+	}
 	if err := link.wire(); err != nil {
 		link.fail(err)
 		return link, nil
@@ -748,6 +765,7 @@ func (l *Link) wire() error {
 		Replay:               domaincloud.NewReplayWindow(0),
 		Inbound:              l.relay.Deliver,
 		DirectInbound:        l.relay.DeliverDirect,
+		InboundTraced:        l.relay.DeliverTraced,
 		PeerInbound:          l.enqueuePeer,
 		PeerAck:              l.enqueuePeerAck,
 		PeerTaskStartInbound: l.enqueuePeer,
@@ -765,6 +783,7 @@ func (l *Link) wire() error {
 		ContentKey:           secret,
 		Log:                  func(line string) { l.logf("%s", line) },
 		Now:                  opts.Now,
+		Health:               opts.Health,
 	})
 	if err != nil {
 		return err
@@ -788,6 +807,7 @@ func (l *Link) wire() error {
 		Transport: l.relay,
 		Log:       opts.Log,
 	}
+	l.mu.Lock()
 	l.publisher = &Publisher{
 		MachineID:     identity.MachineID,
 		MachineName:   machineName(identity, settings, HostName(), runtime.GOOS),
@@ -811,6 +831,7 @@ func (l *Link) wire() error {
 		Publish:       l.relay.Publish,
 		Log:           opts.Log,
 	}
+	l.mu.Unlock()
 	// The publisher hears every viewer the relay hears from, which is how a
 	// viewer that arrived after this machine's last change gets the current
 	// state instead of waiting for the heartbeat (`Publisher.Seen`).
@@ -859,9 +880,18 @@ func machineName(identity adaptercloud.Identity, settings adaptercloud.Settings,
 
 // TaskListChanged is `http.CloudTaskLine`: this machine has written a task
 // row, so the list a viewer reads off the machine descriptor is not what the
-// publisher last projected. It records the fact and returns — the publisher's
-// own pass is what reads and publishes, at the cadence it always had.
-func (l *Link) TaskListChanged() { l.taskListMoved.Store(true) }
+// publisher last projected. Reuse the coalesced settle lane so the Session
+// queue change is read fresh without waiting for the five-second poll.
+// No viewers means no additional inventory work.
+func (l *Link) TaskListChanged() {
+	l.taskListMoved.Store(true)
+	l.mu.Lock()
+	publisher := l.publisher
+	l.mu.Unlock()
+	if publisher != nil && publisher.Watched() {
+		publisher.Settle()
+	}
+}
 
 // takeTaskListMoved answers whether a task row was written since it was last
 // asked, and clears the fact. Only the publisher's pass asks.
@@ -1098,26 +1128,32 @@ func (l *Link) runService(ctx context.Context) error {
 				// It waits for the publisher's next re-statement, up to one
 				// SnapshotInterval. The publisher bounds how many may wait
 				// (SessionSnapshotWaitersLimit) and answers the rest at once.
+				h := l.lanePhase(request, connectionhealth.ClassStatus, connectionhealth.LocSessionsLane)
 				answers.Add(1)
 				go func() {
 					defer answers.Done()
-					l.answer(ctx, service, request)
+					l.answerTraced(ctx, service, request, h, connectionhealth.LocSessionsHandler)
 				}()
 			case cloudops.IsRead(request.Plaintext):
 				if !l.takeReadSlot() {
 					l.refuseBusy(ctx, service, request, "read lane", CloudReadConcurrencyLimit)
 					continue
 				}
+				h := l.lanePhase(request, connectionhealth.ClassRead, connectionhealth.LocReadLane)
 				answers.Add(1)
 				go func() {
 					defer answers.Done()
 					defer l.releaseReadSlot()
-					l.answer(ctx, service, request)
+					l.answerTraced(ctx, service, request, h, connectionhealth.LocReadHandler)
 				}()
 			default:
+				// The phase begins before the send, so a command waiting
+				// behind a stuck one shows lane_queued with its own age.
+				h := l.lanePhase(request, connectionhealth.ClassControl, connectionhealth.LocCommandLane)
 				select {
-				case commands <- pending{service: service, request: request}:
+				case commands <- pending{service: service, request: request, health: h}:
 				default:
+					h.End(false)
 					l.refuseBusy(ctx, service, request, "command lane", depth)
 				}
 			}
@@ -1130,6 +1166,7 @@ func (l *Link) runService(ctx context.Context) error {
 type pending struct {
 	service Service
 	request Inbound
+	health  connectionhealth.Handle
 }
 
 // runCommands answers commands one at a time until the lane is closed. A
@@ -1138,9 +1175,10 @@ type pending struct {
 func (l *Link) runCommands(ctx context.Context, commands <-chan pending) {
 	for next := range commands {
 		if ctx.Err() != nil {
+			next.health.End(false)
 			continue
 		}
-		l.answer(ctx, next.service, next.request)
+		l.answerTraced(ctx, next.service, next.request, next.health, connectionhealth.LocCommandHandler)
 	}
 }
 
@@ -1179,8 +1217,40 @@ func (l *Link) refuseBusy(ctx context.Context, service Service, request Inbound,
 		lane, limit, request.Sender, request.Sequence)
 }
 
-// answer handles one request, counting what it answered.
-func (l *Link) answer(ctx context.Context, service Service, request Inbound) {
+// lanePhase begins the finite phase of one request as it is put on a lane.
+// The correlation is minted here: the request's own sender, sequence and
+// channel are never used as one.
+//
+// It continues the correlation the transport's frame phase handed over on
+// the request, so one logical operation reads frame_read → lane_queued →
+// handler under one id; only a request that carries none (monitoring was
+// off when it arrived, or a caller outside the transport) gets a new one.
+func (l *Link) lanePhase(request Inbound, class connectionhealth.Class, location string) connectionhealth.Handle {
+	t := l.opts.Health
+	correlation := request.Correlation
+	if !connectionhealth.ValidID(correlation) {
+		correlation = t.NewCorrelation()
+	}
+	return t.Start(connectionhealth.DaemonSpec(connectionhealth.StageLaneQueued, class, location, correlation))
+}
+
+// answerTraced is answer, moving h to the handler as it starts and ending
+// it with the answer's outcome. The answer's sealing and spooling inside
+// Service.Answer are phases of their own (Relay.PublishTracked) under the
+// same correlation, which the context hands them; the handler's phase still
+// ends only when Answer returns.
+func (l *Link) answerTraced(ctx context.Context, service Service, request Inbound, h connectionhealth.Handle, location string) {
+	_ = h.Step(connectionhealth.StageHandlerStarted, location)
+	ctx = connectionhealth.WithCorrelation(ctx, l.opts.Health, h.Correlation())
+	ok := false
+	defer func() { h.End(ok) }()
+	ok = l.answer(ctx, service, request)
+	_ = h.Progress(connectionhealth.StageHandlerCompleted)
+}
+
+// answer handles one request, counting what it answered, and reports
+// whether the answer was OK.
+func (l *Link) answer(ctx context.Context, service Service, request Inbound) bool {
 	answer := service.Answer(ctx, request)
 	l.mu.Lock()
 	l.answered++
@@ -1188,6 +1258,7 @@ func (l *Link) answer(ctx context.Context, service Service, request Inbound) {
 		l.refused++
 	}
 	l.mu.Unlock()
+	return answer.OK()
 }
 
 // allowCommands reads the write switch from the file, now.
@@ -1255,6 +1326,9 @@ func (l *Link) publicKeyFor(sender string) (ed25519.PublicKey, bool) {
 
 // Pairing is the handover this link drives, for the routes that start one.
 func (l *Link) Pairing() *Pairing { return l.pairing }
+
+// IdentityPairing is the content-key handover, nil before the identity loads.
+func (l *Link) IdentityPairing() *IdentityPairing { return l.identityPairing }
 
 // pairingKeys reads the two keys a handover carries, from the store, now.
 func (l *Link) pairingKeys() (domaincloud.DeviceKey, domaincloud.ContentKey, error) {
@@ -1426,7 +1500,7 @@ func (l *Link) Status() Status {
 	out := Status{
 		Enabled:            l.settings.Enabled,
 		TerminalDirect:     l.settings.TerminalDirect,
-		DirectLocalNetwork: l.settings.DirectLocalNetwork,
+		DirectLocalNetwork: l.directLocalNetworkEnabled(),
 		State:              l.state,
 		RelayURL:           l.settings.RelayURL,
 		APIBase:            l.settings.APIBase,

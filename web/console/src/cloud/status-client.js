@@ -3,6 +3,7 @@
 import { CatalogCloudClient } from "./refusal-client.js"
 import { SESSION_INVENTORY_ID, SESSION_INVENTORY_LIMIT, channelSegment, decodedChannelSegment } from "../legacy/js/net/client.js"
 import { base64Bytes, bytesBase64, envelopeSigningBytes, importMasterSecret, openEnvelope, sealEnvelope, validateEnvelope } from "../legacy/js/net/cloud-crypto.js"
+import { classifyViewerError, viewerHealthBegin, viewerHealthFailed } from "../legacy/js/net/viewer-health-hook.js"
 
 const decoder = new TextDecoder()
 const STATUS = /^ss\/([^/]+)\/([^/]+)$/u
@@ -255,6 +256,14 @@ export class StatusCloudClient extends CatalogCloudClient {
   }
 
   disableClassicSessionView() {
+    const channel = this.classicSessionChannel
+    this.classicSessionChannel = null
+    if (channel && this.subscriptionHolds) {
+      const holds = (this.subscriptionHolds.get(channel) || 0) - 1
+      if (holds > 0) this.subscriptionHolds.set(channel, holds)
+      else this.subscriptionHolds.delete(channel)
+      this._releaseClassicRead(channel)
+    }
     for (const [channel, timer] of this.classicSessionReads) {
       this.clearTimeout(timer)
       this._releaseClassicRead(channel)
@@ -312,6 +321,15 @@ export class StatusCloudClient extends CatalogCloudClient {
       if (!status || status.snapshot_generation !== marker.snapshot_generation ||
         !GENERATION.test(status.execution_generation)) continue
       const channel = "s/" + channelSegment(machine) + "/" + channelSegment(id)
+      // The selected Session is a live view, not a one-shot list recovery.
+      // Keep its channel after the first row, including when the row was
+      // already held before the detail opened. Otherwise the model picker
+      // and its Effort successor can be published to an unsubscribed page.
+      if (this.classicSessionTarget === id && this.subscriptionHolds && this.classicSessionChannel !== channel) {
+        this.subscriptionHolds.set(channel, (this.subscriptionHolds.get(channel) || 0) + 1)
+        this.classicSessionChannel = channel
+        this.subscribe([channel])
+      }
       const held = this.sessionSnapshots.get(machine + "\u0000" + id)
       if (held?.execution_generation === status.execution_generation) continue
       if (this.classicSessionReads.has(channel) ||
@@ -401,6 +419,29 @@ export class StatusCloudClient extends CatalogCloudClient {
       supported: this.carrierSupported(machine),
       open: typeof this.directCarriers?.open === "function" && this.directCarriers.open(machine) === true,
     }
+  }
+
+  /**
+   * One direct attempt the person asked for (`DirectCarrier.tryNow`), or
+   * `{ kind: "unsupported" }` when this page has no carrier to offer at all.
+   */
+  async tryDirect(machine) {
+    const carrier = this._carrierFor(machine)
+    if (!carrier || typeof carrier.tryNow !== "function") return { kind: "unsupported" }
+    return carrier.tryNow()
+  }
+
+  sameNetworkAvailable(machine) {
+    const descriptor = this.machineDescriptor(machine)?.machine
+    return this.allowWrites === true && descriptor?.commands?.includes("direct-local-network-enable") === true &&
+      descriptor.operation_allowed === true && this._carrierFor(machine)?.canEnableSameNetwork === true
+  }
+
+  async enableSameNetwork(machine) {
+    const result = await this._machineRequestAs(crypto.randomUUID(), machine,
+      "direct-local-network-enable", {}, "action")
+    if (result?.direct_local_network !== true) throw refused("bad_response", "The machine did not confirm the setting.")
+    this._carrierFor(machine)?.sameNetworkEnabled()
   }
 
   /** The carrier for this machine, or null when this page has none to offer. */
@@ -518,7 +559,8 @@ export class StatusCloudClient extends CatalogCloudClient {
       !answer.sdp_sealed || answer.carrier !== offer.connection) {
       throw refused("carrier_bad_answer", "this machine's carrier answer is not usable")
     }
-    return { sdpSealed: answer.sdp_sealed, directReceipts: answer.direct_receipts === true }
+    return { sdpSealed: answer.sdp_sealed, directReceipts: answer.direct_receipts === true,
+      directLocalNetwork: typeof answer.direct_local_network === "boolean" ? answer.direct_local_network : undefined }
   }
 
   /** Seals and signs the `termi` offer. The frozen sealer validates only ctl/, so sign the renamed bytes. */
@@ -625,6 +667,11 @@ export class StatusCloudClient extends CatalogCloudClient {
       this._applySnapshot(channel, payload, envelope, false)
     } catch (error) {
       this._recordReceiveFailure(error, envelope, false, probe)
+      // The same words the relay's receive path records (`cloud-client.js` `_receiveEnvelope`): an
+      // envelope that arrived on the carrier and did not open or apply is this page's failure,
+      // whatever the relay socket is doing.
+      viewerHealthFailed("viewer_decrypt_apply", error && error.code === "replay" ? "replay_rejected"
+        : probe.stage === "apply" ? "apply_failed" : "decrypt_failed", { class: "read" })
       // This channel delivered something this page cannot use, and it will deliver the next
       // answer the same way. Nothing has failed from the read's point of view — the carrier is
       // open and its request was written to it — so it is this that has to end the channel, and
@@ -664,7 +711,11 @@ export class StatusCloudClient extends CatalogCloudClient {
       }
       const waiters = { waiting: [waiter], timer: null, ref: null, machine: identity.machine, type,
         request: extra && typeof extra.request === "string" ? extra.request : null,
-        action: false, channel: null, retireUncertain: !!(readOptions && readOptions.retireUncertain) }
+        action: false, channel: null, retireUncertain: !!(readOptions && readOptions.retireUncertain),
+        // The read's connection-health trace, as a relay read's (`_read`): issued now, settled by
+        // `_settleRead` under the same correlation, so a read the carrier holds and never answers
+        // is a timed-out read, not a silence behind an open relay socket.
+        health: viewerHealthBegin("viewer_request_issued", "read") }
       self.readWaiters.set(key, waiters)
       self._watchReadAbort(key, waiters, waiter)
       if (self.readWaiters.get(key) !== waiters) return
@@ -704,6 +755,12 @@ export class StatusCloudClient extends CatalogCloudClient {
     this.carrierReads.delete(key)
     const waiters = flight.waiters
     if (this.readWaiters.get(key) !== waiters) return
+    // The read's carrier gave up and the relay takes it over: recorded under the read's own
+    // correlation, before the answer the relay brings settles it.
+    if (waiters.health) {
+      waiters.health.mark("viewer_carrier_replace", "viewer_stage_failed",
+        { error: cause ? classifyViewerError(cause, "read") : "carrier_closed", outcome: "error" })
+    }
     // The sequence the carrier was given is spent. Nothing on the relay will ever
     // acknowledge it, so stop waiting for an ACK under that number before the
     // resend pins a new one.

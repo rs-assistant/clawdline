@@ -135,3 +135,45 @@ func TestProjectAndSessionIconReadLiveOverride(t *testing.T) {
 		t.Fatalf("corrupt legacy returned %d", code)
 	}
 }
+
+func TestSVGProjectAndSessionIconWire(t *testing.T) {
+	home := placesHome(t)
+	state := filepath.Join(home, ".config", "clawdline-next")
+	path := filepath.Join(home, "projects", "vector")
+	if err := os.MkdirAll(path, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := projects.OpenPlaceRegistry(state).Add([]string{path}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	icons, err := icon.NewRegistryWithOverrides(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24z" fill="#123456"/></svg>`
+	g := icon.Grid{Accent: "#123456", SVG: source}
+	if err := icons.Save(path, g, icons.For(path)); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{cfg: config.Config{Dir: state}, broker: &orchestrator.Broker{Dir: state}, icons: icons}
+	rec := httptest.NewRecorder()
+	s.placesRoute(rec, httptest.NewRequest("GET", "/v1/places", nil))
+	if rec.Code != 200 {
+		t.Fatalf("places: %d %s", rec.Code, rec.Body.String())
+	}
+	var answer struct {
+		Places []struct {
+			Icon icon.Grid `json:"icon"`
+		} `json:"places"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &answer); err != nil {
+		t.Fatal(err)
+	}
+	if len(answer.Places) != 1 || answer.Places[0].Icon.SVG != source {
+		t.Fatal("project wire lost SVG")
+	}
+	row := s.sessionRow(rowInput{item: session.Session{CWD: path}})
+	if row.Icon == nil || row.Icon.Svg != source || row.Icon.Cells == nil {
+		t.Fatalf("session wire lost SVG or empty cells: %+v", row.Icon)
+	}
+}

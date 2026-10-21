@@ -1,0 +1,711 @@
+/* M01–M06 and the evidence view, drawn from the Cloud's stored reads.
+ *
+ * Each screen shows what its reads returned and nothing more: the overall
+ * verdict stays "unknown" because the Cloud has no presence contract, a group
+ * state is the Cloud's `cloud-derive/1` word, a read that failed says why in its
+ * own panel while the reads that succeeded stay on screen, and what no producer
+ * reports yet (relay, API, viewer, latency, queues, incidents, owner
+ * diagnostics) is a labelled unsupported panel, never an empty table. */
+import { useMemo, useState, type ReactNode } from "react"
+import type { Coverage, Envelope, StoredEvent, StoredGroup, StoredSource } from "./stored"
+import { isServiceSource, stageRole } from "./stored"
+import { heldEvents, mayLoadOlder, partBody, type PartName, type StoredFailure, type StoredState } from "./cloud"
+import { buildStoredEvidence, STORED_EVIDENCE_MAX_BYTES } from "./stored-export"
+import type { HealthRoute, HealthScreen } from "./route"
+import { healthDuration, type HealthSay, type HealthWord } from "./words"
+import { HTable, linkClick, Panel, Unknown } from "./parts"
+import { axisOf, eventLanes, groupLanes, seqLanes, sourceMarks, windowBands, type Axis } from "./timeline"
+import { ChartPanel, KnownStrip, listBands, NotCollected, ProblemSummary, SeqChart, SourceChart, StageChart, Timeline, TraceChart } from "./timeline-view"
+import { IncidentBadge, IncidentCoverage, IncidentTable, M05, openIncidents, type IncidentActions } from "./incident-screens"
+import { SOURCE_FILTERS, type SourceFilter } from "./route"
+
+export type StoredNav = { href: (s: HealthScreen) => string; go: (s: HealthScreen) => void }
+export type StoredProps = { state: StoredState; route: HealthRoute; say: HealthSay; nav: StoredNav; fixture: boolean; loadOlder: () => void; actions: IncidentActions }
+
+/* ---- small pieces ---------------------------------------------------------- */
+
+/** An exact instant as the server sent it, shown in UTC to the millisecond. */
+export function exactUTC(iso: string): string {
+  const d = new Date(iso)
+  const p = (n: number, w = 2) => String(n).padStart(w, "0")
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}.${p(d.getUTCMilliseconds(), 3)} UTC`
+}
+
+export function At({ iso }: { iso: string | null }) {
+  return iso === null ? <span className="adm-unknown">—</span> : <time dateTime={iso}>{exactUTC(iso)}</time>
+}
+
+export function Link({ to, nav, children, className }: { to: HealthScreen; nav: StoredNav; children: ReactNode; className?: string }) {
+  return <a className={className ?? "adh-link"} href={nav.href(to)} onClick={(e) => linkClick(e, () => nav.go(to))}>{children}</a>
+}
+
+export function Id({ v }: { v: string | null }) {
+  return v === null ? <span className="adm-unknown">—</span> : <code className="adh-id">{v}</code>
+}
+
+const num = (say: HealthSay, n: number | null) => (n === null ? <Unknown>{say("unknown")}</Unknown> : n.toLocaleString("en-US"))
+
+const GROUP_GLYPH: Record<StoredGroup["group_outcome"], string> = {
+  stall_detected: "■", slow: "▲", recovered: "✓", released_after_stall: "◇", loss: "✕", unsupported: "?",
+}
+
+function GroupBadge({ g, say }: { g: StoredGroup["group_outcome"]; say: HealthSay }) {
+  return (
+    <span className={`adh-badge adh-g-${g}`}>
+      <span aria-hidden="true" className="adh-glyph">{GROUP_GLYPH[g]}</span>
+      {say(`st_group_${g}` as HealthWord)}
+    </span>
+  )
+}
+
+function failureWord(say: HealthSay, code: StoredFailure): string {
+  return say(`st_fail_${code}` as HealthWord)
+}
+
+/** One read's failure, in its own panel: never an empty list, never a zero. */
+export function PartFailed({ name, code, say }: { name: PartName; code: StoredFailure; say: HealthSay }) {
+  return (
+    <div className="adm-notice adh-part-failed" role="status">
+      <p><strong>{say("st_partFailed", { part: say(`st_part_${name}` as HealthWord) })}</strong></p>
+      <p>{failureWord(say, code)}</p>
+      <p className="adm-code">{say("failedCode", { code })}</p>
+    </div>
+  )
+}
+
+export function Stale({ state, name, say }: { state: StoredState; name: PartName; say: HealthSay }) {
+  const p = state.parts[name]
+  if (!p || p.status !== "ok" || p.failure === null) return null
+  return <p className="adm-stale" role="status">{say("st_partStale", { part: say(`st_part_${name}` as HealthWord), reason: failureWord(say, p.failure), time: exactUTC(new Date(p.at).toISOString()) })}</p>
+}
+
+/** Renders a part's body, its stale note, or its failure; `missing` covers a part the plan did not ask for. */
+function WithPart<N extends PartName>({ state, name, say, children }: { state: StoredState; name: N; say: HealthSay; children: (body: NonNullable<ReturnType<typeof partBody<N>>>) => ReactNode }) {
+  const p = state.parts[name]
+  if (!p) return null
+  if (p.status === "failed") return <PartFailed name={name} code={p.code} say={say} />
+  return <><Stale state={state} name={name} say={say} />{children(p.body as NonNullable<ReturnType<typeof partBody<N>>>)}</>
+}
+
+function UnsupportedPanel({ title, reason, say }: { title: string; reason: string; say: HealthSay }) {
+  return (
+    <Panel title={title}>
+      <p><span className="adh-chip adh-q-unsupported">{say("quality_unsupported")}</span></p>
+      <p className="adm-fine">{reason}</p>
+    </Panel>
+  )
+}
+
+/* ---- shared tables --------------------------------------------------------- */
+
+function CoveragePanelBody({ c, say }: { c: Coverage; say: HealthSay }) {
+  return (
+    <>
+      <dl className="adh-facts">
+        <dt>{say("st_sequence")}</dt><dd>{say(`st_seq_${c.sequence}` as HealthWord)}{c.sequence_reason ? ` (${c.sequence_reason})` : ""}</dd>
+        <dt>{say("st_retentionFloor")}</dt><dd><At iso={c.retention_floor} /></dd>
+        <dt>{say("st_dropped")}</dt>
+        <dd>{c.dropped === null ? <Unknown>{say("unknown")}</Unknown> : say("st_droppedValue", { lost: c.dropped.transitions_lost === null ? say("unknown") : c.dropped.transitions_lost, overflow: c.dropped.overflow === null ? say("unknown") : c.dropped.overflow })}</dd>
+        <dt>{say("st_truncated")}</dt><dd>{c.truncated ? say("st_yes") : say("st_no")}</dd>
+      </dl>
+      {c.gaps === null ? <p className="adm-fine"><Unknown>{say("st_gapsUnknown")}</Unknown></p> : c.gaps.length === 0 ? (
+        <p className="adm-fine">{say("st_noGapsListed")}</p>
+      ) : (
+        <HTable caption={say("st_gapsTitle")}
+          columns={[{ label: say("st_colMachine") }, { label: say("st_colBoot") }, { label: say("st_colSeq") }, { label: say("st_colCount"), num: true }, { label: say("st_colCause") }]}
+          rows={c.gaps.map((g, i) => ({ key: `${g.source_id}-${g.boot_id}-${g.from}-${i}`, head: <Id v={g.machine_id} />, cells: [<Id key="b" v={g.boot_id} />, `${g.from}–${g.to}`, num(say, g.count), say(`st_cause_${g.cause}` as HealthWord)] }))} />
+      )}
+      <p className="adm-fine">{say("st_gapEdges")}</p>
+    </>
+  )
+}
+
+
+const COVERAGE_NAMES = ["daemon", "relay_worker", "relay_do", "api", "viewer", "external_probe", "incidents", "bundles", "exports"] as const
+
+function SourceCoveragePanel({ env, say }: { env: Envelope; say: HealthSay }) {
+  const entries = Object.entries(env.source_coverage)
+  return (
+    <Panel title={say("st_sourceCoverageTitle")}>
+      {entries.length === 0 ? <p className="adm-fine"><Unknown>{say("unknown")}</Unknown></p> : (
+        <ul className="adh-coverage-list">
+          {entries.map(([k, v]) => (
+            <li key={k}><span className="adh-coverage-name">{(COVERAGE_NAMES as readonly string[]).includes(k) ? say(`st_src_${k}` as HealthWord) : k}</span> <span className={`adh-chip adh-q-${v === "collected" ? "complete" : v === "service_scope" ? "partial" : v}`}>{say(`st_cov_${v}` as HealthWord)}</span></li>
+          ))}
+        </ul>
+      )}
+      <p className="adm-fine">{say("st_ownerDiagnostics", { state: env.owner_diagnostics })}</p>
+    </Panel>
+  )
+}
+
+function GroupsTable({ groups, say, nav, caption }: { groups: StoredGroup[]; say: HealthSay; nav: StoredNav; caption: string }) {
+  return (
+    <HTable caption={caption}
+      columns={[{ label: say("st_colOutcome") }, { label: say("st_colMachine") }, { label: say("st_colBoot") }, { label: say("st_colTrace") }, { label: say("st_colStage") }, { label: say("st_colSeq") }, { label: say("st_colEvents"), num: true }, { label: say("st_colDropped"), num: true }, { label: say("st_colQuality") }, { label: say("st_colReceived") }, { label: say("st_colWall") }]}
+      rows={groups.map((g, i) => ({
+        key: `${g.source_id}-${g.boot_id}-${g.phase_id ?? ""}-${g.correlation ?? ""}-${i}`,
+        head: <GroupBadge g={g.group_outcome} say={say} />,
+        cells: [
+          <Link key="m" to={{ screen: "M02", machine: g.machine_id }} nav={nav}><Id v={g.machine_id} /></Link>,
+          <Id key="b" v={g.boot_id} />,
+          g.correlation ? <Link key="t" to={{ screen: "M04", trace: g.correlation }} nav={nav}><Id v={g.correlation} /></Link> : <span key="t" className="adm-unknown">{g.phase_id === null ? "—" : say("st_phase", { id: g.phase_id })}</span>,
+          `${g.last_stage ?? "—"}${g.class ? ` · ${g.class}` : ""}`,
+          `${g.first_seq}–${g.last_seq}`,
+          String(g.events),
+          num(say, g.dropped),
+          g.group_quality === "complete" ? say("quality_complete") : `${say("quality_partial")}: ${say(`st_greason_${g.group_reason}` as HealthWord)}`,
+          <At key="r" iso={g.last_received_at} />,
+          <span key="w" className="adm-fine"><At iso={g.last_wall} /></span>,
+        ],
+      }))} />
+  )
+}
+
+function GroupsPanelBody({ state, say, nav, filter, title }: { state: StoredState; say: HealthSay; nav: StoredNav; filter?: (g: StoredGroup) => boolean; title: string }) {
+  return (
+    <>
+      <WithPart state={state} name="outcomes" say={say}>
+        {(o) => {
+          if (o.groups === null) return <p className="adm-fine"><Unknown>{say("st_groupsUnknown", { reason: o.partial_reason ?? "—" })}</Unknown></p>
+          const groups = filter ? o.groups.filter(filter) : o.groups
+          return (
+            <>
+              <p className="adm-fine">{say("st_groupsRule", { rule: o.rule_version ?? "—" })}</p>
+              {groups.length === 0 ? <p className="adm-fine">{say("st_noGroups")}</p> : <GroupsTable groups={groups} say={say} nav={nav} caption={title} />}
+              {o.partial_reason ? <p className="adm-fine">{say("st_partialReason", { reason: say(`st_partial_${o.partial_reason}` as HealthWord) })}</p> : null}
+            </>
+          )
+        }}
+      </WithPart>
+    </>
+  )
+}
+
+function GroupsPanel(props: { state: StoredState; say: HealthSay; nav: StoredNav; filter?: (g: StoredGroup) => boolean; title: string }) {
+  return <Panel title={props.title}><GroupsPanelBody {...props} /></Panel>
+}
+
+
+function EventsTable({ events, say, nav, caption }: { events: StoredEvent[]; say: HealthSay; nav: StoredNav; caption: string }) {
+  return (
+    <HTable caption={caption}
+      columns={[{ label: say("st_colReceived") }, { label: say("st_colEvent") }, { label: say("st_colStage") }, { label: say("st_colSeq"), num: true }, { label: say("st_colMachine") }, { label: say("st_colBoot") }, { label: say("st_colBuild") }, { label: say("st_colTrace") }, { label: say("st_colCount"), num: true }, { label: say("st_colWall") }]}
+      rows={events.map((e) => ({
+        key: e.id,
+        head: <At iso={e.received_at} />,
+        cells: [
+          e.state ? <span key="e">{e.event} <span className={`adh-chip adh-q-${e.state === "unverified_after_gap" ? "partial" : "stale"}`}>{say(`st_wd_${e.state}` as HealthWord)}</span></span> : `${e.event}${e.rule ? ` (${e.rule})` : ""}`,
+          `${e.stage ?? "—"}${e.class ? ` · ${e.class}` : ""}${e.kind ? ` · ${e.kind}` : ""}`,
+          String(e.producer_seq),
+          <Link key="m" to={{ screen: "M02", machine: e.machine_id }} nav={nav}><Id v={e.machine_id} /></Link>,
+          <Id key="b" v={e.boot_id} />,
+          <span key="c"><Id v={e.build_commit} /> {e.build_commit ? <span className="adm-fine">{say("st_producerDeclared")}</span> : null}</span>,
+          e.correlation ? <Link key="t" to={{ screen: "M04", trace: e.correlation }} nav={nav}><Id v={e.correlation} /></Link> : <span key="t" className="adm-unknown">—</span>,
+          num(say, e.count),
+          <span key="w" className="adm-fine"><At iso={e.wall} /></span>,
+        ],
+      }))} />
+  )
+}
+
+function EventsPanelBody({ state, say, nav, title, pinned, loadOlder }: { state: StoredState; say: HealthSay; nav: StoredNav; title: string; pinned: boolean; loadOlder: () => void }) {
+  const name: PartName = state.parts.trace ? "trace" : "events"
+  const events = heldEvents(state)
+  const older = mayLoadOlder(state, pinned)
+  return (
+    <>
+      <WithPart state={state} name={name} say={say}>
+        {(body) => (
+          <>
+            {events.length === 0 ? <p className="adm-fine">{body.evidence_quality === "not_collected" ? say("st_notCollected") : say("st_noEvents")}</p> : <EventsTable events={events} say={say} nav={nav} caption={title} />}
+            <p className="adm-fine">{say("st_eventsHeld", { n: events.length, pages: 1 + state.older.length })}</p>
+            {older === "yes" ? (
+              <button type="button" className="adm-btn adm-btn-small" onClick={loadOlder} disabled={state.olderBusy} aria-busy={state.olderBusy}>
+                {state.olderBusy ? say("st_loadingOlder") : say("st_loadOlder")}
+              </button>
+            ) : older === "live" ? <p className="adm-fine">{say("st_pauseToPage")}</p> : older === "bound" ? <p className="adm-fine">{say("st_pageBound")}</p> : null}
+            {state.olderFailure ? <p className="adm-stale" role="status">{say("st_olderFailed", { reason: failureWord(say, state.olderFailure) })}</p> : null}
+            <p className="adm-fine">{say("st_wallDisplayOnly")}</p>
+          </>
+        )}
+      </WithPart>
+    </>
+  )
+}
+
+function EventsPanel(props: { state: StoredState; say: HealthSay; nav: StoredNav; title: string; pinned: boolean; loadOlder: () => void }) {
+  return <Panel title={props.title}><EventsPanelBody {...props} /></Panel>
+}
+
+
+/** Service records on the newest page: each stage's own result, its elapsed time as the service
+ *  measured it, and whether that stage is waiting on something downstream. */
+function ServicePanelBody({ state, say, nav }: { state: StoredState; say: HealthSay; nav: StoredNav }) {
+  const title = say("st_serviceTitle")
+  return (
+    <>
+      <WithPart state={state} name="events" say={say}>
+        {(body) => {
+          const rows = body.events.filter((e) => isServiceSource(e.source))
+          return (
+            <>
+              {rows.length === 0 ? <p className="adm-fine">{say("st_serviceNone")}</p> : (
+                <HTable caption={title}
+                  columns={[{ label: say("st_colReceived") }, { label: say("st_colSource") }, { label: say("st_colStage") }, { label: say("st_colRole") }, { label: say("st_colEvent") }, { label: say("st_colResult") }, { label: say("st_colElapsed"), num: true }, { label: say("st_colCount"), num: true }, { label: say("st_colBuild") }, { label: say("st_colTrace") }]}
+                  rows={rows.map((e) => {
+                    const role = stageRole(e.stage)
+                    return {
+                      key: e.id,
+                      head: <At iso={e.received_at} />,
+                      cells: [
+                        `${e.source} · ${e.producer_instance}`,
+                        e.stage ?? "—",
+                        role === null ? <Unknown key="r">{say("unknown")}</Unknown> : say(`st_role_${role}` as HealthWord),
+                        e.event,
+                        e.outcome === null ? <Unknown key="o">{say("unknown")}</Unknown> : say(`st_out_${e.outcome}` as HealthWord),
+                        e.elapsed_ms === null ? <Unknown key="e">{say("unknown")}</Unknown> : say("ms", { n: e.elapsed_ms }),
+                        num(say, e.count),
+                        <span key="c"><Id v={e.build_commit} /> {e.build_commit ? <span className="adm-fine">{say("st_producerDeclared")}</span> : null}</span>,
+                        e.correlation ? <Link key="t" to={{ screen: "M04", trace: e.correlation }} nav={nav}><Id v={e.correlation} /></Link> : <span key="t" className="adm-unknown">—</span>,
+                      ],
+                    }
+                  })} />
+              )}
+              <p className="adm-fine">{say("st_serviceNote")}</p>
+            </>
+          )
+        }}
+      </WithPart>
+    </>
+  )
+}
+
+function ServicePanel(props: { state: StoredState; say: HealthSay; nav: StoredNav }) {
+  return <Panel title={props.say("st_serviceTitle")}><ServicePanelBody {...props} /></Panel>
+}
+
+
+function SourcesTable({ sources, say, nav }: { sources: StoredSource[]; say: HealthSay; nav: StoredNav }) {
+  return (
+    <HTable caption={say("st_sourcesTitle")}
+      columns={[{ label: say("st_colMachine") }, { label: say("st_colSource") }, { label: say("st_colBoot") }, { label: say("st_colBuild") }, { label: say("st_colFreshness") }, { label: say("st_colReceived") }, { label: say("st_colAccepted"), num: true }, { label: say("st_colRejected"), num: true }, { label: say("st_colOffset"), num: true }]}
+      rows={sources.map((s) => ({
+        key: s.source_id,
+        head: <Link to={{ screen: "M02", machine: s.machine_id }} nav={nav}><Id v={s.machine_id} /></Link>,
+        cells: [
+          `${s.source ?? "—"} · ${s.producer_instance}`,
+          <span key="b"><Id v={s.boot_id} /> <span className="adm-fine">{say(`st_boot_${s.boot_order}` as HealthWord)}{s.boots_evicted > 0 ? ` · ${say("st_bootsEvicted", { n: s.boots_evicted })}` : ""}</span></span>,
+          <span key="c"><Id v={s.build_commit} /> <span className="adm-fine">{say("st_producerDeclared")}</span></span>,
+          <span key="f" className={`adh-chip adh-q-${s.freshness === "fresh" ? "complete" : "stale"}`}>{say(`st_fresh_${s.freshness}` as HealthWord)}</span>,
+          <span key="r"><At iso={s.last_received_at} /> <span className="adm-fine">({healthDuration(say, Math.round(s.last_receipt_age_ms / 1000))})</span></span>,
+          String(s.events_accepted),
+          String(s.events_rejected),
+          s.clock_offset_ms === null ? <Unknown key="o">{say("unknown")}</Unknown> : say("ms", { n: s.clock_offset_ms }),
+        ],
+      }))} />
+  )
+}
+
+function SourcesPanelBody({ state, say, nav }: { state: StoredState; say: HealthSay; nav: StoredNav }) {
+  return (
+    <WithPart state={state} name="sources" say={say}>
+      {(b) => (
+        <>
+          {b.sources.length === 0 ? <p className="adm-fine">{say("st_notCollected")}</p> : <SourcesTable sources={b.sources} say={say} nav={nav} />}
+          {b.partial_reason ? <p className="adm-fine">{say("st_partialReason", { reason: say(`st_partial_${b.partial_reason}` as HealthWord) })}</p> : null}
+          <p className="adm-fine">{say("st_freshNotPresence")}</p>
+        </>
+      )}
+    </WithPart>
+  )
+}
+
+function SourcesPanel({ state, say, nav, title }: { state: StoredState; say: HealthSay; nav: StoredNav; title: string }) {
+  return <Panel title={title}><SourcesPanelBody state={state} say={say} nav={nav} /></Panel>
+}
+
+function firstEnvelope(state: StoredState): Envelope | null {
+  for (const name of ["overview", "outcomes", "sources", "trace", "events", "incidents", "incident"] as PartName[]) {
+    const b = partBody(state, name)
+    if (b) return b
+  }
+  return null
+}
+
+function Links({ nav, say }: { nav: StoredNav; say: HealthSay }) {
+  return (
+    <nav className="adh-verdict-links" aria-label={say("navGroup")}>
+      <Link to={{ screen: "M02", machine: null }} nav={nav}>{say("screen_M02")}</Link>
+      <Link to={{ screen: "M03" }} nav={nav}>{say("screen_M03")}</Link>
+      <Link to={{ screen: "M05", incident: null }} nav={nav}>{say("screen_M05")}</Link>
+      <Link to={{ screen: "M06" }} nav={nav}>{say("screen_M06")}</Link>
+      <Link to={{ screen: "evidence", trace: null }} nav={nav}>{say("screen_evidence")}</Link>
+    </nav>
+  )
+}
+
+/** The window the list reads used, on the axis, with the envelope that carries its clock. */
+function axisFor(state: StoredState, env: Envelope | null): Axis | null {
+  return axisOf(state.window, env?.as_of ?? null, env?.coverage.retention_floor ?? null)
+}
+
+function EventTimelinePanel({ state, say, nav, title, pinned, loadOlder, filter }: { state: StoredState; say: HealthSay; nav: StoredNav; title: string; pinned: boolean; loadOlder: () => void; filter?: (e: StoredEvent) => boolean }) {
+  const name: PartName = state.parts.trace ? "trace" : "events"
+  const body = partBody(state, name)
+  const all = heldEvents(state)
+  const events = filter ? all.filter(filter) : all
+  const axis = axisFor(state, body)
+  const sources = partBody(state, "sources")?.sources ?? null
+  if (!body || !axis) return <EventsPanel state={state} say={say} nav={nav} title={title} pinned={pinned} loadOlder={loadOlder} />
+  const lanes = eventLanes(events, axis, body.coverage, sources)
+  const shared = listBands(axis, all, state.olderCursor !== null)
+  return (
+    <ChartPanel title={title} say={say}
+      chart={<><Stale state={state} name={name} say={say} /><Timeline lanes={lanes} axis={axis} shared={shared} say={say} env={body} />{filter ? <p className="adm-fine">{say("tl_localOnly", { n: events.length, of: all.length })}</p> : null}<p className="adm-fine">{say("st_eventsHeld", { n: all.length, pages: 1 + state.older.length })}</p></>}
+      table={<EventsPanelBody state={state} say={say} nav={nav} title={title} pinned={pinned} loadOlder={loadOlder} />} />
+  )
+}
+
+function GroupTimelinePanel({ state, say, nav, title, filter }: { state: StoredState; say: HealthSay; nav: StoredNav; title: string; filter?: (g: StoredGroup) => boolean }) {
+  const o = partBody(state, "outcomes")
+  const axis = axisFor(state, o)
+  if (!o || !axis || o.groups === null) return <GroupsPanel state={state} say={say} nav={nav} title={title} filter={filter} />
+  const groups = filter ? o.groups.filter(filter) : o.groups
+  const lanes = groupLanes(groups, axis, partBody(state, "sources")?.sources ?? null)
+  return (
+    <ChartPanel title={title} say={say}
+      chart={<><Stale state={state} name="outcomes" say={say} /><p className="adm-fine">{say("tl_groupsNote", { rule: o.rule_version ?? "—" })}</p><Timeline lanes={lanes} axis={axis} shared={windowBands(axis, null, false)} say={say} env={o} /></>}
+      table={<GroupsPanelBody state={state} say={say} nav={nav} title={title} filter={filter} />} />
+  )
+}
+
+function SourceChartPanel({ state, say, nav, title, boots }: { state: StoredState; say: HealthSay; nav: StoredNav; title: string; boots?: boolean }) {
+  const b = partBody(state, "sources")
+  const axis = axisFor(state, b ?? firstEnvelope(state))
+  if (!b || !axis) return <SourcesPanel state={state} say={say} nav={nav} title={title} />
+  return (
+    <ChartPanel title={title} say={say}
+      chart={<><Stale state={state} name="sources" say={say} /><SourceChart marks={sourceMarks(b.sources, axis)} axis={axis} say={say} nav={nav} /><p className="adm-fine">{say("st_freshNotPresence")}</p></>}
+      table={<>
+        <SourcesPanelBody state={state} say={say} nav={nav} />
+        {boots ? b.sources.map((s) => (
+          <div key={s.source_id}>
+            <HTable caption={say("st_bootsTitle", { source: s.producer_instance })}
+              columns={[{ label: say("st_colBoot") }, { label: say("st_colGeneration"), num: true }, { label: say("st_colBuild") }, { label: say("st_colFirst") }, { label: say("st_colReceived") }, { label: say("st_colSeq"), num: true }]}
+              rows={s.boots.map((x) => ({ key: x.boot_id, head: <Id v={x.boot_id} />, cells: [String(x.server_generation), <Id key="c" v={x.build_commit} />, <At key="f" iso={x.first_received_at} />, <At key="l" iso={x.last_received_at} />, String(x.last_seq)] }))} />
+            <p className="adm-fine">{say("st_bootOrderNote")}</p>
+          </div>
+        )) : null}
+      </>} />
+  )
+}
+
+function SeqPanel({ state, say }: { state: StoredState; say: HealthSay }) {
+  const env = partBody(state, "overview") ?? partBody(state, "outcomes")
+  if (!env) return null
+  return (
+    <ChartPanel title={say("tl_seqTitle")} say={say}
+      chart={<>
+        <SeqChart lanes={seqLanes(env.coverage)} say={say} />
+        <p className="adm-fine">
+          {say("st_retentionFloor")}: <At iso={env.coverage.retention_floor} />{" · "}{say("st_dropped")}: {env.coverage.dropped === null ? say("unknown") : say("st_droppedValue", { lost: env.coverage.dropped.transitions_lost ?? say("unknown"), overflow: env.coverage.dropped.overflow ?? say("unknown") })}
+          {env.coverage.truncated ? ` · ${say("st_truncated")}: ${say("st_yes")}` : ""}
+        </p>
+      </>}
+      table={<CoveragePanelBody c={env.coverage} say={say} />} />
+  )
+}
+
+/** Open durable incidents on the page held, each linking to its frozen evidence (M01, M04). */
+function OpenIncidentsPanel({ state, say, nav, filter, title }: { state: StoredState; say: HealthSay; nav: StoredNav; filter?: (r: import("./stored").IncidentRow) => boolean; title?: string }) {
+  const p = state.parts.incidents
+  if (!p) return null
+  if (p.status === "failed") return <PartFailed name="incidents" code={p.code} say={say} />
+  const body = p.body as import("./stored").IncidentListBody
+  const rows = filter ? body.incidents.filter(filter) : (openIncidents(state) ?? [])
+  return (
+    <Panel title={title ?? say("inc_openTitle")}>
+      <Stale state={state} name="incidents" say={say} />
+      {rows.length === 0
+        ? <p className="adm-fine">{body.source_coverage.incidents === "disabled" ? say("inc_noneDisabled") : filter ? say("inc_noneForTrace") : say("inc_noneOpen")}</p>
+        : <IncidentTable rows={rows} say={say} nav={nav} caption={title ?? say("inc_openTitle")} />}
+      <IncidentCoverage body={body} say={say} />
+      <p><Link to={{ screen: "M05", incident: null }} nav={nav}>{say("inc_all")}</Link></p>
+    </Panel>
+  )
+}
+
+/** Builds as each producer declared them in the held records: per source and boot, never verified. */
+function BuildsPanel({ events, say }: { events: StoredEvent[]; say: HealthSay }) {
+  const seen = new Map<string, { source: string; boot: string; build: string | null; n: number }>()
+  for (const e of events) {
+    const key = `${e.source_id}|${e.boot_id}|${e.build_commit ?? ""}`
+    const row = seen.get(key) ?? { source: `${e.source ?? "—"} · ${e.producer_instance}`, boot: e.boot_id, build: e.build_commit, n: 0 }
+    row.n += 1
+    seen.set(key, row)
+  }
+  const rows = [...seen.entries()]
+  return (
+    <Panel title={say("inc_buildsTitle")}>
+      {rows.length === 0 ? <p className="adm-fine">{say("tl_traceNone")}</p> : (
+        <HTable caption={say("inc_buildsTitle")} columns={[{ label: say("st_colSource") }, { label: say("st_colBoot") }, { label: say("st_colBuild") }, { label: say("st_colEvents"), num: true }]}
+          rows={rows.map(([k, r]) => ({ key: k, head: r.source, cells: [<Id key="b" v={r.boot} />, r.build === null ? <Unknown key="c">{say("inc_noBuild")}</Unknown> : <Id key="c" v={r.build} />, String(r.n)] }))} />
+      )}
+      <p className="adm-fine">{say("inc_buildsNote")}</p>
+    </Panel>
+  )
+}
+
+/** The Cloud-side source filter for M03's records; a change is a new address, so pages restart. */
+function SourceFilterControl({ route, say, nav, state }: { route: HealthRoute; say: HealthSay; nav: StoredNav; state: StoredState }) {
+  const source = route.screen === "M03" ? route.source ?? null : null
+  const sourceId = route.screen === "M03" ? route.sourceId ?? null : null
+  const sources = partBody(state, "sources")?.sources ?? []
+  const set = (next: { source?: SourceFilter | null; sourceId?: string | null }) => nav.go({ screen: "M03", source, sourceId, ...next })
+  const events = partBody(state, "events")
+  const held = heldEvents(state).length
+  const pages = 1 + state.older.length
+  const filtered = source !== null || sourceId !== null
+  return (
+    <div className="adh-controls">
+      <label className="adh-control">
+        <span>{say("tl_filterLabel")}</span>
+        <select value={source ?? ""} onChange={(e) => set({ source: e.target.value === "" ? null : (e.target.value as SourceFilter) })}>
+          <option value="">{say("tl_filterAll")}</option>
+          {SOURCE_FILTERS.map((x) => <option key={x} value={x}>{say(`flt_${x}` as HealthWord)}</option>)}
+        </select>
+      </label>
+      <label className="adh-control">
+        <span>{say("flt_sourceId")}</span>
+        <select value={sourceId ?? ""} onChange={(e) => set({ sourceId: e.target.value === "" ? null : e.target.value })}>
+          <option value="">{say("flt_anySource")}</option>
+          {sourceId !== null && !sources.some((x) => x.source_id === sourceId) ? <option value={sourceId}>{sourceId}</option> : null}
+          {sources.map((x) => <option key={x.source_id} value={x.source_id}>{`${x.source ?? "—"} · ${x.producer_instance} · ${x.machine_id}`}</option>)}
+        </select>
+      </label>
+      {events ? (
+        <p className="adm-fine" role="status">
+          {state.olderCursor === null
+            ? say(filtered ? "flt_allLoadedFiltered" : "flt_allLoaded", { n: held, pages })
+            : say(filtered ? "flt_moreFiltered" : "flt_more", { n: held, pages })}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+/* ---- the screens ----------------------------------------------------------- */
+
+function M01({ state, say, nav }: StoredProps) {
+  const outcomes = partBody(state, "outcomes")
+  const overview = partBody(state, "overview")
+  const tally = useMemo(() => {
+    if (!outcomes?.groups) return null
+    const t: Partial<Record<StoredGroup["group_outcome"], number>> = {}
+    for (const g of outcomes.groups) t[g.group_outcome] = (t[g.group_outcome] ?? 0) + 1
+    return t
+  }, [outcomes])
+  return (
+    <div className="adh-screen">
+      <ProblemSummary state={state} say={say} nav={nav} staleCount={overview?.sources.stale ?? null} />
+      <KnownStrip state={state} say={say} />
+      <Links nav={nav} say={say} />
+      <div className="adm-tiles adm-tiles-4">
+        <div className="adm-tile adh-tile">
+          <p className="adm-tile-label">{say("st_tileEvents")}</p>
+          <WithPart state={state} name="overview" say={say}>
+            {(o) => (
+              <>
+                <p className="adm-tile-value">{o.events.total === null ? <Unknown>{say("unknown")}</Unknown> : o.events.total_is_floor ? say("st_atLeast", { n: o.events.total }) : o.events.total.toLocaleString("en-US")}</p>
+                <p className="adm-tile-note">{o.events.by_event === null ? say("st_byEventUnknown") : Object.entries(o.events.by_event).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`).join(" · ") || say("st_noEventsWindow")}</p>
+              </>
+            )}
+          </WithPart>
+        </div>
+        <div className="adm-tile adh-tile">
+          <p className="adm-tile-label">{say("st_tileSources")}</p>
+          <WithPart state={state} name="overview" say={say}>
+            {(o) => (
+              <>
+                <p className="adm-tile-value">{String(o.sources.listed)}{o.sources.more ? "+" : ""}</p>
+                <p className="adm-tile-note">{say("st_freshStale", { fresh: o.sources.fresh === null ? say("unknown") : o.sources.fresh, stale: o.sources.stale === null ? say("unknown") : o.sources.stale })}</p>
+              </>
+            )}
+          </WithPart>
+        </div>
+        <div className="adm-tile adh-tile">
+          <p className="adm-tile-label">{say("st_tileGroups")}</p>
+          <WithPart state={state} name="outcomes" say={say}>
+            {() => tally === null ? <p className="adm-tile-value adh-tile-small"><Unknown>{say("unknown")}</Unknown></p> : (
+              <>
+                <p className="adm-tile-value">{String(Object.values(tally).reduce((a, b) => a + (b ?? 0), 0))}</p>
+                <p className="adm-tile-note">{Object.entries(tally).map(([k, n]) => `${say(`st_group_${k}` as HealthWord)} ${n}`).join(" · ") || say("st_noGroupsShort")}</p>
+              </>
+            )}
+          </WithPart>
+        </div>
+        <div className="adm-tile adh-tile">
+          <p className="adm-tile-label">{say("tileIncident")}</p>
+          <WithPart state={state} name="incidents" say={say}>
+            {(b) => {
+              const open = openIncidents(state) ?? []
+              const newest = open[0]
+              if (b.source_coverage.incidents === "disabled") return <><p className="adm-tile-value adh-tile-small"><span className="adh-chip adh-q-unsupported">{say("st_cov_disabled")}</span></p><p className="adm-tile-note">{say("inc_disabledShort")}</p></>
+              return newest ? (
+                <>
+                  <p className="adm-tile-value adh-tile-small"><Link to={{ screen: "M05", incident: newest.id }} nav={nav}><IncidentBadge state={newest.state} say={say} /></Link></p>
+                  <p className="adm-tile-note">{say("inc_openCount", { n: open.length })}{b.next_cursor !== null ? ` ${say("inc_firstPage")}` : ""}</p>
+                </>
+              ) : <><p className="adm-tile-value adh-tile-small">{say("inc_noneOpen")}</p><p className="adm-tile-note">{say("inc_noneOpenNote")}</p></>
+            }}
+          </WithPart>
+        </div>
+      </div>
+      <OpenIncidentsPanel state={state} say={say} nav={nav} />
+      <GroupTimelinePanel state={state} say={say} nav={nav} title={say("st_groupsTitle")} />
+      <SeqPanel state={state} say={say} />
+      <NotCollected say={say} items={[
+        { title: say("st_latencyTitle"), reason: say("st_latencyUnsupported") },
+      ]} />
+    </div>
+  )
+}
+
+function M02({ state, route, say, nav, loadOlder }: StoredProps) {
+  const machine = route.screen === "M02" ? route.machine : null
+  if (machine === null) {
+    return (
+      <div className="adh-screen">
+        <ProblemSummary state={state} say={say} nav={nav} />
+        <KnownStrip state={state} say={say} />
+        <SourceChartPanel state={state} say={say} nav={nav} title={say("st_sourcesTitle")} />
+        <GroupTimelinePanel state={state} say={say} nav={nav} title={say("st_groupsTitle")} />
+        <NotCollected say={say} items={[{ title: say("st_presenceTitle"), reason: say("st_presenceUnsupported") }]} />
+      </div>
+    )
+  }
+  return (
+    <div className="adh-screen">
+      <p className="adm-fine"><Link to={{ screen: "M02", machine: null }} nav={nav}>{say("st_allMachines")}</Link> · <Id v={machine} /></p>
+      <ProblemSummary state={state} say={say} nav={nav} />
+      <KnownStrip state={state} say={say} />
+      <EventTimelinePanel state={state} say={say} nav={nav} title={say("st_eventsTitle")} pinned={route.scope.until !== null} loadOlder={loadOlder} />
+      <SourceChartPanel state={state} say={say} nav={nav} title={say("st_machineSources")} boots />
+      <GroupTimelinePanel state={state} say={say} nav={nav} title={say("st_groupsTitle")} />
+      <NotCollected say={say} items={[{ title: say("st_presenceTitle"), reason: say("st_presenceUnsupported") }]} />
+    </div>
+  )
+}
+
+function M03({ state, say, nav, route, loadOlder }: StoredProps) {
+  const env = partBody(state, "overview") ?? partBody(state, "sources")
+  const events = partBody(state, "events")
+  return (
+    <div className="adh-screen">
+      <KnownStrip state={state} say={say} />
+      <SourceFilterControl route={route} say={say} nav={nav} state={state} />
+      {events ? (
+        <ChartPanel title={say("tl_stagesTitle")} say={say}
+          chart={<><Stale state={state} name="events" say={say} /><StageChart events={heldEvents(state)} say={say} nav={nav} asOf={events.as_of} more={state.olderCursor !== null} /></>}
+          table={<ServicePanelBody state={state} say={say} nav={nav} />} />
+      ) : <ServicePanel state={state} say={say} nav={nav} />}
+      <EventTimelinePanel state={state} say={say} nav={nav} title={say("tl_serviceTimeline")} pinned={route.scope.until !== null} loadOlder={loadOlder} filter={(e) => isServiceSource(e.source)} />
+      {env ? <SourceCoveragePanel env={env} say={say} /> : <WithPart state={state} name="overview" say={say}>{() => null}</WithPart>}
+      <SourcesPanel state={state} say={say} nav={nav} title={say("st_buildsTitle")} />
+      <NotCollected say={say} items={[
+        { title: say("st_relayTitle"), reason: say("st_relayUnsupported") },
+        { title: say("st_latencyTitle"), reason: say("st_latencyUnsupported") },
+      ]} />
+    </div>
+  )
+}
+
+function M04({ state, route, say, nav, loadOlder }: StoredProps) {
+  const trace = route.screen === "M04" ? route.trace : ""
+  const body = partBody(state, "trace")
+  return (
+    <div className="adh-screen">
+      <p className="adm-fine">{say("st_traceId")} <Id v={trace} /></p>
+      <KnownStrip state={state} say={say} />
+      {body ? (
+        <ChartPanel title={say("tl_traceTitle")} say={say}
+          chart={<><Stale state={state} name="trace" say={say} /><TraceChart events={heldEvents(state)} say={say} /></>}
+          table={<EventsPanelBody state={state} say={say} nav={nav} title={say("st_traceEvents")} pinned={route.scope.until !== null} loadOlder={loadOlder} />} />
+      ) : <EventsPanel state={state} say={say} nav={nav} title={say("st_traceEvents")} pinned={route.scope.until !== null} loadOlder={loadOlder} />}
+      <EventTimelinePanel state={state} say={say} nav={nav} title={say("tl_traceTimeline")} pinned={route.scope.until !== null} loadOlder={loadOlder} />
+      <GroupTimelinePanel state={state} say={say} nav={nav} title={say("st_traceGroups")} filter={(g) => g.correlation === trace} />
+      <OpenIncidentsPanel state={state} say={say} nav={nav} title={say("inc_traceTitle")} filter={(r) => r.group.correlation === trace} />
+      <BuildsPanel events={heldEvents(state)} say={say} />
+      <NotCollected say={say} items={[{ title: say("st_spansTitle"), reason: say("st_spansUnsupported") }]} />
+      <p><Link to={{ screen: "evidence", trace }} nav={nav} className="adm-btn adm-btn-small">{say("st_exportTrace")}</Link></p>
+    </div>
+  )
+}
+
+function M06({ state, say, nav }: StoredProps) {
+  const overview = partBody(state, "overview")
+  return (
+    <div className="adh-screen">
+      <ProblemSummary state={state} say={say} nav={nav} />
+      <KnownStrip state={state} say={say} />
+      <SourceChartPanel state={state} say={say} nav={nav} title={say("tl_freshnessTitle")} />
+      <SeqPanel state={state} say={say} />
+      {overview ? <SourceCoveragePanel env={overview} say={say} /> : <WithPart state={state} name="overview" say={say}>{() => null}</WithPart>}
+      <Panel title={say("st_boundsTitle")}>
+        <p className="adm-fine">{say("st_boundsNote")}</p>
+      </Panel>
+      <Panel title={say("st_probesTitle")}>
+        <p className="adm-fine">{say("st_probesUnsupported")}</p>
+        <p><Link to={{ screen: "M06", probes: true }} nav={nav} className="adm-btn adm-btn-small">{say("st_probesOpen")}</Link></p>
+      </Panel>
+    </div>
+  )
+}
+
+function EvidenceScreen({ state, route, say, fixture }: StoredProps) {
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle")
+  const record = useMemo(() => buildStoredEvidence(state, route, new Date().toISOString(), fixture), [state, route, fixture])
+  return (
+    <div className="adh-screen">
+      <Panel title={say("st_evidenceTitle")}>
+        <p className="adm-fine">{say("st_evidenceNote")}</p>
+        {record.ok ? (
+          <>
+            <p className="adm-fine">{say("st_evidenceSize", { kib: Math.ceil(record.bytes / 1024), max: STORED_EVIDENCE_MAX_BYTES / 1024, events: record.events, groups: record.groups })}</p>
+            <div className="adm-notice-actions">
+              <button type="button" className="adm-btn adm-btn-small" onClick={() => {
+                if (!navigator.clipboard) { setCopied("failed"); return }
+                void navigator.clipboard.writeText(record.json).then(() => setCopied("done"), () => setCopied("failed"))
+              }}>{say("st_copy")}</button>
+              <span role="status" className="adm-fine">{copied === "done" ? say("st_copied") : copied === "failed" ? say("st_copyFailed") : ""}</span>
+            </div>
+            <label className="adh-control adh-evidence-box">
+              <span>{say("st_evidenceJSON")}</span>
+              <textarea readOnly value={record.json} rows={14} spellCheck={false} />
+            </label>
+          </>
+        ) : (
+          <p className="adm-stale" role="status">{record.reason === "too_large" ? say("st_evidenceTooLarge", { kib: Math.ceil((record.bytes ?? 0) / 1024), max: STORED_EVIDENCE_MAX_BYTES / 1024 }) : say("st_evidenceNothing")}</p>
+        )}
+      </Panel>
+      {(["outcomes", "events", "trace", "sources"] as PartName[]).map((n) => {
+        const p = state.parts[n]
+        return p && p.status === "failed" ? <PartFailed key={n} name={n} code={p.code} say={say} /> : null
+      })}
+      <UnsupportedPanel title={say("st_bundleTitle")} reason={say("st_bundleUnsupported")} say={say} />
+    </div>
+  )
+}
+
+export function StoredScreen(props: StoredProps) {
+  switch (props.route.screen) {
+    case "M01": return <M01 {...props} />
+    case "M02": return <M02 {...props} />
+    case "M03": return <M03 {...props} />
+    case "M04": return <M04 {...props} />
+    case "M05": return <M05 state={props.state} route={props.route} say={props.say} nav={props.nav} actions={props.actions} />
+    case "M06": return <M06 {...props} />
+    case "evidence": return <EvidenceScreen {...props} />
+  }
+}

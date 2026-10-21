@@ -16,6 +16,7 @@ import {
     sealEnvelope
 } from "./cloud-crypto.js";
 import { T } from "../core/i18n.js";
+import { classifyViewerError, viewerHealthBegin, viewerHealthFailed } from "./viewer-health-hook.js";
 import { machinePresentation, machinePresentationForFleet } from "../session/selection.js";
 import {
     CloudTrail, DIAGNOSTIC_REPORT_MAX_BYTES, RELAY_CTL_MAX_BYTES, asCloudFailure, cloudFailure,
@@ -661,6 +662,9 @@ export class CloudClient {
             ["clawdline.v1", "clawdline.token." + this.deviceToken]);
         this.socket = ws;
         if (this.resumedFrom) this.renewalProbe = this.resumedFrom._probeLiveness();
+        // A client that takes over from another tries to resume its stream: `_becameReady` says
+        // whether the relay's delivery continued or the rows have to be asked for again.
+        this.healthResume = this.resumedFrom ? viewerHealthBegin("viewer_sse_resume", "transport") : null;
         this.socketOpenedAt = this.now();
         this._forgetSocketSubscriptions();
         var self = this;
@@ -696,6 +700,10 @@ export class CloudClient {
             var dropped = relayCode
                 ? failureFromRelay(relayCode, { message: "the relay closed the connection" })
                 : cloudError("offline", "the cloud connection dropped");
+            if (ours && self.healthResume) {
+                self.healthResume.fail("carrier_closed");
+                self.healthResume = null;
+            }
             if (ours) {
                 self.closedFailure = dropped;
                 self.trail.closed(closeCode);
@@ -737,6 +745,10 @@ export class CloudClient {
     }
 
     _shutdown(failure, acknowledgementFailure) {
+        if (this.healthResume) {
+            this.healthResume.complete("aborted");
+            this.healthResume = null;
+        }
         var ws = this.socket;
         this.socket = null;
         this._forgetSocketSubscriptions();
@@ -875,9 +887,15 @@ export class CloudClient {
             // went to that socket. Take what it heard meanwhile. A socket left half-open by a network
             // change still reads `ready` and hears nothing, so its successor is not a renewal and
             // recovers the rows like any reconnection.
-            if (prior.ready && !prior.retired && prior.continuityUnproven !== true
-                && this.renewalProbe !== null && prior.framesHeard > this.renewalProbe) {
+            var continued = prior.ready && !prior.retired && prior.continuityUnproven !== true
+                && this.renewalProbe !== null && prior.framesHeard > this.renewalProbe;
+            if (continued) {
                 this._continueFrom(prior);
+            }
+            if (this.healthResume) {
+                if (continued) this.healthResume.complete("ok");
+                else this.healthResume.fail("sse_resume_refused");
+                this.healthResume = null;
             }
             prior._handOff(this);
         }
@@ -1194,6 +1212,10 @@ export class CloudClient {
             return await this._openEnvelopeFrame(envelope, realign, probe);
         } catch (error) {
             this._recordReceiveFailure(error, envelope, realign, probe);
+            // The answer this envelope may have carried never reached its read: replay, the apply
+            // step, or anything before the payload opened (lookup, signature, decryption).
+            viewerHealthFailed("viewer_decrypt_apply", error && error.code === "replay" ? "replay_rejected"
+                : probe.stage === "apply" ? "apply_failed" : "decrypt_failed", { class: "read" });
             throw error;
         }
     }
@@ -2735,6 +2757,26 @@ export class CloudClient {
             failure.status !== 408 && failure.status !== 429;
     }
 
+    /** A person's diagnostic press is one explicit request, independent of background quotas
+     * and the lifetime writer lock of another tab. Only the machine's matching receipt
+     * establishes delivery; a timeout leaves the button available for another press. */
+    async sendDiagnostic(machine, data) {
+        if (!this.ready) throw cloudError("cloud_reconnecting", "Cloud is not ready to deliver diagnostics");
+        if (this._machineImplements(machine, VIEWER_EVENTS_COMMAND, { learned: false }) !== "yes") {
+            throw cloudError("cloud_feature_unavailable", "This machine has not advertised viewer diagnostics");
+        }
+        const log = new ViewerEventLog();
+        log.record("cloud.send.diagnostic_requested", Object.assign({}, data, { machine: machine }));
+        const outbox = log.takeBatch({ device: this.deviceID, tab: this.tabID,
+            webBuild: this.webBuild, machine: machine, why: "explicit" });
+        const receipt = await this._machineRequestAs(outbox.request, machine, VIEWER_EVENTS_COMMAND,
+            { batch: JSON.parse(outbox.body) }, "action", undefined, { probe: false });
+        if (!receipt || receipt.batch_id !== outbox.batch_id || receipt.rows !== outbox.rows) {
+            throw cloudError("bad_payload", "The machine's receipt does not name this diagnostic batch");
+        }
+        return receipt;
+    }
+
     _armViewerEvents() {
         if (!this.viewerEventDelivery) return;
         if (!this.viewerEventsOff) {
@@ -3102,11 +3144,12 @@ export class CloudClient {
         } catch (error) { return Promise.reject(error); }
     }
 
-    pastSessions(place, assistant) {
+    pastSessions(place, assistant, cursor) {
         try {
             var route = this._place(place);
-            return this._machineRequest(route.machine, "past-sessions",
-                { place: route.id, assistant: assistant || "" }, "read");
+            var body = { place: route.id, assistant: assistant || "" };
+            if (cursor) body.cursor = cursor;
+            return this._machineRequest(route.machine, "past-sessions", body, "read");
         } catch (error) { return Promise.reject(error); }
     }
 
@@ -3491,7 +3534,10 @@ export class CloudClient {
                 machine: identity.machine, type: type, request: extra && typeof extra.request === "string"
                     ? extra.request : null,
                 action: /^action:/.test(answer), channel: null,
-                retireUncertain: !!(readOptions && readOptions.retireUncertain) };
+                retireUncertain: !!(readOptions && readOptions.retireUncertain),
+                // The read's connection-health trace: issued now, its response and decrypt-apply
+                // recorded under the same correlation when it settles (`_settleRead`).
+                health: viewerHealthBegin("viewer_request_issued", "read") };
             self.readWaiters.set(key, waiters);
             self._watchReadAbort(key, waiters, waiter);
             if (self.readWaiters.get(key) !== waiters) return;
@@ -3606,6 +3652,20 @@ export class CloudClient {
         }
         var ref = waiters.ref;
         if (ref) this.pendingBySequence.delete(ref.seq);
+        if (waiters.health) {
+            if (!error) {
+                // An answer reaches here only opened and applied, so both stages completed.
+                waiters.health.mark("viewer_response_received", "viewer_stage_completed", { outcome: "ok" });
+                waiters.health.mark("viewer_decrypt_apply", "viewer_stage_completed", { outcome: "ok" });
+            } else if (error.code === "cloud_read_abandoned") {
+                waiters.health.mark("viewer_response_received", "viewer_stage_failed",
+                    { error: "unclassified", outcome: "aborted" });
+            } else {
+                var healthError = classifyViewerError(error, "read");
+                waiters.health.mark("viewer_response_received", "viewer_stage_failed",
+                    { error: healthError, outcome: healthError === "timeout" ? "timeout" : "error" });
+            }
+        }
         if (error) {
             error = this._withRef(error, ref);
             this.trail.refused(error.ref, error);
@@ -4297,6 +4357,22 @@ export class CloudClient {
             });
         }
         var self = this;
+        // The write's connection-health trace (`viewer-health-hook.js`): issued now, and its
+        // relay answer recorded under the same correlation. A write that resolves because the
+        // ack timer ran out heard nothing, so it is recorded `pending`, never `ok`.
+        var health = viewerHealthBegin("viewer_request_issued", "control");
+        var healthSettled = false;
+        function healthAnswer(failure, heard) {
+            if (healthSettled) return;
+            healthSettled = true;
+            if (!failure) {
+                health.mark("viewer_response_received", "viewer_stage_completed", { outcome: heard ? "ok" : "pending" });
+                return;
+            }
+            var word = classifyViewerError(failure, "read");
+            health.mark("viewer_response_received", "viewer_stage_failed",
+                { error: word, outcome: word === "timeout" ? "timeout" : "error" });
+        }
         return new Promise(function (resolve, reject) {
             var pending = { ack: null };
             var envelope = null;
@@ -4305,24 +4381,25 @@ export class CloudClient {
             pending.ack = {
                 settle: function (failure) {
                     if (timer !== null) { self.clearTimeout(timer); timer = null; }
-                    if (failure) { reject(failure); return; }
+                    if (failure) { healthAnswer(failure, false); reject(failure); return; }
                     // The relay can answer inside the same turn the frame was written, before
                     // `_publishCommand` has handed the envelope back; resolve with it once it has.
                     relayed = true;
-                    if (envelope) resolve(envelope);
+                    if (envelope) { healthAnswer(null, true); resolve(envelope); }
                 }
             };
             self._publishCommand(machine, type, body, envelopeClass, pending).then(function (sealed) {
                 envelope = sealed;
-                if (relayed) { resolve(sealed); return; }
+                if (relayed) { healthAnswer(null, true); resolve(sealed); return; }
                 if (self.pendingBySequence.get(sealed.seq) !== pending.registered) return;   // refused already
                 timer = self.setTimeout(function () {
                     timer = null;
                     if (self.pendingBySequence.get(sealed.seq) !== pending.registered) return;
                     self.pendingBySequence.delete(sealed.seq);
+                    healthAnswer(null, false);
                     resolve(sealed);
                 }, self.ackTimeoutMs);
-            }, reject);
+            }, function (error) { healthAnswer(error, false); reject(error); });
         });
     }
 

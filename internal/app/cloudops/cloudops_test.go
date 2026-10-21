@@ -454,6 +454,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: machine, name: "read:req-usage-session",
 		method: "GET", path: "/v1/usage/sessions/c0ffee00-0000-4000-8000-000000000005",
 	}, {
+		word:    "usage.overview",
+		body:    map[string]any{"type": "usage.overview", "session": machine, "request": "req-overview", "days": "28", "project": "unattributed"},
+		session: machine, name: "read:req-overview",
+		method: "GET", path: "/v1/usage/overview", query: map[string]string{"days": "28", "project": "unattributed"},
+	}, {
 		word: "usage.task",
 		body: map[string]any{"type": "usage.task", "session": machine,
 			"request": "req-usage-task", "id": taskID},
@@ -1158,6 +1163,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 			"request": "req-events", "batch": map[string]any{"rows": []any{}}},
 		session: machine, name: "action:req-events", code: "unknown_command", status: 400,
 	}, {
+		word:    "direct-local-network-enable",
+		body:    map[string]any{"type": "direct-local-network-enable", "session": machine, "request": "req-local"},
+		session: machine, name: "action:req-local", method: "POST", path: "/v1/cloud/direct/local-network",
+		body2: `{"enabled":true}`,
+	}, {
 		// The one word this machine could serve and deliberately does not.
 		word: "dispatch",
 		body: map[string]any{"type": "dispatch", "session": machine, "request": "req-dispatch",
@@ -1234,5 +1244,19 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 				t.Fatalf("a successful answer carries no body: %s", answer.Payload)
 			}
 		})
+	}
+}
+
+func TestPastPageCursorReachesTheLocalHistoryRoute(t *testing.T) {
+	r := &router{}
+	answer := open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "past-sessions", "session": MachineReplySession, "request": "req-past-page", "place": "project", "assistant": "codex", "cursor": "older/+?= page",
+	}))
+	if answer.Session != MachineReplySession {
+		t.Fatalf("wrong reply %v", answer)
+	}
+	req := r.last()
+	if req.Path != "/v1/places/project/sessions/codex" || req.Query["cursor"] != "older/+?= page" {
+		t.Fatalf("wrong request %v", req)
 	}
 }

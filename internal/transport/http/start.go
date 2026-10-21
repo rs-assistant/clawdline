@@ -182,13 +182,13 @@ func (s *Server) writing(w http.ResponseWriter, r *http.Request, body func(http.
 	//
 	// The answer is filed in the store's receipts, not in this process: a
 	// retry after a restart must not open a second tab (G15).
-	k := store.ReceiptKey{Scope: scopePlaces, Actor: accessOf(r).verdict.Device, Key: key}
+	k := store.ReceiptKey{Scope: scopePlaces, Actor: actorOf(r), Key: key}
 	s.receipted(w, r, k, requestDigest([]byte(r.Method), []byte(routePath(r))),
 		// A full queue is a fact about this moment, not about the request,
 		// and filing it would refuse the same key's retry.
 		func(status int) bool { return status != http.StatusTooManyRequests },
 		body)
-	log.Printf("remote: %s %s by %s", r.Method, r.URL.Path, accessOf(r).verdict.Device)
+	log.Printf("remote: %s %s by %s", r.Method, r.URL.Path, actorOf(r))
 }
 
 // startReading is one look at the machine for one request: the places list's
@@ -250,6 +250,21 @@ func (s *Server) starter(reading startReading) app.Starter {
 		Launcher: newLauncher(),
 		Past: func(ctx context.Context, place projects.Place, assistant string) []projects.Past {
 			return s.past(ctx, place, assistant, reading, 200)
+		},
+		VerifyPast: func(ctx context.Context, place projects.Place, assistant, id string) (bool, error) {
+			if assistant == projects.AssistantCodex {
+				found, err := projects.CodexConversation(ctx, place, id)
+				if err != nil {
+					return false, app.StartRefusal{Status: http.StatusServiceUnavailable, Code: "codex_unavailable", Message: "Codex history could not be read. Retry the request."}
+				}
+				return found, nil
+			}
+			for _, row := range s.past(ctx, place, assistant, reading, 200) {
+				if row.ID == id {
+					return true, nil
+				}
+			}
+			return false, nil
 		},
 		Recorded:             projects.Recorded,
 		PersonaDir:           personas.Dir(s.cfg.Dir),
@@ -509,9 +524,30 @@ func (s *Server) pastRoute(w http.ResponseWriter, r *http.Request, id, assistant
 	}
 	// One more than is sent, so the answer can say whether there were more.
 	const limit = 200
-	found := s.past(ctx, place, assistant, reading, limit+1)
+	var found []projects.Past
+	next := ""
+	if assistant == projects.AssistantCodex {
+		var err error
+		snapshot := s.withOwnSessionTitles(ownrecords.Snapshot{}, time.Now())
+		found, next, err = projects.CodexPastPage(ctx, place, reading.openCodex, projects.PastTitles{
+			Manual: func(id, custom string) string {
+				return manualConversationTitle(snapshot.Titles, id, custom)
+			},
+			Orchestrator: func(id string) string {
+				titles, _ := s.boardTitles(ctx, place.Path, assistant, []string{id}, nil)
+				return titles[id].Label
+			},
+		}, r.URL.Query().Get("cursor"))
+		if err != nil {
+			log.Printf("places: codex history page for %s: %v", place.ID, err)
+			writePlaceRefusal(w, http.StatusServiceUnavailable, "codex_unavailable", "Codex history could not be read. Retry the request.", "")
+			return
+		}
+	} else {
+		found = s.past(ctx, place, assistant, reading, limit+1)
+	}
 	out := contract.PastSessionList{At: time.Now().Unix(), Place: place.ID, Assistant: assistant,
-		More: len(found) > limit, Sessions: []contract.PastSession{}}
+		More: len(found) > limit || next != "", NextCursor: next, Sessions: []contract.PastSession{}}
 	if len(found) > limit {
 		found = found[:limit]
 	}

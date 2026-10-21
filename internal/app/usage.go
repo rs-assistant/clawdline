@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
 )
@@ -37,7 +38,7 @@ const (
 	// usageWindowLimit is how far back a pass looks: a transcript last
 	// written earlier than this is not looked for. A row already stored keeps
 	// its totals; the file is simply not visited again until it is written.
-	usageWindowLimit = 7 * 24 * time.Hour
+	usageWindowLimit = transcript.DailyDayLimit * 24 * time.Hour
 	// usageEvery is how often the daemon runs a pass.
 	usageEvery = time.Minute
 	// usageStallPasses is how many passes' time may go by with none finished
@@ -266,7 +267,7 @@ func (u *UsageLedger) Pass(ctx context.Context) (UsagePass, error) {
 
 	var due []usageFile
 	for k, f := range found {
-		if usageDue(f, stored[k], stored[k].Conversation != "") {
+		if usageDue(f, stored[k], stored[k].Conversation != "", now) {
 			due = append(due, f)
 		}
 	}
@@ -308,23 +309,36 @@ func (u *UsageLedger) Pass(ctx context.Context) (UsagePass, error) {
 		}
 		u.sayAbout(f, reason, err)
 	}
-	return out, nil
+	return out, u.Store.PruneUsageDaily(ctx, now)
 }
 
 // usageDue says a transcript has something a pass should read: it is new, it
 // changed since it was read, its last read stopped short, it could not be read
 // last time, or it is gone and its row does not say so yet.
-func usageDue(f usageFile, prev store.UsageRow, had bool) bool {
-	if f.gone {
-		return had && prev.Reason != store.UsageTranscriptMissing
+func usageDue(f usageFile, prev store.UsageRow, had bool, clocks ...time.Time) bool {
+	now := time.Now()
+	if len(clocks) > 0 {
+		now = clocks[0]
 	}
 	if !had {
 		return true
 	}
 	var version struct {
-		ClassificationVersion int `json:"classification_version"`
+		ClassificationVersion int    `json:"classification_version"`
+		DailyVersion          int    `json:"daily_version"`
+		DailyProjectVersion   int    `json:"daily_project_version"`
+		DailyTimezone         string `json:"daily_timezone"`
 	}
-	if json.Unmarshal(prev.State, &version) != nil || version.ClassificationVersion != transcript.LedgerClassificationVersion {
+	if json.Unmarshal(prev.State, &version) != nil || version.DailyProjectVersion != 1 {
+		return true
+	}
+	if f.gone {
+		return prev.Reason != store.UsageTranscriptMissing
+	}
+	if version.ClassificationVersion != transcript.LedgerClassificationVersion || version.DailyVersion != 1 {
+		return true
+	}
+	if version.DailyTimezone != "" && version.DailyTimezone != transcript.DailyTimezoneKey(now) {
 		return true
 	}
 	return prev.More || prev.Reason != "" || prev.Size != f.size || !prev.ModifiedAt.Equal(f.modified) ||
@@ -340,6 +354,11 @@ func (u *UsageLedger) read(f usageFile, prev store.UsageRow, had bool, now time.
 	}
 	row.Parent = f.parent
 	if f.gone {
+		var state transcript.LedgerState
+		if json.Unmarshal(row.State, &state) == nil {
+			resolveUsageProject(&state)
+			row.State, _ = json.Marshal(&state)
+		}
 		row.Reason = store.UsageTranscriptMissing
 		return row, row.Reason, nil
 	}
@@ -357,7 +376,7 @@ func (u *UsageLedger) read(f usageFile, prev store.UsageRow, had bool, now time.
 		// never counted under two.
 		state = transcript.LedgerState{}
 	}
-	res, err := state.Feed(f.path)
+	res, err := state.FeedDaily(f.path, now)
 	if err != nil {
 		if errors.Is(err, transcript.ErrNoRecord) {
 			row.Reason = store.UsageTranscriptMissing
@@ -370,6 +389,7 @@ func (u *UsageLedger) read(f usageFile, prev store.UsageRow, had bool, now time.
 		return row, row.Reason, err
 	}
 	state.ClassificationVersion = transcript.LedgerClassificationVersion
+	resolveUsageProject(&state)
 	spent, measured := state.Totals()
 	measured = pricedMeasured(spent, measured)
 	stateJSON, err := json.Marshal(&state)
@@ -385,6 +405,18 @@ func (u *UsageLedger) read(f usageFile, prev store.UsageRow, had bool, now time.
 		u.readOpening(&row, f)
 	}
 	return row, "", nil
+}
+
+// Keep the original cwd for durable dispatch joins even after a worktree is
+// removed. A canonical key is evidence from Git, not an absolute-path guess.
+// This runs in the bounded background reader, never in an overview request.
+func resolveUsageProject(state *transcript.LedgerState) {
+	state.DailyProjectVersion = 1
+	if scope, ok := projects.ResolveScope(state.DailyProject); ok && scope.Kind == projects.ScopeRepository {
+		if st, err := os.Stat(filepath.Join(scope.Key, ".git")); err == nil && st.IsDir() {
+			state.DailyProjectKey = scope.Key
+		}
+	}
 }
 
 // readOpening names the child task or Root Assignment the transcript's first

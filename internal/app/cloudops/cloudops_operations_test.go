@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -344,9 +345,9 @@ func TestAMalformedBodyIsRefusedWhereItSafelyNames(t *testing.T) {
 			"scope": "project", "task": "", "path": "../secrets.md"},
 		code: "malformed_read", published: true,
 	}, {
-		name: "a document that is not inert text",
+		name: "a document outside the supported formats",
 		body: map[string]any{"type": "document", "session": pane, "request": "req",
-			"scope": "project", "task": "", "path": "index.html"},
+			"scope": "project", "task": "", "path": "index.xhtml"},
 		code: "malformed_read", published: true,
 	}, {
 		name: "a Project file read cannot name a path",
@@ -673,8 +674,8 @@ func TestADocumentCrossesOnlyAsInertText(t *testing.T) {
 	if body["data"] != base64.StdEncoding.EncodeToString([]byte("# report\n")) {
 		t.Fatalf("the text did not cross: %v", body["data"])
 	}
-	if answer := ask(&router{body: "<p>", media: "text/html; charset=utf-8"}); answer.Code != "document_media_type_unsupported" {
-		t.Fatalf("HTML crossed: %+v", answer)
+	if answer := ask(&router{body: "<p>", media: "application/xhtml+xml"}); answer.Code != "document_media_type_unsupported" {
+		t.Fatalf("an unsupported media type crossed: %+v", answer)
 	}
 	if answer := ask(&router{body: "\xff\xfe", media: "text/plain; charset=utf-8"}); answer.Code != "document_not_utf8" {
 		t.Fatalf("bytes that are not text crossed: %+v", answer)
@@ -783,7 +784,7 @@ func TestTheVocabularyAndTheImplementedListAgreeWithTheCatalog(t *testing.T) {
 		"work.v2.assign", "work.v2.persona-suggestion", "work.v2.remind", "work.v2.edit", "work.v2.cancel", "work.v2.complete", "work.v2.seen", "work.v2.image-create", "work.v2.image-delete", "work.v2.proposal-resolve",
 		"work.v2.convert",
 		"work.v2.todo-create", "work.v2.todo-image-create", "work.v2.todo-action",
-		"usage.session", "usage.task", "usage.item", "usage.compare-compaction", "usage.compare-handoff", "usage.work-units", "usage.work-samples",
+		"usage.session", "usage.overview", "usage.task", "usage.item", "usage.compare-compaction", "usage.compare-handoff", "usage.work-units", "usage.work-samples",
 		"verification.list", "verification.get", "verification.create", "verification.note",
 		"verification.criterion", "verification.close", "verification.delete"} {
 		if !implemented[word] {
@@ -1331,6 +1332,30 @@ func TestTheWorkSamplesCrossWithOnlyTheFieldsTheRouteReads(t *testing.T) {
 		if answer := open(r).Handle(context.Background(), request(t, ClassCtl, body)); answer.Code != "malformed_read" || len(r.seen) != 0 {
 			t.Fatalf("took %v: %+v, asked %v", body, answer, r.seen)
 		}
+	}
+}
+
+func TestUsageOverviewCrossesMachineFiltersAndRouteErrors(t *testing.T) {
+	r := &router{}
+	answer := open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{"type": "usage.overview", "session": MachineReplySession, "request": "req", "days": "28", "project": "unattributed"}))
+	if answer.Status != 200 || len(r.seen) != 1 || r.last().Path != "/v1/usage/overview" || r.last().Query["days"] != "28" || r.last().Query["project"] != "unattributed" {
+		t.Fatalf("overview %+v %v", answer, r.seen)
+	}
+	for _, extra := range []map[string]any{{"days": 7}, {"budget": 1}, {"machine": "another"}} {
+		body := map[string]any{"type": "usage.overview", "session": MachineReplySession, "request": "req"}
+		for k, v := range extra {
+			body[k] = v
+		}
+		r := &router{}
+		answer := open(r).Handle(context.Background(), request(t, ClassCtl, body))
+		if answer.Code != "malformed_read" || len(r.seen) != 0 {
+			t.Fatalf("accepted %v", body)
+		}
+	}
+	r = &router{status: 400, body: `{"error":"unknown_project","detail":"That project is unavailable."}`}
+	answer = open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{"type": "usage.overview", "session": MachineReplySession, "request": "req", "project": "unknown"}))
+	if answer.Status != 400 || answer.Code != "unknown_project" {
+		t.Fatalf("typed refusal %+v", answer)
 	}
 }
 
@@ -1928,5 +1953,60 @@ func TestSessionsSnapshotNamesThePassItsMarkerCarried(t *testing.T) {
 	got, _ := json.Marshal(answerOf(t, answer)["body"])
 	if string(got) != `{"complete":true,"sessions":["%19"],"snapshot_generation":"`+pass+`"}` {
 		t.Fatalf("the answer said %s", got)
+	}
+}
+
+func TestUsageOverviewAcceptsTheBrowserWireFixtures(t *testing.T) {
+	raw, err := os.ReadFile("testdata/usage-overview-browser.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixtures []struct {
+		Query string         `json:"query"`
+		Body  map[string]any `json:"body"`
+	}
+	if err := json.Unmarshal(raw, &fixtures); err != nil {
+		t.Fatal(err)
+	}
+	for _, fixture := range fixtures {
+		body := map[string]any{"type": "usage.overview", "session": MachineReplySession, "request": "req-browser"}
+		for key, value := range fixture.Body {
+			body[key] = value
+		}
+		r := &router{}
+		answer := open(r).Handle(context.Background(), request(t, ClassCtl, body))
+		if answer.Status != 200 || len(r.seen) != 1 || r.last().Path != "/v1/usage/overview" {
+			t.Fatalf("browser body refused: %+v %v", answer, r.seen)
+		}
+		for key, value := range fixture.Body {
+			if r.last().Query[key] != value {
+				t.Fatalf("lost query %s", key)
+			}
+		}
+	}
+}
+
+func TestSameNetworkEnableIsNarrowAndRequiresOperationPermission(t *testing.T) {
+	r := &router{}
+	body := map[string]any{"type": "direct-local-network-enable", "session": MachineReplySession, "request": "req-local"}
+	b := open(r)
+	answer := b.Handle(context.Background(), request(t, ClassCtl, body))
+	if !answer.OK() || len(r.seen) != 1 {
+		t.Fatalf("answer %+v, routes %+v", answer, r.seen)
+	}
+	got := r.last()
+	if got.Method != "POST" || got.Path != "/v1/cloud/direct/local-network" || string(got.Body) != `{"enabled":true}` {
+		t.Fatalf("unexpected enable route: %+v", got)
+	}
+	for _, extra := range []string{"enabled", "path", "settings"} {
+		body[extra] = false
+		if a := b.Handle(context.Background(), request(t, ClassCtl, body)); a.OK() {
+			t.Fatalf("accepted extra field %s", extra)
+		}
+		delete(body, extra)
+	}
+	closed := Bridge{MachineID: "mac-01", Router: r, AllowCommands: func() bool { return false }}
+	if a := closed.Handle(context.Background(), request(t, ClassCtl, body)); a.OK() {
+		t.Fatal("enabled with operations forbidden")
 	}
 }

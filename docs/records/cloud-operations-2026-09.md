@@ -4,24 +4,28 @@
 For maintainers tracing the 2026-09 operation mapping, this record comes from the [Cloud wire specification](../cloud-wire.md).
 The current operation catalog in code is authoritative.
 
-### 10.3 27 種操作
+### 10.3 The 27 operations
 
-`Sources/CloudAppBridge.swift` 的 `case "…"`。寫入類（:3107-3465）：
-`send`、`answer`/`key`、`start`、`resume`、`end`、`focus`、`shell-kill`、`board-command`、
-`timeline-command`、`schedule-create`/`schedule-update`、`schedule-delete`/`schedule-run`、
-`snippet-create`/`snippet-update`、`snippet-delete`、`snippet-order`、
-`schedule-webhook-bind-v1`、`push-subscribe`、`push-unsubscribe`、`push-test`、`voice`、
-`diagnostics.report`、`diagnostics.events`、`dispatch`。
+The `case "…"` branches in `Sources/CloudAppBridge.swift` group mutations at :3107–3465:
+`send`, `answer`/`key`, `start`, `resume`, `end`, `focus`, `shell-kill`, `board-command`,
+`timeline-command`, `schedule-create`/`schedule-update`, `schedule-delete`/`schedule-run`,
+`snippet-create`/`snippet-update`, `snippet-delete`, `snippet-order`,
+`schedule-webhook-bind-v1`, `push-subscribe`, `push-unsubscribe`, `push-test`, `voice`,
+`diagnostics.report`, `diagnostics.events`, and `dispatch`.
 
-唯讀類（:3828-4090）：`transcript`、`info`、`agent`、`shell`、`skills`、`git`、`screen`、`image`、
-`documents`、`document`、`board`、`board.items`、`timeline`、`places`、
-`project-worktree-lifecycle`(-refresh)、`past-sessions`、`schedules`、`snippets`、`schedule`、
-`push-key`。
+Read-only operations at :3828–4090 are `transcript`, `info`, `agent`, `shell`, `skills`, `git`,
+`screen`, `image`, `documents`, `document`, `board`, `board.items`, `timeline`, `places`,
+`project-worktree-lifecycle`(-refresh), `past-sessions`, `schedules`, `snippets`, `schedule`,
+and `push-key`.
 
-Go 版目前有對應本機功能的約 7 種（`docs/remote.md`）。**這一波（地基）一種都不做**；第三階段開始接，
-逐項在[實作紀錄 §10.5](cloud-wire-implementation-2026-09.md)。**數字是量出來的，不要抄**：`cloudops.Vocabulary()` 與 `Implemented()` 都是從 catalog 推
-出來的，2026-09-20 量到詞彙 37 個字、接上 28 個、其餘回具名的拒絕（8 個 `unknown_command`、
-`dispatch` 回 `cloud_dispatch_unpinned`），`Divergences()` 5 筆。
+At the time of this migration note, the Go version had about seven corresponding local
+operations (`docs/remote.md`). The foundation wave deliberately connected none of them;
+phase three began connecting them, as recorded in the
+[implementation record, §10.5](cloud-wire-implementation-2026-09.md).
+Measure these counts rather than copying them: `cloudops.Vocabulary()` and `Implemented()`
+derive from the catalog. On 2026-09-20 the measured vocabulary had 37 words, 28 connected;
+the rest returned named refusals (eight `unknown_command` and `cloud_dispatch_unpinned`
+for `dispatch`), and `Divergences()` returned five entries.
 
 As of 2026-09-23, the hosted Work v2 console carries explicit words. The read words are
 `work.v2.item`, `work.v2.items`, `work.v2.search`, `work.v2.proposals`,
@@ -70,7 +74,7 @@ snapshot nor another settings key crosses. Reading needs the paired line. Saving
 needs the machine's Cloud-command switch and the paired device's Send capability. The screen says
 that a successful assignment captures the pair, so changing it never looks retroactive.
 
-As of 2026-10-07, the Settings page's **立即更新** crosses as `update-apply`, which carries nothing
+As of 2026-10-07, the Settings page's **Update now** crosses as `update-apply`, which carries nothing
 but its request id to `POST /v1/update/apply` with body `{}`: a phone can start the update of the
 newest release of the machine's channel, but cannot name a version or force one. It is a command,
 so it needs the machine's Cloud-command switch and the paired device's Send capability. Its

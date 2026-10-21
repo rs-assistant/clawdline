@@ -1,12 +1,14 @@
+import type { SessionRow } from "@clawdline/contract"
 import type { ProjectedSession } from "./all-machine-sessions.js"
 
 export type FleetFilter = "all" | "attention" | "working" | "idle"
 
-export function matchesFleetFilter(row: ProjectedSession, filter: FleetFilter): boolean {
+export function matchesFleetFilter(row: ProjectedSession, filter: FleetFilter, status?: Pick<Partial<SessionRow>, "shells">): boolean {
+  const hasShells = (status?.shells?.length ?? 0) > 0
   switch (filter) {
     case "attention": return row.waitingForReply === true || row.needsAttention === true
-    case "working": return row.state === "working" && row.freshness === "current"
-    case "idle": return row.state === "idle" && row.freshness === "current"
+    case "working": return (row.state === "working" || hasShells) && row.freshness === "current"
+    case "idle": return row.state === "idle" && !hasShells && row.freshness === "current"
     default: return true
   }
 }

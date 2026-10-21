@@ -27,7 +27,8 @@ func (f *directFixture) answerAt(t *testing.T, seq uint64) map[string]any {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		if row, ok := f.spool.Row(seq); ok {
+		// A reserved spool row is visible before PublishTracked seals it.
+		if row, ok := f.spool.Row(seq); ok && len(row.Sealed) != 0 {
 			env, err := domaincloud.DecodeEnvelope(row.Sealed)
 			if err != nil {
 				t.Fatal(err)

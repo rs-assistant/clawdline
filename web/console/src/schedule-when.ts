@@ -30,9 +30,11 @@ export function scheduleWhenFields(
   at: string,
   days: string | string[],
   on = "",
-): { trigger_only: true } | { at: string; on: string } | { at: string; days: string | string[] } {
+  interval?: { every_days: number; start: string },
+): { trigger_only: true } | { at: string; on: string } | { at: string; days: string | string[] } | { at: string; every_days: number; start: string } {
   if (triggerOnly) return { trigger_only: true }
-  return on ? { at, on } : { at, days }
+  if (on) return { at, on }
+  return interval ? { at, ...interval } : { at, days }
 }
 
 /**

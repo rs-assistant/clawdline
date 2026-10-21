@@ -19,6 +19,7 @@
 
 import { CloudClient } from "./cloud-client.js";
 import { viewerEventLogFor } from "./cloud-viewer-events.js";
+import { classifyViewerError, viewerHealthBegin } from "./viewer-health-hook.js";
 import {
     importSenderPublicKey, loadCryptoKey, loadCryptoKeyID, loadPairingBinding,
     storeCryptoKey, storePairingBinding, storePairingCryptoKeys
@@ -289,6 +290,14 @@ function responseError(result, fallbackCode, fallbackMessage, terminal) {
  * Everything it touches — fetch, storage, IndexedDB, the clock, the socket — is injected, so
  * the same object runs under the tests with fakes and in the browser with the real thing.
  */
+/** `{ identity_epoch, key_epoch }` from a token mint, or null when either is not a whole number. */
+export function tokenIdentityOf(value) {
+    if (!value || typeof value !== "object") return null;
+    var identity = value.identity_epoch, key = value.key_epoch;
+    if (!Number.isSafeInteger(identity) || identity < 0 || !Number.isSafeInteger(key) || key < 1) return null;
+    return { identityEpoch: identity, deviceKeyEpoch: key };
+}
+
 export class CloudViewerSession {
     constructor(options) {
         options = options || {};
@@ -310,6 +319,7 @@ export class CloudViewerSession {
         this.deviceID = null;
         this.caps = [];
         this.devicePrivateKey = null;
+        this.tokenIdentity = null;
         this.devicePublicKey = null;
         this.client = null;
     }
@@ -471,6 +481,9 @@ export class CloudViewerSession {
         if (minted.status !== 200 || !minted.body || typeof minted.body.token !== "string") {
             throw bootError("token_failed", "the device token could not be minted");
         }
+        // The epochs the token was minted under: the owner-diagnostics read proof names them
+        // (`cloud/health-owner/proof.ts`). Absent or malformed reads as unknown, never as 0.
+        this.tokenIdentity = tokenIdentityOf(minted.body.identity);
         return {
             token: minted.body.token,
             expiresAt: Date.parse(minted.body.expires_at),
@@ -861,6 +874,9 @@ export function keepConnected(session, options) {
     // Parked by 4403s `MAXIMUM_FORBIDDEN_PARKS` times: the page coming back no longer starts it.
     var parkedForGood = false;
     var lastAttemptAt = null;
+    // Whether this loop has tried before: the connection-health stage of the next try is a
+    // reconnect, not a first connect (`viewer-health-hook.js`).
+    var attemptedBefore = false;
     // A hidden page keeps its connection exactly as a shown one does: nothing here closes the socket
     // or holds back a connect because the page is out of sight. What is kept is when it was hidden,
     // only to recover from a page the browser froze meanwhile (`staleResume`).
@@ -1099,10 +1115,17 @@ export function keepConnected(session, options) {
             if (stopped) return;
             var outcome = null;
             lastAttemptAt = now();
+            // A connect while a client still serves replaces its carrier (a renewal, or a fresh socket
+            // after a long hide); one after any earlier try is a reconnect; the loop's first is a connect.
+            var healthStage = active && active.ready ? "viewer_carrier_replace"
+                : attemptedBefore ? "viewer_reconnect" : "viewer_connect";
+            attemptedBefore = true;
+            var healthSpan = viewerHealthBegin(healthStage, "transport");
             try {
                 outcome = await session.connect();
             } catch (error) {
-                if (stopped) return;
+                if (stopped) { healthSpan.complete("aborted"); return; }
+                healthSpan.fail(classifyViewerError(error, "connect"));
                 if (error && error.code === "revoked") {
                     onState({ state: "revoked", error: error });
                     return;
@@ -1137,13 +1160,19 @@ export function keepConnected(session, options) {
                 continue;
             }
             if (stopped) {
+                healthSpan.complete("aborted");
                 if (outcome && outcome.client && outcome.client !== active) retireClient(outcome.client);
                 return;
             }
             if (outcome.state !== "connected") {
+                // Signing in again is the session refused; pairing or a device seat is not a failed
+                // connection, only one that did not go on.
+                if (outcome.state === "sign_in") healthSpan.fail("auth_refused");
+                else healthSpan.complete("aborted");
                 onState(outcome);
                 return;
             }
+            healthSpan.complete("ok");
             if (!active || !active.ready || healthySince === null) healthySince = now();
             active = outcome.client;
             staleResume = false;

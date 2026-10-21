@@ -3,7 +3,6 @@
         <header class="documents-head page-bar">
             <div class="page-bar-start">
                 <button id="documents-back" class="documents-back" type="button">‹ Sessions</button>
-                <button id="document-list-back" class="documents-back" type="button" hidden>‹ Documents</button>
             </div>
             <div class="page-bar-end">
                 <button id="documents-refresh" class="page-bar-refresh" type="button"><svg class="page-bar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12a7 7 0 1 1-2.05-4.95" /><path d="M19 4.5V9h-4.5" /></svg></button>
@@ -16,13 +15,26 @@
         </div>
         <article id="document-viewer" class="document-viewer" hidden>
             <div class="document-heading">
-                <div>
+                <button id="document-list-back" class="document-icon" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7" /></svg></button>
+                <div class="document-heading-text">
                     <h2 id="document-title"></h2>
                     <p id="document-meta" class="document-meta"></p>
                 </div>
-                <div class="document-actions">
-                    <button id="document-share" type="button" disabled>Share</button>
-                    <button id="document-copy" type="button" disabled>Copy link</button>
+                <button id="document-share" class="document-icon" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12" /><path d="M8 7l4-4 4 4" /><path d="M5 12v7h14v-7" /></svg></button>
+                <button id="document-fullscreen" class="document-icon document-fullscreen" type="button" disabled><svg class="document-enter-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9V4h5" /><path d="M20 9V4h-5" /><path d="M4 15v5h5" /><path d="M20 15v5h-5" /></svg><svg class="document-exit-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg></button>
+            </div>
+            <button id="document-reveal" class="document-icon document-reveal" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></svg></button>
+            <div id="document-state" class="document-state" hidden>
+                <div class="document-state-sketch" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                <div class="document-state-card">
+                    <svg class="document-state-icon document-state-wait" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+                    <svg class="document-state-icon document-state-fail" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3h7l5 5v13H7z" /><path d="M14 3v5h5" /><path d="M10 13l4 4" /><path d="M14 13l-4 4" /></svg>
+                    <div id="document-state-text" class="document-state-text"></div>
+                    <p id="document-state-detail" class="document-state-detail"></p>
+                    <div class="document-state-actions">
+                        <button id="document-retry" class="document-state-primary" type="button">Read again</button>
+                        <button id="document-others" type="button">Other documents</button>
+                    </div>
                 </div>
             </div>
             <div id="document-body" class="document-body"></div>

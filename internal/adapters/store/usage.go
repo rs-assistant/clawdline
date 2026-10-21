@@ -52,7 +52,15 @@ CREATE INDEX IF NOT EXISTS usage_transcripts_read ON usage_transcripts(read_at);
 `
 
 func openUsage(db *sql.DB) error {
-	_, err := db.Exec(usageSchema)
+	_, err := db.Exec(usageSchema + usageDailySchema)
+	if err != nil {
+		return err
+	}
+	has, err := hasColumn(db, "usage_daily", "project_key")
+	if err != nil || has {
+		return err
+	}
+	_, err = db.Exec("ALTER TABLE usage_daily ADD COLUMN project_key TEXT NOT NULL DEFAULT ''")
 	return err
 }
 
@@ -155,6 +163,9 @@ func (s *Store) SaveUsageRow(ctx context.Context, r UsageRow) error {
 			jsonOr(r.State), jsonOr(r.Spent), jsonOr(r.Measured), r.Size, nanosOrZero(r.ModifiedAt),
 			boolInt(r.More), nanosOrZero(r.ReadAt), r.Reason)
 		if err != nil {
+			return 0, err
+		}
+		if err := saveUsageDaily(ctx, tx, r); err != nil {
 			return 0, err
 		}
 		return res.RowsAffected()

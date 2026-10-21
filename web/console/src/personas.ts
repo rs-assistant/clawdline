@@ -1,3 +1,5 @@
+// @ts-expect-error -- Node's strip-types runner needs the source extension.
+import { builtinDisplay } from "./builtin-display.ts"
 import type { Persona, PersonaCatalog } from "@clawdline/contract"
 
 /**
@@ -141,22 +143,13 @@ export function suggestedPersonaForKind(list: readonly Persona[] | null, kind: s
   return matches.length === 1 ? matches[0] : null
 }
 
-function language(): "en" | "zh-Hant" {
-  const lang =
-    (typeof document !== "undefined" && document.documentElement.lang) ||
-    (typeof navigator !== "undefined" && navigator.language) ||
-    "en"
-  return /^zh-hant(?:-|$)/i.test(lang) || /^zh-(?:tw|hk|mo)(?:-|$)/i.test(lang) ? "zh-Hant" : "en"
-}
-
-/** The persona's name in the page's language. */
+/** The persona's display metadata in the active catalog. */
 export function personaName(p: Persona): string {
-  return p.name[language()] || p.name.en || p.id
+  return builtinDisplay("persona", p.id, p.name, p.summary ?? { en: "" }).name || p.id
 }
 
-/** The persona's one-sentence summary in the page's language; "" when it has none. */
 export function personaSummary(p: Persona): string {
-  return p.summary?.[language()] || p.summary?.en || ""
+  return builtinDisplay("persona", p.id, p.name, p.summary ?? { en: "" }).detail
 }
 
 /** Name and one-sentence summary, for a title attribute or an accessible label. */

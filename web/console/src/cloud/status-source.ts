@@ -8,7 +8,7 @@ import type { MachineSessionProjection, SessionContent, SessionDestination, Mach
 // @ts-expect-error -- Node's type-stripping runner loads the source in its focused test.
 import { destinationAvailable, destinationKey } from "./all-machine-sessions.ts"
 // @ts-expect-error -- Node's type-stripping runner loads the source in its focused test.
-import { record, STATUS_FRESH_MS, statusGapTarget, statusInventoryIDs, statusPassTransition, statusProjection } from "./status-projection.ts"
+import { descriptorParents, record, STATUS_FRESH_MS, statusGapTarget, statusInventoryIDs, statusPassTransition, statusProjection } from "./status-projection.ts"
 import type { CloudClientHandle } from "./copied.js"
 
 type StatusClient = CloudClientHandle & {
@@ -106,7 +106,7 @@ export const STATUS_MARKER_RETRY_MS = 60_000
 type DirectList = { projection: Extract<MachineSessionProjection, { kind: "ready" }>; reply: Record<string, unknown> }
 
 /** A pinned machine reply is a complete, authenticated fallback while ss/ replays a missing row. */
-function directList(machineID: string, reply: unknown, nowMs: number, inventoryIDs: readonly string[] | null,
+function directList(client: StatusClient, machineID: string, reply: unknown, nowMs: number, inventoryIDs: readonly string[] | null,
   held: MachineSessionProjection): DirectList | null {
   const body = record(reply)
   if (!body || (body.complete !== true && body.complete !== false) || !Number.isFinite(body.at) ||
@@ -119,6 +119,7 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
     !["working", "waiting", "idle", "unknown"].includes(String(record(row.status)?.state)))) return null
   const ids = sessions.map((row: Record<string, unknown> | null) => String(row!.id))
   if (new Set(ids).size !== ids.length) return null
+  const taskParents = descriptorParents(client, machineID, ids, nowMs)
   const byConversation = new Map<string, string | null>()
   for (const row of sessions) {
     const conversation = record(row!.status)?.sessionId
@@ -141,7 +142,10 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
     rows: sessions.map((row: Record<string, unknown> | null) => {
       const status = record(row!.status)!
       const ownerConversation = record(status.epic_parent)?.owner_session_id
-      const parentSessionID = typeof ownerConversation === "string" ? byConversation.get(ownerConversation) : null
+      const listedParent = typeof status.parent_session_id === "string" && ids.includes(status.parent_session_id) &&
+        status.parent_session_id !== row!.id ? status.parent_session_id : null
+      const parentSessionID = listedParent ?? taskParents.get(String(row!.id)) ??
+        (typeof ownerConversation === "string" ? byConversation.get(ownerConversation) : null)
       const before = known.get(String(row!.id) + "\u0000" + String(row!.execution_generation))
       const menu = record(status.menu)
       const options = menu?.options
@@ -150,6 +154,7 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
           status.screen_reading === "unavailable" && menu?.source === "transcript")
       return { destination: { machineID, sessionID: String(row!.id),
         executionGeneration: String(row!.execution_generation) }, state: String(status.state),
+      assistant: row!.assistant === "claude" || row!.assistant === "codex" ? row!.assistant : before?.assistant,
       parentSessionID: parentSessionID && parentSessionID !== row!.id ? parentSessionID : before?.parentSessionID,
       machineScope: status.machine_scope === true || before?.machineScope === true,
       coordinatorBound: status.coordinator_bound === true || before?.coordinatorBound === true,
@@ -226,7 +231,7 @@ export function statusSource(current: () => StatusClient | null,
     promise?: Promise<DirectList | null> }>()
   const imageSignals = new Map<string, AbortController>()
   const visibleArtifacts = new Map<string, Set<string>>()
-  const readMachine = async (machineID: string, signal: AbortSignal): Promise<MachineSessionProjection> => {
+  const readMachine = async (machineID: string, signal: AbortSignal, fresh = false): Promise<MachineSessionProjection> => {
     const client = current()
     if (!client || client.ready === false) return { kind: "unavailable", reason: "unknown" }
     if (client !== attemptedClient) {
@@ -252,21 +257,29 @@ export function statusSource(current: () => StatusClient | null,
     if (signal.aborted) return projection
     if (roster?.machines.find((entry) => entry.id === machineID)?.freshness === "stale")
       return retainedStatus(projection, "stale")
+    // Recovery must ask the machine even when the retained set looks fresh:
+    // a push and its old status pass can agree with each other and both be old.
+    const cachedDirect = directLists.get(machineID)
+    if (!fresh && cachedDirect?.value && cachedDirect.client === client &&
+      cachedDirect.until > (client.now?.() ?? Date.now()) &&
+      cachedDirect.value.projection.observedAt > (projection.observedAt ?? 0) &&
+      roster?.machines.some((machine) => machine.id === machineID && machine.freshness === "current"))
+      return cachedDirect.value.projection
     // The roster can arrive before orch/ advertises the reader. One bounded
     // authenticated attempt is safe: an older machine refuses sessions.list,
     // while waiting for the descriptor can hold a cold browser for a minute.
-    if (projection.kind === "unavailable" &&
-      (projection.reason === "unknown" || projection.reason === "event_gap" || projection.reason === "stale") &&
+    if ((fresh || projection.kind === "unavailable" &&
+      (projection.reason === "unknown" || projection.reason === "event_gap" || projection.reason === "stale")) &&
       client.listPresentationsForMachine && pinnedReadSupport(client, machineID) !== "no" && !signal.aborted) {
       const now = client.now?.() ?? Date.now()
       let cached = directLists.get(machineID)
-      if (!cached || cached.client !== client || cached.until <= now) {
+      if (fresh || !cached || cached.client !== client || cached.until <= now) {
         const started = now
-        const reason = projection.reason
+        const reason = projection.kind === "unavailable" ? projection.reason : "stale"
         const failures = cached?.client === client ? cached.failures : 0
         const promise = client.listPresentationsForMachine(machineID, new AbortController().signal)
           .then((reply) => {
-            const value = directList(machineID, reply, client.now?.() ?? Date.now(),
+            const value = directList(client, machineID, reply, client.now?.() ?? Date.now(),
               statusInventoryIDs(client, machineID, client.now?.() ?? Date.now()), statusProjection(client, machineID))
             if (!value) reportListFailure(client, machineID, reason, "invalid_reply",
               (client.now?.() ?? Date.now()) - started, failures + 1)
@@ -296,6 +309,7 @@ export function statusSource(current: () => StatusClient | null,
         if (answer.machines.some((machine) => machine.id === machineID && machine.freshness === "current"))
           return direct.projection
       }
+      if (fresh) return { kind: "unavailable", reason: "unknown" }
       projection = statusProjection(client, machineID)
       if (projection.kind === "unavailable" && projection.reason === "stale")
         projection = { ...projection, retryAt: cached.until }
@@ -417,7 +431,8 @@ export function statusSource(current: () => StatusClient | null,
             icon: typeof icon?.accent === "string" && Array.isArray(icon.cells) &&
               icon.cells.every((line: unknown) => Array.isArray(line) &&
                 line.every((cell: unknown) => cell === null || typeof cell === "string"))
-              ? { accent: icon.accent, cells: icon.cells as ((string | null)[])[] } : undefined })
+              ? { accent: icon.accent, cells: icon.cells as ((string | null)[])[],
+                  svg: typeof icon.svg === "string" ? icon.svg : undefined } : undefined })
         }
         return result
       } catch { return null }

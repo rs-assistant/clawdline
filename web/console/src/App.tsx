@@ -1,3 +1,5 @@
+import { SurveyCoordinator } from "./onboarding/Survey.js"
+import { useCloudAccount } from "./cloud/account-context.js"
 import { catalogWord } from "./catalog.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { SessionRow } from "@clawdline/contract"
@@ -66,7 +68,7 @@ import {
  * stylesheet is that app's. The drawer is `input/sidebar.js` and the page
  * switch is `core/pages.js`, rule for rule.
  */
-type Page = "sessions" | "devices" | "projects" | "workflow" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
+type Page = "usage" | "sessions" | "devices" | "projects" | "workflow" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
 
 /** What became of a session the address asked for: see `openAsked`. */
 type Asked = "none" | "waiting" | "opened" | "gone"
@@ -79,7 +81,8 @@ type Asked = "none" | "waiting" | "opened" | "gone"
 const PAGES: { id: Page; nav: string; icon: SidebarIconName; key?: string; text?: string; ready: boolean }[] = [
   { id: "sessions", nav: "nav-sessions", icon: "sessions", key: "webSessions", ready: true },
   { id: "projects", nav: "nav-projects", icon: "projects", key: "webProjects", ready: false },
-  { id: "workflow", nav: "nav-workflow", icon: "workflow", text: "Workflow", ready: false },
+  { id: "usage", nav: "nav-usage", icon: "usage", ready: false },
+  { id: "workflow", nav: "nav-workflow", icon: "workflow", ready: false },
   { id: "plan", nav: "nav-plan", icon: "plan", key: "webPlan", ready: false },
   { id: "devices", nav: "nav-devices", icon: "devices", key: "webDevices", ready: false },
   { id: "notifications", nav: "nav-notifications", icon: "notifications", ready: false },
@@ -205,7 +208,7 @@ function rowNode(id: string): HTMLElement | null {
  * pills beside each other left the counts no room to be read.
  */
 export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
-  fleetTargetIdentity = null, fleetReaderMachine = null,
+  fleetTargetIdentity = null, fleetReaderMachine = null, executionReadRevision = 0,
   cloudStartedRow = null, onCloudStartedObserved, cloudMachineOffline = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
@@ -214,6 +217,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   cloudSessions?: ReactNode
   cloudPeerAccess?: ReactNode | ((active: boolean) => ReactNode)
   fleetList?: (filter: string, onFilter: (value: string) => void) => ReactNode
+  executionReadRevision?: number
   fleetTarget?: SessionDestination | null
   fleetTargetRow?: SessionRow | null
   fleetTargetIdentity?: Pick<ProjectedSession, "machineScope" | "coordinatorBound"> | null
@@ -285,6 +289,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   // screen at a time, and `data-pane` is the desk's second column on or off.
   // Each is mirrored in a ref because the keyboard reads them between renders,
   // as the original reads its state object.
+  const surveyAccount = useCloudAccount()
   const [selected, setSelectedState] = useState<string | null>(null)
   const [openId, setOpenState] = useState<string | null>(null)
   const [view, setViewState] = useState<"list" | "detail">("list")
@@ -732,6 +737,10 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   useEffect(() => {
     const onPop = (event: PopStateEvent) => {
       if (!phone()) return
+      // A fragment navigation fires popstate before hashchange. The address
+      // already names the document while pageRef still names the Session;
+      // closing it here would replace that address with the Session list.
+      if (hasDocumentIntent(location.hash)) return
       // A document link from the attention card adds a browser history step.
       // Its back gesture returns to the still-open Session, not its list,
       // regardless of whether popstate or hashchange reaches us first.
@@ -932,7 +941,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
       title={tooOldTitle(p.id)}
     >
       <SidebarIcon name={p.icon} />
-      {p.id === "notifications" ? nextWord("notificationNav") : p.key ? T[p.key] : p.text}
+      {p.id === "usage" ? nextWord("usageOverview") : p.id === "notifications" ? nextWord("notificationNav") : p.id === "workflow" ? catalogWord("workflow", "workflow") : p.key ? T[p.key] : p.text}
       {tooOldMark(p.id)}
     </button>
   )
@@ -945,15 +954,23 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
           className="brand"
           id="brand"
           type="button"
-          aria-label={T.webMenu}
-          title={T.webMenu}
+          aria-label={nextWord(menu ? "sidebarHide" : "sidebarShow")}
           aria-controls="sidebar"
           aria-expanded={menu}
           ref={brandRef}
           onClick={() => (menu ? closeMenu() : setMenu(true))}
         >
-          <canvas id="brand-mark" width={0} height={0} ref={markRef} />
+          <span className="brand-handle" aria-hidden="true">
+            <canvas id="brand-mark" width={0} height={0} ref={markRef} />
+            <svg className="brand-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <path d="m10 4-4 4 4 4" />
+            </svg>
+            <svg className="brand-chevron brand-chevron-open" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <path d="m6 4 4 4-4 4" />
+            </svg>
+          </span>
           <b>clawdline</b>
+          <span className="brand-tooltip" aria-hidden="true">{nextWord(menu ? "sidebarHide" : "sidebarShow")}</span>
         </button>
         {!hideSessionCounts && <Counts
           reading={sessionCountState(fleet)}
@@ -994,7 +1011,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         <div className="sidebar-panel" id="sidebar-panel">
           <section className="sidebar-group" aria-label={nextWord("sidebarMain")}>
             <h2>{nextWord("sidebarMain")}</h2>
-            {sidebarPages.filter((p) => p.id === "sessions" || p.id === "projects").map(sidebarPage)}
+            {sidebarPages.filter((p) => p.id === "sessions" || p.id === "projects" || p.id === "usage").map(sidebarPage)}
             <button
               className="sidebar-item"
               id="nav-archive"
@@ -1107,7 +1124,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         onStarted={openStarted}
         streamTasks={fleet.tasksLive ? fleet.tasks : null}
         fleetList={fleetList?.(filter, setFilter)}
-        fleetDetailKey={fleetList && fleetTarget ? destinationKey(fleetTarget) : undefined}
+        fleetDetailKey={fleetList && fleetTarget ? JSON.stringify([fleetTarget.machineID, fleetTarget.sessionID,
+          fleetTarget.executionGeneration, executionReadRevision]) : undefined}
         fleetCoordinatorBound={!!fleetList && !!fleetTarget && fleetTargetIdentity?.machineScope === true &&
           fleetTargetIdentity.coordinatorBound === true}
         fleetDetailPending={fleetDetailPending}
@@ -1122,6 +1140,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         // the document and only hides them.
         <Component key={id} shown={page === id} />
       ))}
+      {!surveyAccount ? <SurveyCoordinator /> : null}
       <Overlays />
       {machine ? <MachineDashboard
         sessions={fleet.snapshot?.sessions ?? []}

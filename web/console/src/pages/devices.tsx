@@ -1,7 +1,8 @@
-import { useLayoutEffect, useRef, useState, type MouseEvent } from "react"
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, type MouseEvent } from "react"
 import { createPortal } from "react-dom"
 import type { PageModule } from "./types.js"
-import { accountMachinesInstalled, bindDevices, devicesLede, offerForgetting, offerLastSeen, offerPairing, watchMachineActions, type DevicesPage } from "../legacy/devices-bridge.js"
+import { accountMachinesInstalled, bindDevices, devicesLede, offerForgetting, offerLastSeen, offerPairing, watchAccountMachines, watchMachineActions, type DevicesPage } from "../legacy/devices-bridge.js"
+import { AccountMachines } from "./devices/AccountMachines.js"
 import { nextWord } from "../next-strings.js"
 import { machineSeenWord } from "../cloud/machine-seen.js"
 import sectionMarkup from "./devices/section.html?raw"
@@ -54,6 +55,26 @@ function DevicesPageView({ shown }: { shown: boolean }) {
   const was = useRef(false)
   const [signedIn, setSignedIn] = useState<HTMLElement | null>(null)
   const [cloudPermission, setCloudPermission] = useState<HTMLElement | null>(null)
+  // On the hosted console the account's machines are a React list with a sheet
+  // (`devices/AccountMachines.tsx`); the copied cards stay for the daemon's own page.
+  const accountList = useSyncExternalStore(watchAccountMachines, accountMachinesInstalled, accountMachinesInstalled)
+  const [accountNode, setAccountNode] = useState<HTMLElement | null>(null)
+
+  useLayoutEffect(() => {
+    const section = document.getElementById("devices")
+    const rows = document.getElementById("devices-rows")
+    if (!section || !rows || !accountList) return
+    section.setAttribute("data-account-list", "")
+    const node = document.createElement("div")
+    node.id = "devices-account-machines"
+    rows.before(node)
+    setAccountNode(node)
+    return () => {
+      section.removeAttribute("data-account-list")
+      node.remove()
+      setAccountNode(null)
+    }
+  }, [accountList])
 
   useLayoutEffect(() => {
     const shell = document.querySelector("#devices .devices-shell")
@@ -152,6 +173,7 @@ function DevicesPageView({ shown }: { shown: boolean }) {
       />
       {signedIn && createPortal(<SignedInBlock shown={shown} />, signedIn)}
       {cloudPermission && createPortal(<CloudTerminalPermission shown={shown} />, cloudPermission)}
+      {accountNode && createPortal(<AccountMachines shown={shown} onStart={() => navigate("sessions")} />, accountNode)}
     </>
   )
 }

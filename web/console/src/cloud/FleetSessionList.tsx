@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../LoadingSkeleton.js"
 import { useEffect, useRef, useState } from "react"
 import { nextWord } from "../next-strings.js"
 import { showModalWithoutChoice } from "../modal-focus.js"
@@ -10,7 +11,7 @@ import type { OrderHold } from "../session/order.js"
 import { SessionToolbar } from "../session/SessionToolbar.js"
 import { ScheduleSection, scheduleMachineReady } from "../pages/schedules.js"
 import { destinationKey, displayedPresentationStatus, fleetRowTitle, presentationPass, projectionRefreshAt, settleProjection,
-  shownDestinationKeys,
+  shownDestinationKeys, mergeListPresentation,
   type MachineSessionProjection, type ProjectionProblem, type SessionDestination,
   type SessionListPresentation, type SessionProjectionSource, type FleetMachine,
   type ProjectedSession } from "./all-machine-sessions.js"
@@ -28,7 +29,7 @@ type Reading = { phase: "loading" } | { phase: "settled"; value: MachineSessionP
 
 /** Only the fleet list is new; the conversation and composer belong to SessionsPage. */
 export function FleetSessionList({ machines, source, target, filter, onFilter, onOpen,
-  carrierOf, onMachineAction, onCloseRequest, onArchiveRequest, onPresentations, onProjection, titleRevision, confirmedTitles }: {
+  carrierOf, onConnection, onMachineAction, onCloseRequest, onArchiveRequest, onPresentations, onProjection, titleRevision, confirmedTitles }: {
   machines: readonly FleetMachine[]
   source: SessionProjectionSource | null
   titleRevision?: number
@@ -42,6 +43,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   onPresentations?: (machineID: string, rows: readonly (SessionListPresentation & {
     destination: SessionDestination; projection?: ProjectedSession })[]) => void
   onProjection?: (machineID: string, reading: MachineSessionProjection) => void
+  onConnection: (machineID: string) => void
   onMachineAction?: (machineID: string, action: MachineToolbarAction) => void
   onCloseRequest: (target: SessionDestination, title: string) => void
   onArchiveRequest: (target: SessionDestination, title: string) => void
@@ -116,7 +118,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   // The original Session list hands all its canvases to one page clock after
   // every render. Fleet rows use the same clock, including after status updates.
   useEffect(() => {
-    L.registerSpinners([...(listScroll.current?.querySelectorAll<HTMLCanvasElement>("canvas.spin") ?? [])])
+    L.registerSpinners([...(listScroll.current?.querySelectorAll<HTMLCanvasElement>('.cloud-all-group-body[data-open="true"] canvas.spin') ?? [])])
   })
 
   useEffect(() => {
@@ -255,10 +257,8 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
             const key = destinationKey(row.destination)
             const previous = presentations.current.get(key)
             presentations.current.set(key, {
-              machineID, sessionID: row.destination.sessionID, pass, title: row.title,
-              icon: row.icon ?? previous?.icon, cwd: row.cwd ?? previous?.cwd,
-              status: row.status ?? previous?.status,
-              observedAt: row.status ? row.observedAt : previous?.observedAt,
+              machineID, sessionID: row.destination.sessionID, pass,
+              ...mergeListPresentation(row, previous),
             })
           }
           const expected = readings[machineID]
@@ -297,7 +297,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     const presentationFailed = !!missingTitle && presentationFailures.current.get(machine.id) === pass
     const presentationLoading = !!missingTitle && !presentationFailed
     const filtered = reading?.phase === "settled" && reading.value.rows
-      ? reading.value.rows.filter((row) => matchesFleetFilter(row, statusFilter) &&
+      ? reading.value.rows.filter((row) => matchesFleetFilter(row, statusFilter, displayedPresentationStatus(row, presentations.current.get(destinationKey(row.destination)))) &&
         (!search || `${machine.name} ${machine.id} ${machine.platform} ${row.machineScope ? "Clawdfather" : (confirmedTitles?.get(destinationKey(row.destination)) ?? presentations.current.get(destinationKey(row.destination))?.title ?? "")} ${row.destination.sessionID} ${stateWord(row.state)}`
           .toLocaleLowerCase().includes(search))) : []
     const shown = filtered.map((row) => {
@@ -404,35 +404,38 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
           return <section key={machine.id} className="cloud-all-group"
           aria-label={`${machine.name} ${machine.id}` + (carrier ? ` · ${nextWord(carrier.word, { machine: machine.name })}` : "")}>
           <h2 className="cloud-all-group-heading">
-            <button type="button" aria-expanded={!isCollapsed}
-              aria-label={nextWord(isCollapsed ? "cloudAllExpandMachine" : "cloudAllCollapseMachine", { machine: machine.name })}
-              onClick={() => setCollapsed((before) => ({ ...before, [machine.id]: !isCollapsed }))}>
-              {/* The dot leads the machine's name, so every machine's light
-                  lines up in one column down the list. Inside the button it can
-                  only be seen, because the button states its own label; the
-                  section's name below says it for a reader. */}
+            <button type="button" className="cloud-all-connection"
+              aria-label={`${machine.name} · ${nextWord("msTabConnection")}`}
+              aria-haspopup="dialog" onClick={() => onConnection(machine.id)}>
               <span className="cloud-all-group-name">{carrier && <CarrierDot reading={carrier} machine={machine.name} />}
                 {machine.name} <small>{machine.platform}</small>
                 {rows.length > 0 && <span className="cloud-all-group-count"
                   aria-label={nextWord("cloudAllSessionCount", { count: rows.length })}>{rows.length}</span>}
               </span>
+            </button>
+            <button type="button" className="cloud-all-collapse" aria-expanded={!isCollapsed}
+              aria-label={nextWord(isCollapsed ? "cloudAllExpandMachine" : "cloudAllCollapseMachine", { machine: machine.name })}
+              onClick={() => setCollapsed((before) => ({ ...before, [machine.id]: !isCollapsed }))}>
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
             </button></h2>
-          {!isCollapsed && <>
+          <div className="cloud-all-group-body" data-open={!isCollapsed}
+            inert={isCollapsed} aria-hidden={isCollapsed}>
+          <div className="cloud-all-group-content">
           {/* A verified Session reading can settle before the roster's machine
               freshness changes. Its own completeness and row freshness are the
               authority here; an unrelated roster state must not leave a
               permanent "checking connection" banner above settled results. */}
           {offline && <p role="status" className="cloud-all-offline">{nextWord("cloudAllMachineOffline",
             { seen: machineSeenWord(machine.seenAt ?? null) })}</p>}
-          {!reading || reading.phase === "loading" ? !offline && <p role="status">{nextWord("cloudAllLoading")}</p> : <>
-            {/* // refusal-ok: Unknown means the list is still being verified; its reason stays in the reading for the scheduled retry. */}
-            {reading.value.kind === "unavailable" && !offline && (reading.value.reason === "unknown"
+          {!reading || reading.phase === "loading" ? !offline && <LoadingSkeleton id="SK-02" label={nextWord("cloudAllLoading")} /> : <>
+            {/* // refusal-ok: Background verification keeps its reason and scheduled retry without announcing transient recovery above retained rows. */}
+            {reading.value.kind === "unavailable" && !offline && (reading.value.reason === "unknown" ||
+              reading.value.reason === "stale" || reading.value.reason === "event_gap"
               ? !reading.value.rows?.length && <p role="status">{nextWord("cloudAllLoading")}</p>
               : <p role="status">{problemWord(reading.value.reason)}</p>)}
             {reading.value.kind === "ready" && !reading.value.complete && !offline &&
               <p role="status">{nextWord("cloudAllPartialMachine")}</p>}
-            {presentationLoading && <p role="status">{nextWord("cloudAllLoading")}</p>}
+            {presentationLoading && <LoadingSkeleton id="SK-02" label={nextWord("cloudAllLoading")} />}
             {presentationFailed && <p role="alert">{nextWord("cloudAllNameUnavailable")} <button type="button"
               onClick={() => { presentationPasses.current.delete(machine.id); presentationFailures.current.delete(machine.id)
                 refreshPresentation((revision) => revision + 1) }}>{nextWord("cloudAllTryAgain")}</button></p>}
@@ -451,8 +454,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
                     status={displayedPresentationStatus(row, presentation)}
                     sessionID={row.destination.sessionID} machineID={machine.id} machineName={machine.name}
                     assistant={row.assistant ?? presentation?.assistant} state={row.state} stateLabel={stateWord(row.state)}
-                    freshness={row.freshness === "current" ? "" : nextWord(
-                      row.freshness === "stale" ? "cloudAllStale" : "cloudAllUnknown")}
+                    freshness={row.freshness === "unknown" ? nextWord("cloudAllUnknown") : ""}
                     lastMovementAt={row.lastMovementAt} attention={row.needsAttention === true}
                     depth={depth} branchThrough={branchThrough} ancestorThrough={ancestorThrough}
                     open={!!target && destinationKey(target) === destinationKey(row.destination)}
@@ -470,7 +472,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
           </>}
           {reading?.phase === "settled" && !!reading.value.unknownTargets &&
             <p role="status">{nextWord("cloudAllUnknownTargets", { count: reading.value.unknownTargets })}</p>}
-          </>}
+          </div></div>
         </section>
         })}
       </div>

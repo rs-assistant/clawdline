@@ -239,7 +239,7 @@ and no permanent record of one; what remains is the bounded `session.end` audit 
 by a record and removed by a record, and for the landing rows the only thing that ever wrote the
 removing record was a person calling `POST /v1/orchestrator/tasks/:id/landing` with this machine's
 credential. So `pending_landing_owned` went up and never came down: on 2026-09-06 one root's card
-read 「還有 21 項未了結」 — twelve pending landings and nine touched-claim rows, from twelve children
+read “21 obligations remain” — twelve pending landings and nine touched-claim rows, from twelve children
 that had all reached `success` and whose records nobody had ever closed.
 
 The broker now closes what it can prove by itself, and nothing else. A periodic sweep asks git two

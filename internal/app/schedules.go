@@ -327,6 +327,9 @@ func (b *ScheduleBook) List(ctx context.Context) ([]map[string]any, error) {
 // summary is the three fields every answer about one schedule starts with.
 func (b *ScheduleBook) summary(s schedule.Schedule, now time.Time) map[string]any {
 	row := map[string]any{"id": s.ID, "title": s.Title, "enabled": s.Enabled}
+	if s.When.Start != nil {
+		row["when"] = s.When.Object()
+	}
 	if s.TimeZone != "" {
 		row["time_zone"] = s.TimeZone
 	}
@@ -447,7 +450,7 @@ func (b *ScheduleBook) MachineRefusal(ctx context.Context, method, id string, bo
 }
 
 var formFields = map[string]bool{
-	"title": true, "at": true, "days": true, "on": true, "place_id": true, "assistant": true,
+	"title": true, "at": true, "days": true, "on": true, "every_days": true, "start": true, "place_id": true, "assistant": true,
 	"instructions": true, "enabled": true, "close_tab": true, "catch_up_hours": true,
 	"notify_on_failure": true, "timeout_minutes": true, "model": true, "reasoning_effort": true, "permission_mode": true,
 	"trigger_only": true, "time_zone": true,
@@ -605,7 +608,7 @@ func (b *ScheduleBook) build(ctx context.Context, body map[string]any, id string
 		// A form that says trigger_only says it instead of a time: the file
 		// carries only the flag, and a time sent beside it is refused rather
 		// than quietly dropped.
-		for _, key := range []string{"at", "days", "on"} {
+		for _, key := range []string{"at", "days", "on", "every_days", "start"} {
 			if _, named := body[key]; named {
 				r := refusedSchedule(400, "bad_request", "trigger_only is sent instead of at, days and on, not beside them.")
 				return nil, schedule.Schedule{}, &r
@@ -616,6 +619,15 @@ func (b *ScheduleBook) build(ctx context.Context, body map[string]any, id string
 		when["on"] = on
 		if _, days := body["days"]; !days {
 			delete(when, "days")
+		}
+	}
+	_, hasIntervalStart := body["start"]
+	if _, interval := body["every_days"]; interval || hasIntervalStart {
+		when = map[string]any{"at": orEmpty(body, "at")}
+		for _, key := range []string{"every_days", "start", "days", "on"} {
+			if value, named := body[key]; named {
+				when[key] = value
+			}
 		}
 	}
 	enabled := any(true)

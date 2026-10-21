@@ -379,13 +379,17 @@ func (s *Server) pushSessionURL(ctx context.Context, id string) string {
 // pushDevice is the paired device asking, or a refusal in the Swift app's
 // words. Every one of these routes needs one: the gate has already required a
 // token, and this is the name behind it.
+//
+// A Cloud viewer is its own device here (`actorOf`), so two phones on the
+// account keep a subscription each, and neither can remove or test the
+// other's — nor this machine's own console's.
 func pushDevice(w http.ResponseWriter, r *http.Request) (string, bool) {
 	v := accessOf(r).verdict
 	if !v.Allowed || v.Device == "" {
 		writeAuthRefusal(w, http.StatusUnauthorized, "unauthorized", "This needs a paired device.")
 		return "", false
 	}
-	return v.Device, true
+	return actorOf(r), true
 }
 
 // audit records one event in whichever of the two records it belongs to

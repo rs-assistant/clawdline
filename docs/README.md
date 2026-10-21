@@ -40,7 +40,7 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 | [user/clawdfather-and-dispatch.md](user/clawdfather-and-dispatch.md) | User page | English | The Agent skill, dispatching children, callbacks for long commands, landing, handoff, and machine coordination |
 | [clawdfather-role.md](clawdfather-role.md) | Decision | English | Board ownership and Clawdfather machine stewardship |
 | [user/projects.md](user/projects.md) | User page | English | Adding projects, the Projects page, and bringing project settings to another machine |
-| [user/new-machine.md](user/new-machine.md) | User page | English | One prompt, in English and Traditional Chinese, that has an Agent set up a second machine: git, credentials, clones and project settings |
+| [user/new-machine.md](user/new-machine.md) | User page | English with a Traditional Chinese prompt | One prompt, in English and Traditional Chinese, that has an Agent set up a second machine: git, credentials, clones and project settings |
 | [user/usage.md](user/usage.md) | User page | English | Token bills by category, assistant quotas, the compaction window and capacity |
 | [user/troubleshooting.md](user/troubleshooting.md) | User page | English | From a symptom to its cause and fix |
 | [linux-headless-browser.md](linux-headless-browser.md) | User page | English | An agent on Linux cannot screenshot a page: install the browser's libraries and fonts, with or without `sudo` |
@@ -62,7 +62,7 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 | [ai-squad-contract.md](ai-squad-contract.md) | Public design note | English | Squad contract and role boundaries |
 | [repo-health.md](repo-health.md) | Public design note | English | Proposed governance review and document policy |
 | [token-ledger.md](token-ledger.md) | Public design note | English | What a session's tokens were spent on — board, protocol, rules, work, delegation — and how the ledger measures it |
-| [verifications.md](verifications.md) | Public design note | English | Things waiting to be verified: a change, a date to look again, what would count as it holding and the data it is judged by — the sidebar's 驗收, `clawdline verify`, and a scheduled readout |
+| [verifications.md](verifications.md) | Public design note | English | Things waiting to be verified: a change, a date to look again, what would count as it holding and the data it is judged by — the sidebar's Verify, `clawdline verify`, and a scheduled readout |
 | [design-guidelines.md](design-guidelines.md) | Public design note | English | Ten design rules, each paid for by a failure: a loop that stops says so, everything that accumulates has a limit, unknown is not absent |
 | [design-decisions.md](design-decisions.md) | Public design note | Chinese | The decision register the implementation follows. Where an analysis below disagrees, this wins. It also records decisions about the old app's data |
 | [work-system.md](work-system.md) | Public design note | Chinese | The work system on one page: board items, session to-dos, the Backlog and GitHub Issues, each with its lifecycle, what is built and what is only designed, and how the page itself is changed |
@@ -87,6 +87,7 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 | [squad-packages.md](squad-packages.md) | Public design note | English | Offline squad ZIP format, contribution example, validation, preview, adoption and private export boundaries |
 | [cross-platform.md](cross-platform.md) | Public design note | English | Every feature on macOS, Linux and Windows, and what a platform shows when it cannot do something |
 | [localization.md](localization.md) | Public design note | English | Shipped languages, separate language preferences, catalog fallback and delivery checks |
+| [console-loading.md](console-loading.md) | Internal UI inventory | English | Stable screen IDs, existing skeletons and proposed first-read improvements |
 
 ## How it got here
 
@@ -111,3 +112,5 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 ## Dated records
 
 [Records index](records/README.md) lists retired documents and dated measurements moved from specifications.
+
+- [Onboarding survey](onboarding-survey.md): optional bilingual questions, consent, persistence and aggregate reporting.

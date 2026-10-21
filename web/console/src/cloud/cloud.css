@@ -25,24 +25,30 @@
     .door[data-cloud-screen="checking"] .door-card, .cloud-opening-ring { animation: none; }
 }
 
+/* A machine is one card: the row that opens it, its Pair and "⋯" beside it,
+   and a folded panel below with the evidence and the rare actions. */
 .cloud-machines { list-style: none; margin: 4px 0 6px 0; padding: 0; }
-.cloud-machines li { margin: 0 0 8px 0; }
-.cloud-machines button {
-    display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-    width: 100%; padding: 11px 12px;
-    background: #101014; border: 1px solid var(--line); border-radius: 10px;
-    color: var(--ink); text-align: left;
+.cloud-machines li {
+    margin: 0 0 8px 0; background: #101014; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
 }
-.cloud-machines button:hover:not(:disabled) { border-color: var(--accent-ed); }
-.cloud-machines button:disabled { opacity: 0.55; cursor: default; }
-.cloud-machine-name { font-size: 14px; font-weight: 600; }
-.cloud-machine-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.cloud-machine-heading .cloud-machine-platform-icon { width: 34px; height: 34px; border-radius: 8px; }
-.cloud-machine-heading .cloud-machine-platform-icon svg { width: 20px; height: 20px; }
-.cloud-machine-heading .cloud-machine-name { min-width: 0; overflow-wrap: anywhere; }
+.cloud-machines li[data-more] { border-color: var(--accent-ed); }
+.cloud-machine-row { display: flex; align-items: center; gap: 4px; padding-right: 6px; }
+.cloud-machines .cloud-machine-open {
+    flex: 1; min-width: 0; min-height: 60px; display: flex; flex-direction: row; align-items: center; gap: 12px;
+    padding: 8px 6px 8px 12px; background: none; border: 0; border-radius: 0; color: var(--ink); text-align: left;
+}
+.cloud-machines .cloud-machine-open:disabled { cursor: default; }
+.cloud-machines .cloud-machine-open:disabled .cloud-machine-name { opacity: 0.7; }
+.cloud-machine-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cloud-machine-name { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.cloud-machine-status { font-size: 13px; color: var(--dim); }
+.cloud-machine-status[data-status="online"] { color: #7fbf8f; }
+.cloud-machine-status[data-status="pair"] { color: #e08b6e; }
+.cloud-machine-chevron { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--dim); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cloud-machines .cloud-machine-open .cloud-machine-platform-icon { width: 34px; height: 34px; border-radius: 8px; }
+.cloud-machines .cloud-machine-open .cloud-machine-platform-icon svg { width: 20px; height: 20px; }
 .cloud-machine-identity { font-size: 11px; color: var(--faint); font-family: var(--mono); }
 .cloud-machine-facts { font-size: 12px; color: var(--dim); }
-.cloud-machines li > button:first-child span { overflow-wrap: anywhere; }
 .door[data-cloud-screen="machines"] .fine { overflow-wrap: anywhere; }
 /* A long machine roster must scroll inside the picker. Centering an oversized
    door card clips its first rows above the viewport on a narrow phone. */
@@ -117,6 +123,14 @@
     box-sizing: border-box; width: min(300px, calc(100vw - 24px)); padding: 8px;
     border: 1px solid var(--line); border-radius: 12px;
     background: #141418; box-shadow: 0 16px 44px rgba(0, 0, 0, 0.42);
+    transform-origin: top right;
+    opacity: 0; transform: translateY(-6px) scale(.97);
+    visibility: hidden; pointer-events: none;
+    transition: opacity 200ms var(--ease), transform 200ms var(--ease), visibility 0s 200ms;
+}
+.cloud-switch-menu[data-open="true"] {
+    opacity: 1; transform: none; visibility: visible; pointer-events: auto;
+    transition-delay: 0s;
 }
 /* The line's state in words, so it does not rest on the dot's colour alone,
    and the retry the connection light's press used to be. */
@@ -215,7 +229,9 @@
 @media (prefers-reduced-motion: reduce) {
     .cloud-all-refresh[aria-busy="true"] svg { animation: none; opacity: .5; }
 }
-.cloud-all-group-heading { margin: 0; }
+.cloud-all-group-heading { margin: 0; display: flex; align-items: center; gap: 8px; }
+.cloud-all-group-heading .cloud-all-connection { flex: 1; min-width: 0; }
+.cloud-all-group-heading .cloud-all-collapse { flex: 0 0 44px; width: 44px; justify-content: center; }
 .cloud-all-group-heading button { display: flex; align-items: center; justify-content: space-between; gap: 8px;
     box-sizing: border-box; width: 100%; min-height: 44px; padding: 0; appearance: none;
     border: 0; background: transparent; color: var(--dim); font: inherit; text-align: left; cursor: pointer; }
@@ -255,47 +271,52 @@
 /* The row and its action group are siblings because buttons cannot nest.
    Desktop positions the controls over reserved space in the row. On narrow
    screens the list item becomes the card and contains both parts. */
-.cloud-machines li { position: relative; }
-.cloud-machines li > button:first-child { padding-right: 150px; }
-.cloud-machines li[data-pairable] > button:first-child { padding-right: 230px; }
-.cloud-machine-actions {
-    position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
-    display: flex; align-items: center; gap: 2px;
+.cloud-machine-actions { flex: none; display: flex; align-items: center; gap: 2px; }
+.cloud-machines .cloud-more {
+    width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    padding: 0; background: transparent; border: 1px solid transparent; border-radius: 8px;
+    color: var(--dim); font-size: 18px; line-height: 1;
 }
-@media (max-width: 600px) {
-    .cloud-machines li {
-        background: #101014; border: 1px solid var(--line); border-radius: 10px;
-        overflow: hidden;
-    }
-    .cloud-machines li > button:first-child,
-    .cloud-machines li[data-pairable] > button:first-child {
-        padding: 11px 12px 4px;
-        background: transparent; border: 0; border-radius: 0;
-    }
-    .cloud-machine-actions {
-        position: static; transform: none; justify-content: flex-end;
-        padding: 0 6px 5px;
-    }
+.cloud-machines .cloud-more:hover { color: var(--ink); background: var(--card-hi); }
+.cloud-machines .cloud-more[aria-expanded="true"] { color: var(--ink); background: var(--card-hi); }
+.cloud-machine-more {
+    display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; border-top: 1px solid var(--line);
 }
-/* `.cloud-machines button` above styles every button in the list and is more
-   specific, so every action states its compact shape in full. */
+.cloud-machine-more[hidden] { display: none; }
+.cloud-machine-more-title { margin: 0 0 2px 0; font-size: 12px; font-weight: 600; color: var(--ink); }
+.cloud-machine-more-actions { display: flex; gap: 8px; margin-top: 8px; }
 .cloud-machines .cloud-forget,
 .cloud-machines .cloud-rename {
-    width: auto; min-width: 76px; height: 44px; padding: 0 10px; gap: 6px;
-    flex-direction: row; align-items: center; justify-content: center;
-    background: transparent; border: 1px solid transparent; border-radius: 7px;
-    color: var(--dim); line-height: 1; text-align: center;
+    flex: 1; min-height: 44px; padding: 0 10px; display: flex; flex-direction: row; align-items: center; justify-content: center;
+    background: var(--card-hi); border: 1px solid var(--line); border-radius: 9px;
+    color: var(--ink); font-size: 13px; line-height: 1; text-align: center;
 }
-.cloud-machines .cloud-forget { font-size: 16px; }
+.cloud-machines .cloud-forget { color: #e09985; }
 .cloud-machines .cloud-forget:hover:not(:disabled) { background: #2f2322; color: #f0b6a2; border-color: #57362e; }
-.cloud-machines .cloud-forget:disabled { opacity: 0.4; cursor: default; }
-/* Renaming one, beside it. Same shape, and deliberately not the removing
-   colour: one of the two is irreversible and the other is a label. */
-.cloud-machines .cloud-rename {
-    font-size: 13px;
-}
-.cloud-machines .cloud-rename:hover:not(:disabled) { background: var(--card-hi); color: var(--ink); border-color: var(--line); }
+.cloud-machines .cloud-rename:hover:not(:disabled) { border-color: var(--accent-ed); }
+.cloud-machines .cloud-forget:disabled,
 .cloud-machines .cloud-rename:disabled { opacity: 0.4; cursor: default; }
+
+/* Codes, origins and the technical record, folded under the sentence that matters. */
+.door .cloud-detail { margin-top: 10px; font-size: 12px; color: var(--faint, var(--dim)); }
+.door .cloud-detail > summary { padding: 6px 0; cursor: pointer; }
+.door .cloud-detail p { margin: 4px 0 0 0; line-height: 1.6; white-space: pre-line; color: var(--dim); }
+.door .cloud-detail-code { font-family: var(--mono); overflow-wrap: anywhere; }
+.door .cloud-account-line { margin-top: 10px; text-align: center; }
+.door .cloud-install-link { display: flex; align-items: center; justify-content: center; min-height: 44px; font-size: 13px; color: var(--accent); text-decoration: none; }
+.door .cloud-retrying-lede { display: flex; align-items: center; gap: 10px; }
+.door .cloud-retrying-lede .cloud-opening-ring { width: 14px; height: 14px; flex: none; }
+.door .cloud-retry-now { width: 100%; min-height: 44px; margin-top: 12px; text-align: center; }
+.door[data-cloud-screen="machines"] .buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.door[data-cloud-screen="machines"] .buttons .chip { min-height: 44px; text-align: center; }
+.cloud-home-steps { list-style: none; margin: 14px 0 4px 0; padding: 0; display: grid; gap: 8px; }
+.cloud-home-steps li {
+    display: flex; align-items: center; gap: 12px; min-height: 50px;
+    padding: 0 14px; background: var(--card-hi, #1c1c22); border-radius: 10px; font-size: 13.5px; color: var(--ink);
+}
+.cloud-home-steps li > b { flex: none; width: 14px; font-weight: 700; color: var(--accent); }
+.cloud-home-steps li span { flex: 1; }
+.cloud-home-steps svg { width: 22px; height: 22px; flex: none; fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .cloud-forget-ask .say {
     margin: 12px 0 0 0; color: var(--dim); font-size: 12.5px; line-height: 1.55;
@@ -344,48 +365,89 @@
 
 .cloud-pair-ask .say { margin: 12px 0 0 0; white-space: pre-line; }
 .cloud-pair-ask .fine { margin: 8px 0 0 0; }
-.cloud-pair-status {
-    margin: 10px 0 6px 0; padding: 8px 10px;
-    border: 1px solid var(--accent-ed); border-radius: 8px;
-    color: var(--ink); font-size: 12px; line-height: 1.4;
+/* One way at a time (`PairPanel.tsx`): a sentence on what pairing gives,
+   numbered steps, what the person gets at the end, and one primary button.
+   What only a broken camera needs appears when the camera breaks. */
+.cloud-pair-intro { margin: 8px 0 0 0; color: var(--dim); font-size: 14px; line-height: 1.55; }
+.cloud-pair-steps { counter-reset: pair-step; margin: 16px 0 0 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.cloud-pair-steps > li {
+    counter-increment: pair-step; position: relative; padding-left: 36px;
+    color: var(--ink); font-size: 14px; line-height: 1.5; min-height: 26px;
 }
-.cloud-pair-ways { display: grid; gap: 9px; margin-top: 12px; }
-.cloud-pair-ways article {
-    padding: 10px; border: 1px solid var(--line); border-radius: 10px;
-    background: #101014; color: var(--dim); font-size: 12px; line-height: 1.45;
+.cloud-pair-steps > li::before {
+    content: counter(pair-step); position: absolute; left: 0; top: -1px;
+    width: 26px; height: 26px; border-radius: 50%; background: var(--card-hi, #26252a);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: var(--ink);
 }
-.cloud-pair-ways article[data-recommended] { border-color: var(--accent-ed); }
-.cloud-pair-way-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.cloud-pair-way-head h3 { margin: 0; color: var(--ink); font-size: 13px; }
-.cloud-pair-way-head span { color: var(--accent); font-size: 10.5px; text-align: right; }
-.cloud-pair-ways article > p { margin: 5px 0 0 0; }
-.cloud-pair-ways ol { margin: 7px 0 0 20px; padding: 0; }
-.cloud-pair-ways li + li { margin-top: 3px; }
-.cloud-pair-ways code {
-    display: block; margin-top: 7px; padding: 6px 7px;
-    border-radius: 6px; background: #09090c; color: var(--ink);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+.cloud-pair-steps > li[data-done]::before { content: "✓"; background: var(--accent); color: #17110e; }
+.cloud-pair-outcome { margin: 16px 0 0 0; color: var(--dim); font-size: 13px; line-height: 1.5; }
+.cloud-pair-ask .cloud-pair-primary {
+    display: block; width: 100%; min-height: 48px; margin-top: 14px; padding: 10px 12px; text-align: center;
+    border: 1px solid var(--accent); border-radius: 10px;
+    background: var(--accent); color: #17110e; font-size: 15px; font-weight: 700; cursor: pointer;
 }
-.cloud-pair-ways .cloud-pair-success { color: var(--ink); }
-.cloud-pair-ways .cloud-pair-generate {
-    width: 100%; margin-top: 8px; padding: 8px 10px; text-align: center;
-    border: 1px solid var(--accent); border-radius: 8px;
-    background: var(--accent); color: #17110e; font-weight: 600; cursor: pointer;
+.cloud-pair-ask .cloud-pair-primary:hover { background: #e08b6e; }
+.cloud-pair-ask .cloud-pair-primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cloud-pair-link {
+    display: block; width: 100%; min-height: 44px; margin-top: 4px; padding: 0;
+    border: none; background: none; color: var(--accent); font-size: 13px; text-align: center; cursor: pointer;
 }
-.cloud-pair-ways .cloud-pair-generate:hover { background: #e08b6e; }
-.cloud-pair-ways .cloud-pair-generate:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cloud-pair-link:hover { text-decoration: underline; }
+.cloud-pair-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.cloud-pair-helper-way { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+.cloud-pair-helper-way .fine { margin: 0; text-align: center; }
+.cloud-pair-how { margin-top: 14px; }
+.cloud-pair-how > summary { padding: 8px 0; cursor: pointer; font-size: 12px; color: var(--dim); }
+.cloud-pair-how > summary:hover { color: var(--ink); }
+.cloud-pair-ask .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.cloud-pair-code { margin-top: 8px; font-size: 11px; color: var(--dim); }
+.cloud-pair-wait {
+    display: flex; align-items: flex-start; gap: 10px; margin: 16px 0 0 0;
+    padding: 12px; border: 1px solid var(--line); border-radius: 10px;
+    color: var(--ink); font-size: 14px; line-height: 1.45;
+}
+.cloud-pair-wait .cloud-pair-spinner { margin-top: 3px; }
+.cloud-pair-wait .fine { margin: 4px 0 0 0; }
+.cloud-pair-question { margin: 12px 0 0 0; color: var(--ink); font-size: 18px; font-weight: 700; line-height: 1.4; }
+.cloud-pair-fingerprint {
+    display: grid; gap: 6px; justify-items: center; margin-top: 14px; padding: 16px 10px;
+    border-radius: 12px; background: #101014; color: var(--dim); font-size: 12px;
+}
+.cloud-pair-fingerprint b {
+    white-space: nowrap; color: var(--ink); letter-spacing: 0.06em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 20px;
+}
+.cloud-pair-answer { display: grid; gap: 8px; margin-top: 14px; }
+.cloud-pair-answer .cloud-pair-primary { margin-top: 0; }
+.cloud-pair-ask .cloud-pair-mismatch { min-height: 44px; color: var(--warn, var(--ink)); text-align: center; }
+.cloud-pair-result { margin: 12px 0 0 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; }
+.cloud-pair-result[data-tone="warn"] { border-color: var(--warn, var(--accent-ed)); }
+.cloud-pair-result b { display: block; color: var(--ink); font-size: 15px; }
+.cloud-pair-result p { margin: 6px 0 0 0; color: var(--dim); font-size: 13px; line-height: 1.5; }
 .cloud-pair-scanner { margin-top: 10px; }
-.cloud-pair-scan-start { width: 100%; padding: 9px 10px; text-align: center; }
 .cloud-pair-scan-video {
     display: block; width: 100%; max-height: 260px; object-fit: cover;
     border: 1px solid var(--line); border-radius: 8px; background: #08080b;
 }
-.cloud-pair-scan-video[hidden], .cloud-pair-scan-start[hidden] { display: none; }
+.cloud-pair-scan-video[hidden] { display: none; }
 .cloud-pair-scan-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .cloud-pair-scan-controls span { color: var(--ink); }
-.cloud-pair-scan-issue { color: var(--warn, var(--ink)); margin: 8px 0 0; }
-.cloud-pair-scan-issue p { margin: 0 0 8px; }
-.cloud-pair-scan-issue button { min-height: 44px; }
+.cloud-pair-scan-controls .chip { flex: none; min-height: 44px; white-space: nowrap; }
+.cloud-pair-scan-issue { margin: 4px 0 0; padding: 12px; border: 1px solid var(--warn, var(--accent-ed)); border-radius: 10px; }
+.cloud-pair-scan-issue b { color: var(--ink); font-size: 15px; }
+.cloud-pair-scan-issue p { margin: 6px 0 0; color: var(--ink); font-size: 13px; line-height: 1.5; }
+/* The two ways past a broken camera, side by side and drawn alike. */
+.cloud-pair-ask .cloud-pair-photo-options > .chip {
+    flex: 1; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); font-size: 13px;
+}
+.cloud-pair-yourkey { margin-top: 14px; line-height: 1.5; }
+.cloud-pair-yourkey b { margin: 0 4px; color: var(--ink); white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.04em; }
+.cloud-pair-yourkey span { display: block; }
 .cloud-pair-photo-options { display: flex; gap: 8px; margin-top: 8px; }
 .cloud-pair-photo-option {
     position: relative; flex: 1; overflow: hidden; padding: 8px 10px;
@@ -462,25 +524,39 @@
 .cloud-pair-ask .buttons .chip { min-width: 88px; padding: 8px 14px; text-align: center; }
 #cloud-pair-start { margin-top: 14px; }
 
-/* The viewer-device limit (`DeviceLimitPanel.tsx`): the devices using the
-   account's slots, each with Remove and its in-card question. */
-.cloud-devices { list-style: none; margin: 14px 0 0 0; padding: 0; display: grid; gap: 8px; }
+/* The viewer-device limit (`DeviceLimitPanel.tsx`): a short title, the
+   devices unused longest first with the first one marked, and an in-card
+   question only for a device used in the last day. */
+.cloud-device-title { margin: 0 0 6px 0; color: var(--ink); font-size: 20px; font-weight: 650; }
+.cloud-device-order { margin: 16px 0 0 0; color: var(--dim); font-size: 12px; }
+.cloud-devices { list-style: none; margin: 8px 0 0 0; padding: 0; display: grid; gap: 8px; }
 .cloud-devices li {
-    display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center;
-    padding: 10px 12px; background: var(--card-hi); border: 1px solid var(--line); border-radius: 10px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 0 12px; align-items: center;
+    min-height: 60px; box-sizing: border-box; padding: 8px 8px 8px 14px;
+    background: var(--card-hi); border: 1px solid var(--line); border-radius: 12px;
 }
-.cloud-device-name { color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
-.cloud-device-facts { grid-column: 1; color: var(--dim); font-size: 12px; }
-.cloud-devices .cloud-device-remove { grid-column: 2; grid-row: 1 / span 2; padding: 6px 12px; }
+.cloud-devices li.oldest { background: #2a1f1a; border-color: #6b3f2c; }
+.cloud-device-icon { color: var(--dim); }
+.cloud-devices li.oldest .cloud-device-icon { color: #e8a184; }
+.cloud-device-text { display: grid; gap: 2px; min-width: 0; }
+.cloud-device-name { color: var(--ink); font-size: 15px; overflow-wrap: anywhere; }
+.cloud-device-facts { color: var(--dim); font-size: 13px; }
+.cloud-devices li.oldest .cloud-device-facts { color: #f0b49b; }
+.cloud-devices .cloud-device-remove { min-width: 64px; min-height: 44px; padding: 6px 12px; text-align: center; }
 .cloud-devices .cloud-device-remove:hover:not(:disabled) { background: #2f2322; color: #f0b6a2; border-color: #57362e; }
+.cloud-devices li.oldest .cloud-device-remove { background: #d97757; border-color: #d97757; color: #1a0f0a; font-weight: 600; }
+.cloud-devices li.oldest .cloud-device-remove:hover:not(:disabled) { background: #e08a6c; border-color: #e08a6c; color: #1a0f0a; }
 .cloud-devices .cloud-device-remove:disabled { opacity: 0.4; cursor: default; }
-.cloud-devices > li > .say { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: 12px; }
+.cloud-devices > li > .say { margin: 0; font-size: 12px; }
 .cloud-device-ask { grid-column: 1 / -1; }
-.cloud-device-ask .say { margin: 10px 0 0 0; color: var(--dim); font-size: 12.5px; line-height: 1.55; }
-.cloud-device-ask .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-.cloud-device-ask .buttons .chip { min-width: 88px; padding: 8px 14px; text-align: center; }
+.cloud-device-ask .say { margin: 10px 0 0 0; color: #f2d79b; font-size: 13.5px; line-height: 1.55; }
+.cloud-device-ask .buttons { display: flex; gap: 8px; margin-top: 12px; }
+.cloud-device-ask .buttons .chip { flex: 1; min-height: 44px; padding: 8px 14px; text-align: center; }
 .cloud-device-ask .confirm-go { border-color: #57362e; color: #e09985; }
 .cloud-device-ask .confirm-go:hover:not(:disabled) { background: #2f2322; color: #f0b6a2; }
+.cloud-device-failure { margin-top: 12px; }
+.cloud-device-failure .say { margin: 0; }
+.cloud-device-code { margin: 2px 0 0 0; color: var(--dim); font-size: 12px; }
 .cloud-device-limit .go { margin-top: 14px; }
 .cloud-detail-problem { margin: 24px; color: var(--dim); line-height: 1.5; }
 .cloud-detail-problem p { margin: 0; }
@@ -493,3 +569,23 @@
 }
 .cloud-detail-act:hover { border-color: var(--accent-ed); }
 .cloud-detail-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Keep the intrinsic height live as Session snapshots change. CSS reverses an
+   interrupted transition; no delayed callback can close a reopened group. */
+.cloud-all-group-body {
+    display: grid; grid-template-rows: 0fr; visibility: hidden;
+    transition: grid-template-rows 220ms var(--ease), visibility 0s 220ms;
+}
+.cloud-all-group-body[data-open="true"] {
+    grid-template-rows: 1fr; visibility: visible; transition-delay: 0s;
+}
+.cloud-all-group-content { min-height: 0; overflow: hidden; }
+.cloud-all-group-body[aria-hidden="true"] { pointer-events: none; }
+.cloud-all-group-heading svg { transition: transform 220ms var(--ease); }
+@media (prefers-reduced-motion: reduce) {
+    .cloud-switch-menu, .cloud-switch-chevron, .cloud-all-group-body,
+    .cloud-all-group-heading svg { transition: none; }
+}
+/* In the machine list, Pair is the row's one action for a machine that needs it. */
+.cloud-machines .cloud-pair { background: var(--accent); border-color: var(--accent); color: #17110e; font-size: 13px; padding: 0 14px; }
+.cloud-machines .cloud-pair:hover:not(:disabled) { background: #e08b6e; }

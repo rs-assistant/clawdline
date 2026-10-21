@@ -37,6 +37,7 @@ protocol SettingsWindowHost: AnyObject {
     func settingsSuspendHotKey()
     /// Read the file again and re-apply the hotkey, the menus and the rest.
     func settingsApplyConfig()
+    func settingsLanguageSelected(_ tag: String)
 }
 
 /// `Style.ink` (Sources/Panel.swift), so the title bar and the page's own
@@ -84,6 +85,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, WKNavigationDe
         sendState()
     }
 
+    func languageChanged(reloadPage: Bool) {
+        window?.title = L.t.settingsTitle
+        if reloadPage, loaded { web?.reload() }
+    }
+
     private func build() {
         let config = WKWebViewConfiguration()
         let content = WKUserContentController()
@@ -91,6 +97,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, WKNavigationDe
                                            injectionTime: .atDocumentStart,
                                            forMainFrameOnly: true))
         content.add(WeakMessageHandler(self), name: "shellSettingsWindow")
+        content.add(WeakMessageHandler(self), name: "shellLanguage")
         config.userContentController = content
 
         let web = WKWebView(frame: .zero, configuration: config)
@@ -147,10 +154,17 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, WKNavigationDe
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         // Only the page this window loaded may ask; one it navigated to by a
         // link is somebody else's.
-        guard message.frameInfo.isMainFrame,
+        guard message.frameInfo.isMainFrame, message.webView === web,
+              message.frameInfo.request.url?.scheme == home.scheme,
               message.frameInfo.request.url?.host == home.host,
               message.frameInfo.request.url?.port == home.port,
-              let body = message.body as? [String: Any],
+              web?.url.map({ $0.scheme == home.scheme && $0.host == home.host && $0.port == home.port }) == true,
+              let body = message.body as? [String: Any] else { return }
+        if message.name == "shellLanguage" {
+            if let tag = body["tag"] as? String { host?.settingsLanguageSelected(tag) }
+            return
+        }
+        guard message.name == "shellSettingsWindow",
               let kind = body["kind"] as? String else { return }
         switch kind {
         case "state":

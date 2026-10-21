@@ -146,7 +146,7 @@
       }
     },
     "PastSessionList": {
-      "description": "GET /v1/places/{id}/sessions[/{assistant}]: what that assistant has recorded in the place, newest first, at most two hundred. Dispatched children and `-p` runs are not conversations and are left out.",
+      "description": "GET /v1/places/{id}/sessions[/{assistant}]: what that assistant has recorded in the place, newest first. Codex returns one provider page of twenty with an opaque next_cursor; other assistants return at most two hundred. Dispatched children and `-p` runs are not conversations and are left out.",
       "type": "object",
       "additionalProperties": false,
       "required": ["at", "place", "assistant", "more", "sessions"],
@@ -154,12 +154,13 @@
         "at": { "type": "integer" },
         "place": { "type": "string" },
         "assistant": { "type": "string" },
+        "next_cursor": { "description": "Opaque continuation for the next Codex page; omitted at the end.", "type": "string" },
         "more": { "description": "The list stopped at its cap and there were more.", "type": "boolean" },
         "sessions": { "type": "array", "items": { "$ref": "#/$defs/PastSession" } }
       }
     },
     "PlaceError": {
-      "description": "A refusal from the start, resume and history routes: not_found, forbidden, bad_request, invalid_launch, terminal_closed, terminal_unsupported, terminal_io_failed, iterm_attention_required, capability_unavailable, terminal_busy, unknown_persona (a start or resume ending `/as/{persona}` that names no persona in GET /v1/personas).",
+      "description": "A refusal from the start, resume and history routes: codex_unavailable (503; provider read failed, retryable and never evidence of absence), not_found, forbidden, bad_request, invalid_launch, terminal_closed, terminal_unsupported, terminal_io_failed, iterm_attention_required, capability_unavailable, terminal_busy, unknown_persona (a start or resume ending `/as/{persona}` that names no persona in GET /v1/personas).",
       "type": "object",
       "additionalProperties": false,
       "required": ["code", "message", "request_id"],

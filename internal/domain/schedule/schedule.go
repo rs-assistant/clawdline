@@ -59,7 +59,7 @@ type Day struct{ Year, Month, Day int }
 func (d Day) String() string { return fmt.Sprintf("%04d-%02d-%02d", d.Year, d.Month, d.Day) }
 
 // When is `when`: a time of day and exactly one of every day, some weekdays,
-// or one named date — or, with TriggerOnly, no time at all.
+// one named date, or an anchored calendar-day interval — or, with TriggerOnly, no time at all.
 type When struct {
 	// TriggerOnly is `{"trigger_only": true}`: a schedule the clock never
 	// fires. It runs by a manual Run or by a webhook and by nothing else, so it
@@ -68,8 +68,10 @@ type When struct {
 	TriggerOnly  bool
 	Hour, Minute int
 	Daily        bool
+	EveryDays    int64
+	Start        *Day
 	// Weekdays is indexed by time.Weekday. Meaningful only when Daily is false
-	// and On is nil.
+	// and On and Start are nil.
 	Weekdays [7]bool
 	// On is set for a schedule that runs once.
 	On *Day
@@ -83,7 +85,10 @@ func (w When) Once() bool { return w.On != nil }
 // spellings: `09:00` and a re-typed `09:00` are the same time.
 func (w When) Same(o When) bool {
 	if w.TriggerOnly != o.TriggerOnly || w.Hour != o.Hour || w.Minute != o.Minute || w.Daily != o.Daily ||
-		w.Weekdays != o.Weekdays {
+		w.Weekdays != o.Weekdays || w.EveryDays != o.EveryDays {
+		return false
+	}
+	if (w.Start == nil) != (o.Start == nil) || (w.Start != nil && *w.Start != *o.Start) {
 		return false
 	}
 	if (w.On == nil) != (o.On == nil) {
@@ -95,7 +100,7 @@ func (w When) Same(o When) bool {
 // At is `when.at` as the file spells it.
 func (w When) At() string { return fmt.Sprintf("%02d:%02d", w.Hour, w.Minute) }
 
-// Object is `when` back in the file's own spelling: `{at, days}`, `{at, on}`
+// Object is `when` back in the file's own spelling: `{at, days}`, `{at, on}`, `{at, every_days, start}`
 // or `{trigger_only: true}`.
 func (w When) Object() map[string]any {
 	if w.TriggerOnly {
@@ -103,6 +108,9 @@ func (w When) Object() map[string]any {
 	}
 	out := map[string]any{"at": w.At()}
 	switch {
+	case w.Start != nil:
+		out["every_days"] = w.EveryDays
+		out["start"] = w.Start.String()
 	case w.On != nil:
 		out["on"] = w.On.String()
 	case w.Daily:
@@ -339,11 +347,30 @@ func ParseWhen(raw any) (When, error) {
 		return When{TriggerOnly: true}, nil
 	}
 	_, hasAt := obj["at"]
-	if !ok || len(obj) != 2 || !hasAt || len(unknownKeys(obj, map[string]bool{"at": true, "days": true, "on": true})) > 0 {
-		return When{}, bad("when must contain at and exactly one of days or on, or be {\"trigger_only\": true}")
+	_, interval := obj["every_days"]
+	_, start := obj["start"]
+	valid := ok && hasAt
+	if interval || start {
+		valid = valid && interval && start && len(obj) == 3 && len(unknownKeys(obj, map[string]bool{"at": true, "every_days": true, "start": true})) == 0
+	} else {
+		valid = valid && len(obj) == 2 && len(unknownKeys(obj, map[string]bool{"at": true, "days": true, "on": true})) == 0
+	}
+	if !valid {
+		return When{}, bad("when must contain at with days, on, or every_days and start, or be {\"trigger_only\": true}")
 	}
 	var w When
-	if on, present := obj["on"]; present {
+	if interval {
+		n, valid := Integer(obj["every_days"])
+		text, _ := obj["start"].(string)
+		day, validDay := ParseDay(text)
+		if !valid || n < 1 {
+			return When{}, bad("when.every_days must be a positive integer")
+		}
+		if !validDay {
+			return When{}, bad("when.start must be a real calendar date spelled YYYY-MM-DD")
+		}
+		w.EveryDays, w.Start = n, &day
+	} else if on, present := obj["on"]; present {
 		text, _ := on.(string)
 		day, ok := ParseDay(text)
 		if !ok {
@@ -588,6 +615,9 @@ func (w When) LatestFire(now time.Time, loc *time.Location) time.Time {
 		return time.Time{}
 	}
 	now = now.In(loc)
+	if w.Start != nil {
+		return w.intervalFire(now, loc, false)
+	}
 	if w.On != nil {
 		fire := w.fireOn(w.On.Year, time.Month(w.On.Month), w.On.Day, loc)
 		if !fire.After(now) {
@@ -614,6 +644,9 @@ func (w When) NextFire(now time.Time, loc *time.Location) time.Time {
 		return time.Time{}
 	}
 	now = now.In(loc)
+	if w.Start != nil {
+		return w.intervalFire(now, loc, true)
+	}
 	if w.On != nil {
 		fire := w.fireOn(w.On.Year, time.Month(w.On.Month), w.On.Day, loc)
 		if fire.After(now) {
@@ -630,6 +663,48 @@ func (w When) NextFire(now time.Time, loc *time.Location) time.Time {
 		return c
 	}
 	return time.Time{}
+}
+
+// calendarDay counts Gregorian dates, independently of DST and elapsed hours.
+func calendarDay(y int, m time.Month, d int) int64 {
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Unix() / 86400
+}
+
+// intervalFire jumps directly to the adjacent occurrence, even for long intervals.
+// The supported date grammar ends at 9999; do not overflow time arithmetic for
+// an interval whose next occurrence lies outside that calendar.
+func (w When) intervalFire(now time.Time, loc *time.Location, next bool) time.Time {
+	anchor := calendarDay(w.Start.Year, time.Month(w.Start.Month), w.Start.Day)
+	y, m, d := now.Date()
+	today := calendarDay(y, m, d)
+	if today < anchor {
+		if next {
+			return w.fireOn(w.Start.Year, time.Month(w.Start.Month), w.Start.Day, loc)
+		}
+		return time.Time{}
+	}
+	day := today - (today-anchor)%w.EveryDays
+	fire := func(day int64) time.Time {
+		date := time.Unix(day*86400, 0).UTC()
+		return w.fireOn(date.Year(), date.Month(), date.Day(), loc)
+	}
+	candidate := fire(day)
+	if next {
+		if candidate.After(now) {
+			return candidate
+		}
+		if w.EveryDays > calendarDay(9999, time.December, 31)-day {
+			return time.Time{}
+		}
+		return fire(day + w.EveryDays)
+	}
+	if !candidate.After(now) {
+		return candidate
+	}
+	if day-anchor < w.EveryDays {
+		return time.Time{}
+	}
+	return fire(day - w.EveryDays)
 }
 
 // Action is what the minute timer does about one occurrence.

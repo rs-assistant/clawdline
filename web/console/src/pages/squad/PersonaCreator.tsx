@@ -1,13 +1,9 @@
 import { useRef, useState } from "react"
-import type { Icon } from "@clawdline/contract"
+import { freshRoleIcon, RoleIconEditor } from "./RoleIconEditor.js"
 import { nextWord } from "../../next-strings.js"
 import { showModalWithoutChoice } from "../../modal-focus.js"
 import { failureSentence } from "../../refusals/refusal-text.js"
 import type { SquadAPI } from "./api.js"
-
-const accent = "#2bb3a3"
-const shape = ["..XXXX..", ".X....X.", "X.X..X.X", "X......X", "X.XXXX.X", ".X....X.", "..XXXX.."]
-const icon: Icon = { accent, cells: shape.map((row) => [...row].map((cell) => cell === "X" ? accent : null)) }
 
 function freshID(): string { return `personal.persona.role-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}` }
 
@@ -19,6 +15,7 @@ export function PersonaCreator({ api, canWrite, catalogVersion, onSaved }: {
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const opener = useRef<HTMLButtonElement>(null)
+  const [icon, setIcon] = useState(freshRoleIcon)
   const [id, setID] = useState(freshID)
   const [description, setDescription] = useState("")
   const [name, setName] = useState("")
@@ -52,7 +49,7 @@ export function PersonaCreator({ api, canWrite, catalogVersion, onSaved }: {
       }, catalogVersion, crypto.randomUUID())
       dialog.current?.close()
       await onSaved(id)
-      setID(freshID()); setDescription(""); setName(""); setSummary(""); setBody("")
+      setIcon(freshRoleIcon()); setID(freshID()); setDescription(""); setName(""); setSummary(""); setBody("")
     } catch (cause) { setError(failureSentence(cause, nextWord("roleCreateFailed"))) }
     finally { setBusy("") }
   }
@@ -70,6 +67,7 @@ export function PersonaCreator({ api, canWrite, catalogVersion, onSaved }: {
       </section>
       <form className="squad-role-form" onSubmit={(event) => { event.preventDefault(); void save() }}>
         <h3>{nextWord("roleCreateReview")}</h3>
+        <RoleIconEditor icon={icon} onChange={setIcon} disabled={!!busy} />
         <label>{nextWord("roleCreateName")}<input required maxLength={120} value={name} disabled={!!busy} onChange={(event) => setName(event.target.value)} /></label>
         <label>{nextWord("roleCreateSummary")}<textarea required maxLength={500} rows={2} value={summary} disabled={!!busy} onChange={(event) => setSummary(event.target.value)} /></label>
         <label>{nextWord("roleCreateDefinition")}<textarea required maxLength={6000} rows={12} value={body} disabled={!!busy} onChange={(event) => setBody(event.target.value)} /></label>

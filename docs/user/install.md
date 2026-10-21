@@ -24,7 +24,7 @@ it chose: `✓ tmux found`, or `✓ tmux: this release carries tmux 3.6a`.
 
 The last row is the only one you can skip and still lose something visible: Claude Code hands its
 `5h`/`7d` plan percentages only to the stdin of `statusLine.command`, so without one the Status
-Line's right edge reads `方案額度 未知`. [usage.md](usage.md) says what to configure.
+Line's right edge reads `Plan limits unknown`. [usage.md](usage.md) says what to configure.
 
 ## 1. Install
 
@@ -143,9 +143,9 @@ clawdline project add ~/code/my-app ~/code/another-app
 ## Updates
 
 The daemon checks for a new release every few hours. When there is one, the console's Settings
-page and `clawdline update` say so; **立即更新** there, or `clawdline update --apply`, installs it.
+page and `clawdline update` say so; **Update now** there, or `clawdline update --apply`, installs it.
 Every release is signature-checked before it is installed, and one that does not come up healthy
-is rolled back by itself. Automatic updates are off until you turn on **自動更新** on the Settings
+is rolled back by itself. Automatic updates are off until you turn on **Automatic updates** on the Settings
 page or run `clawdline setting set update_auto_apply true`. [updates.md](../updates.md) has the
 whole of it.
 

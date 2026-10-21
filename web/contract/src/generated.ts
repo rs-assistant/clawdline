@@ -3433,15 +3433,18 @@ export type HealthReason =
 export const HealthReasonValues: readonly HealthReason[] = ["broker_beat_stalled", "capacity_exhausted", "capacity_beat_stalled", "work_sweep_stalled"] as const
 
 /**
- * A project's mark: rows of `#RRGGBB`, with null for transparent. It is derived
- * from the project path and the machine's icon registry by the same rules the Swift
- * app uses, so both apps draw the same creature — a mark somebody recognises by
- * colour and shape is not recognisable if the second app draws it differently, and
- * near-identical is worse than obviously different.
+ * A project mark with an RGB accent and either bounded colour cells (null is
+ * transparent) or a self-contained static SVG with empty cells. Both render
+ * proportionally inside the existing icon slot.
  */
 export interface Icon {
   accent: string
   cells: ((string | null)[])[]
+
+  /**
+   * Optional self-contained SVG; cells is empty when present.
+   */
+  svg?: string
 }
 
 /**
@@ -4229,8 +4232,9 @@ export interface PastSession {
 
 /**
  * GET /v1/places/{id}/sessions[/{assistant}]: what that assistant has recorded in
- * the place, newest first, at most two hundred. Dispatched children and `-p` runs
- * are not conversations and are left out.
+ * the place, newest first. Codex returns one provider page of twenty with an opaque
+ * next_cursor; other assistants return at most two hundred. Dispatched children and
+ * `-p` runs are not conversations and are left out.
  */
 export interface PastSessionList {
   assistant: string
@@ -4240,6 +4244,11 @@ export interface PastSessionList {
    * The list stopped at its cap and there were more.
    */
   more: boolean
+
+  /**
+   * Opaque continuation for the next Codex page; omitted at the end.
+   */
+  next_cursor?: string
   place: string
   sessions: PastSession[]
 }
@@ -4327,8 +4336,9 @@ export interface PersonaSuggestionRequest {
 }
 
 /**
- * A refusal from the start, resume and history routes: not_found, forbidden,
- * bad_request, invalid_launch, terminal_closed, terminal_unsupported,
+ * A refusal from the start, resume and history routes: codex_unavailable (503;
+ * provider read failed, retryable and never evidence of absence), not_found,
+ * forbidden, bad_request, invalid_launch, terminal_closed, terminal_unsupported,
  * terminal_io_failed, iterm_attention_required, capability_unavailable,
  * terminal_busy, unknown_persona (a start or resume ending `/as/{persona}` that
  * names no persona in GET /v1/personas).
@@ -5851,16 +5861,16 @@ export interface ScheduleRecord {
 /**
  * The body POST /v1/orchestrator/schedules and PATCH /v1/orchestrator/schedules/:id
  * take — the form's fields, flattened. `place_id` is an id from GET /v1/places,
- * never a path. Either `at` with exactly one of `days` and `on` (`days` is not
- * defaulted), or `trigger_only: true` with none of `at`, `days` and `on` — a
- * schedule the clock never fires, run only by hand or by webhook. schedule_id,
- * created_at, when_changed_at, fired_at and project_dir are the machine's and are
- * refused as unknown fields. Writes need an Idempotency-Key and either a device
- * that may send or, for a schedule that runs once, this machine's orchestrator
- * token. A session carrying a person's recent instruction may write a repeating
- * schedule by sending both `session_id` and `via.run`; the run must have been
- * issued for a message to that conversation. Those proof fields are audit evidence
- * and are not stored in the schedule.
+ * never a path. Either `at` with one of `days`, `on`, or the pair `every_days` and
+ * `start` (`days` is not defaulted), or `trigger_only: true` with none of `at`,
+ * `days`, `on`, `every_days` and `start` — a schedule the clock never fires, run
+ * only by hand or by webhook. schedule_id, created_at, when_changed_at, fired_at
+ * and project_dir are the machine's and are refused as unknown fields. Writes need
+ * an Idempotency-Key and either a device that may send or, for a schedule that runs
+ * once, this machine's orchestrator token. A session carrying a person's recent
+ * instruction may write a repeating schedule by sending both `session_id` and
+ * `via.run`; the run must have been issued for a message to that conversation.
+ * Those proof fields are audit evidence and are not stored in the schedule.
  */
 export interface ScheduleRequest {
   assistant: string
@@ -5869,6 +5879,12 @@ export interface ScheduleRequest {
   close_tab?: string
   days?: string[]
   enabled?: boolean
+
+  /**
+   * Positive calendar-day interval, paired with start and at; excludes days, on and
+   * trigger_only.
+   */
+  every_days?: number
   instructions: string
 
   /**
@@ -5899,6 +5915,11 @@ export interface ScheduleRequest {
    * session-authorized repeating write.
    */
   session_id?: string
+
+  /**
+   * Inclusive anchor date, YYYY-MM-DD, for every_days. Manual runs do not move it.
+   */
+  start?: string
   template?: ScheduleTemplate
 
   /**
@@ -5974,6 +5995,7 @@ export interface ScheduleRow {
    * never fires it, and it runs only by hand or by webhook. It never has next_fire.
    */
   trigger_only?: boolean
+  when?: ScheduleWhen
 }
 
 /**
@@ -6071,13 +6093,25 @@ export interface ScheduleUserAuthorization {
 /**
  * `when` in the file's own spelling: `at` (HH:MM, local time) and exactly one of
  * `days` (`daily`, or weekday names sun…sat) or `on` (YYYY-MM-DD, a schedule that
- * runs once) — or, alone, `trigger_only: true`, a schedule with no time that runs
- * only by hand or by webhook.
+ * runs once), or `every_days` with `start` (an anchored calendar-day interval) —
+ * or, alone, `trigger_only: true`, a schedule with no time that runs only by hand
+ * or by webhook.
  */
 export interface ScheduleWhen {
   at?: string
   days?: string[]
+
+  /**
+   * Positive calendar-day interval, paired with start and at; excludes days, on and
+   * trigger_only.
+   */
+  every_days?: number
   on?: string
+
+  /**
+   * Inclusive anchor date, YYYY-MM-DD, for every_days. Manual runs do not move it.
+   */
+  start?: string
   trigger_only?: boolean
 }
 
@@ -6908,11 +6942,11 @@ export interface SessionRow {
   tty?: string
 
   /**
-   * The live broker work that makes a broker-projected `waiting_session` row wait,
-   * collected by the same pass that decided the state. Present only on such rows;
-   * at most `session.waiting_for` entries, with `waiting_for_omitted` counting the
-   * rest. Both Cloud list scopes and the local list describe a wait from this field
-   * alone.
+   * The live broker work owned by this Session, collected by the same pass that
+   * decided the work state. Independent of the terminal state, so working and
+   * unknown rows can also name outstanding work; at most `session.waiting_for`
+   * entries, with `waiting_for_omitted` counting the rest. Both Cloud list scopes
+   * and the local list describe a wait from this field alone.
    */
   waiting_for?: SessionWaitTarget[]
 
@@ -7257,6 +7291,28 @@ export interface SettingsRequest {
   claude_default_model: string | null
 
   /**
+   * Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+   * as ciphertext only paired owner devices can open. Separate from
+   * cloud_health_upload, which never permits it. Absent or false means off, and off
+   * makes no request. Only the local token may change it.
+   */
+  cloud_health_owner_retention: boolean | null
+
+  /**
+   * Whether this daemon uploads its connection-health records to Cloud. Absent or
+   * false means off, and off makes no request. Only the local token may change it.
+   * Owner diagnostics (location, age, deadline) are never sent.
+   */
+  cloud_health_upload: boolean | null
+
+  /**
+   * Only `false`: dismisses the retired Cloudflare tunnel notice by removing that
+   * tunnel's old keys from the file. The old keys themselves are refused as
+   * `retired_setting`.
+   */
+  cloudflare_tunnel_retired: boolean | null
+
+  /**
    * Whether a new session is named by an assistant.
    */
   codex_auto_name: boolean | null
@@ -7439,16 +7495,6 @@ export interface SettingsRequest {
   remote: boolean | null
 
   /**
-   * A hostname, or empty.
-   */
-  remote_hostname: string | null
-
-  /**
-   * `off`, `quick` or `named`.
-   */
-  remote_tunnel: string | null
-
-  /**
    * Whether the bar comes back with the terminal.
    */
   reopen_on_return: boolean | null
@@ -7462,6 +7508,11 @@ export interface SettingsRequest {
    * Have a model write the sentence a notification carries.
    */
   smart_notifications: boolean | null
+
+  /**
+   * A full Tailscale name ending in `.ts.net`, or empty.
+   */
+  tailscale_hostname: string | null
 
   /**
    * `auto`, `iterm`, `iterm_native` or `tmux`.
@@ -7541,6 +7592,29 @@ export interface SettingsSnapshot {
    * one. Empty leaves the choice to Claude Code.
    */
   claude_default_model: string | null
+
+  /**
+   * Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+   * as ciphertext only paired owner devices can open. Separate from
+   * cloud_health_upload, which never permits it. Absent or false means off, and off
+   * makes no request. Only the local token may change it.
+   */
+  cloud_health_owner_retention: boolean | null
+
+  /**
+   * Whether this daemon uploads its connection-health records to Cloud. Absent or
+   * false means off, and off makes no request. Only the local token may change it.
+   * Owner diagnostics (location, age, deadline) are never sent.
+   */
+  cloud_health_upload: boolean | null
+
+  /**
+   * True while the file still holds the built-in Cloudflare tunnel's settings
+   * (`remote_tunnel`, `remote_tunnel_name`, `remote_hostname`, `cloudflared_path`),
+   * removed on 2026-10-20. They start nothing; the settings page explains once, and
+   * writing `cloudflare_tunnel_retired: false` takes them out of the file.
+   */
+  cloudflare_tunnel_retired?: boolean
 
   /**
    * Whether a new session is named by an assistant. The Swift app's spelling, kept
@@ -7751,16 +7825,6 @@ export interface SettingsSnapshot {
   remote: boolean | null
 
   /**
-   * The hostname a named tunnel answers on.
-   */
-  remote_hostname: string | null
-
-  /**
-   * `off`, `quick` or `named`.
-   */
-  remote_tunnel: string | null
-
-  /**
    * Whether the bar comes back with the terminal.
    */
   reopen_on_return: boolean | null
@@ -7775,6 +7839,12 @@ export interface SettingsSnapshot {
    * Have a model write the sentence a notification carries.
    */
   smart_notifications: boolean | null
+
+  /**
+   * This machine's full Tailscale name (`<machine>.<tailnet>.ts.net`) that
+   * Tailscale Serve answers on; accepted only while `remote` is on.
+   */
+  tailscale_hostname: string | null
 
   /**
    * Where a new session opens: `auto`, `iterm`, `iterm_native` or `tmux`. With tmux
@@ -8029,6 +8099,8 @@ export interface SquadEffectivePersona {
 }
 
 export interface SquadEffectiveSettings {
+  auto_dispatch: SquadFieldBool
+  auto_dispatch_version: number
   motion: SquadFieldBool
   motion_settings_version: number
   personas: SquadEffectivePersona[]
@@ -8117,8 +8189,9 @@ export interface SquadInputText {
 }
 
 export interface SquadMotionRequest {
+  auto_dispatch?: SquadInputBool
   expected_version: number
-  motion: SquadInputBool
+  motion?: SquadInputBool
   place_id?: string
   scope_id?: string
 }
@@ -9169,81 +9242,6 @@ export interface TranscriptUnread {
 }
 
 /**
- * `off`; `quick`, an address made up per run under trycloudflare.com; `named`, the
- * person's own tunnel (`remote_tunnel_name`) and hostname (`remote_hostname`).
- */
-export type TunnelMode =
-    "off"
-  | "quick"
-  | "named"
-
-export const TunnelModeValues: readonly TunnelMode[] = ["off", "quick", "named"] as const
-
-/**
- * `off`; `starting`, launched or waiting to retry and not yet registered with the
- * edge; `up`; `failed`, with a reason — including a refusal to start.
- */
-export type TunnelState =
-    "off"
-  | "starting"
-  | "up"
-  | "failed"
-
-export const TunnelStateValues: readonly TunnelState[] = ["off", "starting", "up", "failed"] as const
-
-/**
- * One reading of the tunnel.
- */
-export interface TunnelStatus {
-  at: number
-
-  /**
-   * Launches in a row that have died, while it is retrying; absent when none have.
-   */
-  attempts?: number
-
-  /**
-   * The cloudflared the next launch would run: `cloudflared_path` when it is set
-   * and executable, else where a package manager puts it, else PATH. Absent when
-   * there is none.
-   */
-  binary?: string
-
-  /**
-   * When state, url or reason last moved.
-   */
-  changed: number
-
-  /**
-   * The command line of the child that is running or was last started, binary
-   * first. It always carries `--config` and this daemon's own file, never the
-   * person's ~/.cloudflared/config.yml.
-   */
-  command?: string[]
-
-  /**
-   * The configuration file cloudflared is pointed at, in this daemon's state
-   * directory.
-   */
-  config: string
-  installed: boolean
-  mode: TunnelMode
-
-  /**
-   * Why it failed or refused, in the tunnel's own sentence. Present when state is
-   * failed.
-   */
-  reason?: string
-  state: TunnelState
-
-  /**
-   * The address, once a connection to Cloudflare's edge is registered. Present when
-   * state is up.
-   */
-  url?: string
-}
-
-/**
  * The last update of a release install, as the updater recorded it in the state
  * directory.
  */
@@ -9778,6 +9776,75 @@ export interface UsageItemOwner {
 export interface UsageNamedSize {
   name: string
   tokens: number
+}
+
+export interface UsageOverview {
+  at: number
+  coverage: UsageOverviewCoverage
+  daily: UsageOverviewDay[]
+  days: number
+  previous_daily: UsageOverviewDay[]
+  previous_since: number
+  previous_totals: UsageOverviewTotals
+  previous_until: number
+  project: string
+  project_options: UsageOverviewProjectOption[]
+  projects: UsageOverviewProject[]
+  since: number
+  timezone: string
+  totals: UsageOverviewTotals
+  until: number
+}
+
+export interface UsageOverviewCoverage {
+  history_from: number
+  sessions_read: number
+  sessions_total: number
+  state: UsageOverviewCoverageState
+  tasks_truncated?: boolean
+  truncated: boolean
+}
+
+export type UsageOverviewCoverageState =
+    "missing"
+  | "partial"
+  | "complete"
+
+export const UsageOverviewCoverageStateValues: readonly UsageOverviewCoverageState[] = ["missing", "partial", "complete"] as const
+
+export interface UsageOverviewDay {
+  coverage: UsageOverviewCoverageState
+  date: string
+  dispatches: number
+  duration_median_seconds: number | null
+  duration_samples: number
+  tokens: number | null
+}
+
+export interface UsageOverviewParts {
+  cache_read: number
+  cache_write: number
+  input: number
+  output: number
+}
+
+export interface UsageOverviewProject {
+  id: string
+  name: string
+  tokens: number
+}
+
+export interface UsageOverviewProjectOption {
+  id: string
+  name: string
+}
+
+export interface UsageOverviewTotals {
+  dispatches: number
+  duration_median_seconds: number | null
+  duration_samples: number
+  parts: UsageOverviewParts
+  tokens: number | null
 }
 
 /**

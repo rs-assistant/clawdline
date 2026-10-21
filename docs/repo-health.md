@@ -3,7 +3,7 @@
 
 Status: **proposed design, 2026-10-06.** Nothing here is built. Every claim about how Clawdline
 behaves today cites the file and line it was read from; anything not checked is labelled
-*assumption*. The feature is called **Governance review** (治理檢視), not "health": `health` already
+*assumption*. The feature is called **Governance review**, not "health": `health` already
 means a service health check in Project status (`internal/adapters/projectlinks/status.go:227,462`,
 `docs/project-status.md:363-419`), and a second meaning of the same word on the same Project card
 would make both unreadable. The file keeps the name `repo-health.md` because that is the path this

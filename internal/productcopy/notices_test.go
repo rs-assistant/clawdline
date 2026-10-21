@@ -5,6 +5,23 @@ import (
 	"testing"
 )
 
+func TestDeliveryAndBatchCompletionAreTranslatedInEveryShippedLanguage(t *testing.T) {
+	for _, language := range Languages {
+		for _, key := range []string{"delivery.title", "delivery.body", "fanout.title", "fanout.body"} {
+			got := Format(language, key, map[string]string{"count": "12", "failed": "3"})
+			if got == "" || strings.ContainsAny(got, "{}<>") {
+				t.Fatalf("%s %s rendered invalid copy %q", language, key, got)
+			}
+			if language != "en" && got == Format("en", key, map[string]string{"count": "12", "failed": "3"}) {
+				t.Errorf("%s %s fell back to English", language, key)
+			}
+			if key == "fanout.body" && (!strings.Contains(got, "12") || !strings.Contains(got, "3")) {
+				t.Errorf("%s batch completion lost task counts: %q", language, got)
+			}
+		}
+	}
+}
+
 func TestNotificationCatalogKeepsSourceLanguagesCompleteAndOtherLanguagesValid(t *testing.T) {
 	if len(Languages) != 9 || len(notices) == 0 {
 		t.Fatalf("languages=%v keys=%d", Languages, len(notices))

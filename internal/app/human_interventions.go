@@ -120,7 +120,7 @@ func ValidateHumanDocumentURL(raw, machine, session string) error {
 		}
 	}
 	switch strings.ToLower(path.Ext(file)) {
-	case ".md", ".markdown", ".txt":
+	case ".md", ".markdown", ".txt", ".html":
 	default:
 		return humanInterventionError("document_url_invalid", "The document must be a supported text file.")
 	}
@@ -203,9 +203,23 @@ func (h *HumanInterventions) List(ctx context.Context, conversation string) ([]w
 }
 
 func (h *HumanInterventions) Update(ctx context.Context, id, conversation, action, resolution string, version int64, k store.ReceiptKey, answer func(work.HumanIntervention) []byte) (work.HumanIntervention, []byte, error) {
+	if action != "read" && action != "resolve" && action != "reopen" {
+		return work.HumanIntervention{}, nil, humanInterventionError("intervention_action_invalid", "Choose read, resolve or reopen.")
+	}
+	return h.update(ctx, id, conversation, "", action, resolution, version, k, answer)
+}
+
+func (h *HumanInterventions) Withdraw(ctx context.Context, id, source, reason string, version int64, k store.ReceiptKey, answer func(work.HumanIntervention) []byte) (work.HumanIntervention, []byte, error) {
+	if source == "" || !humanText(reason, humanInterventionTextLimit) {
+		return work.HumanIntervention{}, nil, humanInterventionError("intervention_reason_invalid", "A withdrawal reason is required within the note text limit.")
+	}
+	return h.update(ctx, id, "", source, "withdraw", reason, version, k, answer)
+}
+
+func (h *HumanInterventions) update(ctx context.Context, id, conversation, source, action, resolution string, version int64, k store.ReceiptKey, answer func(work.HumanIntervention) []byte) (work.HumanIntervention, []byte, error) {
 	var out work.HumanIntervention
 	var body []byte
-	if action != "read" && action != "resolve" && action != "reopen" {
+	if action != "read" && action != "resolve" && action != "reopen" && action != "withdraw" {
 		return out, nil, humanInterventionError("intervention_action_invalid", "Choose read, resolve or reopen.")
 	}
 	if action == "resolve" && len(resolution) > humanInterventionTextLimit {
@@ -217,7 +231,7 @@ func (h *HumanInterventions) Update(ctx context.Context, id, conversation, actio
 		if err != nil {
 			return err
 		}
-		if prev.TargetConversation != conversation {
+		if (source == "" && prev.TargetConversation != conversation) || (source != "" && prev.SourceConversation != source) {
 			return store.ErrHumanInterventionNotFound
 		}
 		if action == "reopen" && prev.Kind == "secret" && prev.Resolution == "Secret Handoff used" {
@@ -226,19 +240,28 @@ func (h *HumanInterventions) Update(ctx context.Context, id, conversation, actio
 		if prev.Version != version {
 			return store.ErrConflict
 		}
+		if action == "withdraw" && prev.ResolvedAt != nil {
+			return humanInterventionError("intervention_already_closed", "This note is already closed; its existing outcome is preserved.")
+		}
 		out = prev
 		switch action {
 		case "read":
 			if out.ReadAt == nil {
 				out.ReadAt = &at
 			}
+		case "withdraw":
+			out.ResolvedAt = &at
+			out.Withdrawn = true
+			out.Resolution = strings.TrimSpace(resolution)
 		case "resolve":
+			out.Withdrawn = false
 			if out.ReadAt == nil {
 				out.ReadAt = &at
 			}
 			out.ResolvedAt = &at
 			out.Resolution = strings.TrimSpace(resolution)
 		case "reopen":
+			out.Withdrawn = false
 			out.ResolvedAt = nil
 			out.Resolution = ""
 		}

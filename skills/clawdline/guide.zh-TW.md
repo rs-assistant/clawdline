@@ -323,9 +323,10 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 1. **Project。** 執行 `clawdline project list`。清單沒有這個 checkout 時，用
    `clawdline project add <absolute-root>` 加入 repository root，再列一次。這只記錄能從哪裡開 Session，
    不會改 repository。
-2. **名稱與圖示。** 沒有設定時，Clawdline 會從路徑產生一個穩定圖示。使用者想指定名稱或像素圖示時，
+2. **名稱與圖示。** 沒有設定時，Clawdline 會從路徑產生一個穩定圖示。使用者想指定名稱、像素圖示或 SVG 時，
    保留 `~/.claude/project-icons.json` 裡的其他每一列，只修改這個 Project 最長相符路徑的那一列。格式在
-   Clawdline repository 的 `docs/project-status.md`；Projects 頁也能複製已解析好的圖示，不必手改 JSON。
+   Clawdline repository 的 `docs/project-icons.md`：像素格上限為 64×64；SVG 須有正尺寸的 `viewBox`，
+   只含靜態內容與內部參照，最多 96 KiB。兩者都會縮放進原有圖示框，不會撐大版面。
    全域使用者檔案不是 repository 內容；若原要求沒有授權修改，先把準備寫入的完整 entry 給使用者看。
 3. **Deploy 與長時間工作。** Clawdline 只讀狀態收據，從不執行 deploy。GitHub repository 的 deploy 收據
    是 `~/.claude/statusline-cache/ghrun-<owner>-<repo>.json`，owner 與 repo 取自 `origin`。已經知道 run
@@ -900,6 +901,8 @@ body）與 `DELETE /v1/orchestrator/schedules/<id>`（以 JSON body 送出兩個
 指示。絕對不要把一次 run 當成使用者沒有要求之工作的概括授權。這份證據讓代轉行為可以稽核；它不會把
 整台機器共用的 orchestrator token 變成某個 Session 專屬的憑證。
 
+每隔固定天數的排程用 `"at":"09:00", "every_days":3, "start":"2026-10-21"` 取代 `days` 或 `on`。正整數天數依 `time_zone` 的日曆日期計算，包含起始日期；手動執行不移動週期，補跑仍只處理最近一次。這是長期指示，須帶相同的使用者授權證明。
+
 排程可以不設時間：用 `"trigger_only": true` 取代 `at`、`days` 與 `on`。時鐘永遠不會執行它；它只由
 `…/run` 或它的 webhook 啟動，而且只在 `enabled` 時。它和重複排程一樣是長期指示，需要同一份證據。
 
@@ -1078,6 +1081,14 @@ clawdline note create --requested-by-person --body-file note.json
 密碼、憑證或 API key 請使用 **Secret Handoff／機密交付**。建立 `kind: "secret"` 的便條，標題、請求動作與原因都不得包含機密；在 `summary` 填入具體的憑證名稱（例如「正式環境 API key」），它會顯示為多行輸入欄位正上方的標籤。`detail`、`options`、`document_url` 留空。使用者在該欄位貼上內容，單行密碼也使用同一欄位。不要請使用者把機密放進建議回覆、一般訊息、文件或指令參數。送出後，目標 Session 可執行 `clawdline secret run <note-id> -- <command> [args...]`；指令會從標準輸入取得一次性的內容，輸出會被抑制。內容於 15 分鐘後或 daemon 重啟時失效；即使接收程式失敗，也已使用掉這次交付。需要時重新請使用者交付，切勿印出內容或透過 shell 對話紀錄傳遞。界線與使用步驟見 `docs/secret-handoff.md`。
 
 `kind` 可為 `read`、`answer`、`action`、`report` 或 `secret`；`title`、`summary`、`action`、`reason` 必填。`answer` 可提供二至四個選項，每個選項的 `draft` 是按鈕顯示的建議回覆。使用者點一下，Console 就把它當成對話訊息直接送到便條所在的 Session，後面附上便條 ID、標題和待回覆事項，讓接收的 Session 知道使用者回答的是哪張便條；按鈕不顯示這段脈絡。送出成功後，便條才會移到最近已處理。送出失敗時，便條維持待處理，關注按鈕會說明回覆沒有送出。較長內容放 `detail`；`document_url` 可指向真正可讀的 Cloud 文件，建立便條前先驗證文件路徑與檔案。依實際收到的對話訊息行事，不看便條狀態：使用者手動標記已處理的便條，並沒有送出任何訊息。只有使用者明確要求建立便條時才用 `--requested-by-person`；泛稱「完成工作」不算明確要求。加上此旗標時便條仍會顯示，但不會送便條推播。若工作確實卡在答覆上，另記錄等待使用者的狀態；Agent 主動建立的便條已負責關注通知，別再重複送一則。便條不會喚醒 Agent。
+
+**撤回不再需要關注的便條**
+
+執行 `clawdline note list`，列出歸屬於自己存活 Root 的便條、ID、版本與目前狀態。自己留下的待處理便條已經不再需要關注時，執行：
+
+`clawdline note withdraw --id <便條ID> --version <版本> --reason "前置問題已解決，不再需要選擇。"`
+
+撤回原因必填。只有環境無法識別自己時才加 `--from <存活Root對話ID>`。結果不確定時，沿用 CLI 印出的冪等鍵加上 `--key` 重試。版本過期回傳 `version_conflict`，先重新讀取再判斷；其他來源的便條回傳 `intervention_not_found`；已結束的便條回傳 `intervention_already_closed`，保留原本結果。撤回會移除關注紅點，便條以灰色移到最近紀錄，顯示 Agent 已撤回與原因；這不代表使用者回答或批准。使用者可重新開啟。不要撤回其他 Root 的便條；機器憑證仍為共用，來源欄位不是密碼學上的 Session 隔離。
 
 ## 10. 看板
 

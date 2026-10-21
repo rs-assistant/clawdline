@@ -1,0 +1,14 @@
+{
+  "master_secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "key_hex": "aa6389356d48cc7b83c3ce5ce29c4d69dacabc8eb4498e05a8beabc697269250",
+  "tenant": "usr_vector",
+  "machine_id": "mac_vector",
+  "aad": {"alg":"A256GCM-HKDF-SHA256","attachment_id":"hs_886d381f0cf37d93e190afcaff40a851","boot_id":"boot-v1","content_key_epoch":1,"expires_at_ms":1787832000000,"identity_epoch":0,"machine_id":"mac_vector","previous_ciphertext_sha256":"","revision":1,"schema":"clawdline.health-sealed-aad/1","subject_id":"ev-1","subject_kind":"evidence","tenant":"usr_vector"},
+  "aad_canonical": "{\"alg\":\"A256GCM-HKDF-SHA256\",\"attachment_id\":\"hs_886d381f0cf37d93e190afcaff40a851\",\"boot_id\":\"boot-v1\",\"content_key_epoch\":1,\"expires_at_ms\":1787832000000,\"identity_epoch\":0,\"machine_id\":\"mac_vector\",\"previous_ciphertext_sha256\":\"\",\"revision\":1,\"schema\":\"clawdline.health-sealed-aad/1\",\"subject_id\":\"ev-1\",\"subject_kind\":\"evidence\",\"tenant\":\"usr_vector\"}",
+  "aad_sha256": "1fc16842d7acc87cac8825295b2d4fe21d495fd9f11a6ebe7292820a99629ac9",
+  "nonce_hex": "000102030405060708090a0b",
+  "plaintext": "{\"age_ns\":1,\"location\":\"synthetic.go:1\",\"schema\":\"clawdline.health-owner-diagnostics/1\"}",
+  "ciphertext_b64": "2RjrTRmDHth9zZVCL6iQzE4opEL2aqjVCKbeR772IMiNmBdI4uIQeIcdSPPseUOZVwno4heWb5D5R+vqQha8kpjAxgy4T5W+Dcck/3S7LPGNIHmhiV5R3jV70SydFVy/Pw+/pJjqrME=",
+  "ciphertext_sha256": "5f49fa37988ce9ff66ffc0ac3fb087106735eaded184b426cbec2f61b952ec8a",
+  "attachment_id": "hs_886d381f0cf37d93e190afcaff40a851"
+}

@@ -181,12 +181,12 @@ func (s *Server) restoreWriting(w http.ResponseWriter, r *http.Request, body fun
 		writeRefusal(w, http.StatusRequestEntityTooLarge, "body_too_large", "That request is larger than this route reads.")
 		return
 	}
-	k := store.ReceiptKey{Scope: scopePlaces, Actor: accessOf(r).verdict.Device, Key: key}
+	k := store.ReceiptKey{Scope: scopePlaces, Actor: actorOf(r), Key: key}
 	s.receipted(w, r, k, requestDigest([]byte(r.Method), []byte(routePath(r)), raw),
 		// A full store is a fact about this moment, not about the request.
 		func(status int) bool { return status != http.StatusServiceUnavailable },
 		func(w http.ResponseWriter) { body(w, raw) })
-	log.Printf("remote: %s %s by %s", r.Method, r.URL.Path, accessOf(r).verdict.Device)
+	log.Printf("remote: %s %s by %s", r.Method, r.URL.Path, actorOf(r))
 }
 
 // conversationsOf reads `{conversations: [...]}`. present is false when the

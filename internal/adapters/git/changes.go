@@ -228,8 +228,8 @@ func (g *Git) readOnlyWithDifference(ctx context.Context, cwd string, allowDiffe
 	defer cancel()
 	// **This reading of somebody's repository runs git, and nothing that
 	// repository asked to have run.** A directory is opened here because a
-	// session is sitting in it and somebody pressed a menu item — a device
-	// that may only read is enough — and the repository under it may have been
+	// session is sitting in it and somebody pressed a menu item — any paired
+	// device may ask, and it is only a read — and the repository under it may have been
 	// cloned by an agent an hour ago. Several git settings name a program and
 	// git runs it: `core.fsmonitor` during `status`, an external driver or a
 	// `textconv` filter during a diff. So they are turned off on the command

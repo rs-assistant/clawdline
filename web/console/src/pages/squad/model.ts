@@ -81,6 +81,9 @@ export interface SquadView {
   sessions: SquadSession[]
   motion: Effective<boolean>
   motionSettingsVersion: number
+  autoDispatch: Effective<boolean>
+  autoDispatchVersion: number
+  autoDispatchSupported: boolean
   catalogVersion: number
   canWrite: boolean
   partial: boolean

@@ -25,6 +25,8 @@ import {
  * machine printed. A link that could not be read carries why, and is said
  * rather than dropped.
  */
+export type PairDevice = "app" | "phone" | "desktop"
+
 export type PairRequest =
   | { mode: "offer"; machine: { id: string; name: string } | null }
   | { mode: "invitation"; ok: boolean; code: string }
@@ -51,10 +53,13 @@ export function PairPanel(props: {
   helpers?: { id: string; name: string }[]
   onAgentStart?: (helper: string, offer: string, target: { id: string; name: string }) => Promise<PairAgentReply>
   onAgentStatus?: (helper: string, task: string) => Promise<PairAgentProgress>
-  canScan: boolean
+  /** Which device this is: the Home Screen app and a phone browser scan the machine's QR here; a computer copies a code. */
+  device: PairDevice
   onScan: (fragment: string) => void
+  /** The fingerprints differed: the machine that answered is not to be kept. */
+  onMismatch?: (machine: string) => void
 }) {
-  const { request, state, nameOf, onBegin, onStop, onAgain, onClose, onPaired, canScan, onScan } = props
+  const { request, state, nameOf, onBegin, onStop, onAgain, onClose, onPaired, device, onScan, onMismatch } = props
   const T = L.strings
   const [copied, setCopied] = useState<"" | "yes" | "no">("")
   const [codeCopied, setCodeCopied] = useState<"" | "yes" | "no">("")
@@ -152,8 +157,8 @@ export function PairPanel(props: {
   }, [state.phase, state.phase === "waiting" ? state.fragment : "", asked?.id])
   const title = offer
     ? asked
-      ? nextWord("cloudPairTitle", { machine: asked.name })
-      : nextWord("cloudPairTitleAny")
+      ? nextWord(device === "app" ? "cloudPairTitleApp" : "cloudPairTitle", { machine: asked.name })
+      : nextWord(device === "app" ? "cloudPairTitleAnyApp" : "cloudPairTitleAny")
     : nextWord("cloudPairLinkLede")
 
   return (
@@ -194,63 +199,57 @@ export function PairPanel(props: {
     switch (state.phase) {
       case "idle":
         if (offer) {
+          // A phone scans the machine's QR inside this page, so the key lands
+          // in this browser's own store; a computer has no camera to point,
+          // so it copies a code to paste on the machine.
+          const steps = device === "desktop"
+            ? ["cloudPairStepCopy", "cloudPairStepPaste", "cloudPairStepCompare"] as const
+            : ["cloudPairStepOpen", "cloudPairStepScanApp", "cloudPairStepCompare"] as const
+          const begin = () => {
+            autoHelper.current = ""
+            onBegin()
+          }
           return (
             <>
-              <p className="cloud-pair-status">{nextWord("cloudPairStatusUnpaired")}</p>
-              <p className="fine cloud-pair-container">{nextWord(canScan ? "cloudPairContainerPwa" : "cloudPairContainer")}</p>
-              <p className="fine">{nextWord("cloudPairWaysIntro")}</p>
-              <div className="cloud-pair-ways">
-                <article data-recommended={selectedHelper ? undefined : "true"}>
-                  <div className="cloud-pair-way-head">
-                    <h3>{nextWord("cloudPairFromMachineTitle")}</h3>
-                    {!selectedHelper && <span>{nextWord("cloudPairRecommended")}</span>}
-                  </div>
-                  <p>{nextWord(canScan ? "cloudPairFromMachineWhenPwa" : "cloudPairFromMachineWhen")}</p>
-                  <ol>
-                    <li>{nextWord("cloudPairFromMachineStep1")}</li>
-                    <li>{nextWord(canScan ? "cloudPairFromMachineStep2Pwa" : "cloudPairFromMachineStep2")}</li>
-                  </ol>
-                  {canScan && <PairScanner onScanned={onScan} onUseCode={onBegin} startRef={scanStart} />}
-                  <p className="cloud-pair-success">{nextWord("cloudPairFromMachineSuccess")}</p>
-                </article>
-                <article data-recommended={selectedHelper ? "true" : undefined}>
-                  <div className="cloud-pair-way-head">
-                    <h3>{selectedHelper && asked ? nextWord("cloudPairCloudHand") : nextWord("cloudPairFromBrowserTitle")}</h3>
-                  </div>
-                  {selectedHelper && asked ? (
-                    <>
-                      <p>{nextWord("cloudPairCloudHandWhen", { helper: selectedHelper.name, machine: asked.name })}</p>
-                      {(props.helpers?.length ?? 0) > 1 && <label className="cloud-pair-helper">
-                        {nextWord("cloudPairHelperChoose")}
-                        <select value={selectedHelper.id} onChange={(event) => setHelperID(event.target.value)}>
-                          {props.helpers!.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}
-                        </select>
-                      </label>}
-                    </>
-                  ) : (
-                    <>
-                      <p>{nextWord("cloudPairFromBrowserWhen")}</p>
-                      <ol>
-                        <li>{nextWord("cloudPairFromBrowserStep1")}</li>
-                        <li>{nextWord("cloudPairFromBrowserStep2")}</li>
-                      </ol>
-                      <p className="cloud-pair-success">{nextWord("cloudPairFromBrowserSuccess")}</p>
-                    </>
-                  )}
+              <p className="cloud-pair-intro">{nextWord(device === "app" ? "cloudPairIntroApp" : "cloudPairIntro")}</p>
+              <ol className="cloud-pair-steps">
+                {steps.map((step) => <li key={step}>{nextWord(step)}</li>)}
+              </ol>
+              <p className="cloud-pair-outcome">{nextWord("cloudPairOutcome")}</p>
+              {device !== "desktop" ? (
+                <PairScanner onScanned={onScan} onUseCode={begin} startRef={scanStart} />
+              ) : (
+                <button className="go cloud-pair-primary" type="button" id="cloud-pair-go" onClick={begin}>
+                  {nextWord("cloudPairGenerate")}
+                </button>
+              )}
+              {selectedHelper && asked && (
+                <div className="cloud-pair-helper-way">
+                  {(props.helpers?.length ?? 0) > 1 && <label className="cloud-pair-helper">
+                    {nextWord("cloudPairHelperChoose")}
+                    <select value={selectedHelper.id} onChange={(event) => setHelperID(event.target.value)}>
+                      {props.helpers!.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}
+                    </select>
+                  </label>}
                   <button
-                    className="chip cloud-pair-generate"
+                    className="cloud-pair-link"
                     type="button"
-                    id="cloud-pair-go"
+                    id="cloud-pair-helper-go"
                     onClick={() => {
-                      autoHelper.current = asked ? selectedHelper?.id ?? "" : ""
+                      autoHelper.current = selectedHelper.id
                       onBegin()
                     }}
                   >
-                    {asked && selectedHelper ? nextWord("cloudPairCloudHand") : nextWord("cloudPairGenerate")}
+                    {nextWord("cloudPairCloudHand")}
                   </button>
-                </article>
-              </div>
-              <p className="fine cloud-pair-protection">{nextWord("cloudPairWhy")}</p>
+                  <p className="fine">{nextWord("cloudPairCloudHandWhen", { helper: selectedHelper.name, machine: asked.name })}</p>
+                </div>
+              )}
+              <details className="cloud-pair-how">
+                <summary>{nextWord("cloudPairHowItWorks")}</summary>
+                <p className="fine">{nextWord("cloudPairWhy")}</p>
+                {device === "app" && <p className="fine">{nextWord("cloudPairContainerPwa")}</p>}
+              </details>
               <div className="buttons">
                 <button className="chip" type="button" id="cloud-pair-close" onClick={onClose}>
                   {T.webClose}
@@ -261,13 +260,13 @@ export function PairPanel(props: {
         }
         return (
           <>
-            <p className="fine">{nextWord("cloudPairLinkFine")}</p>
+            <p className="cloud-pair-intro">{nextWord("cloudPairLinkFine")}</p>
+            <button className="go cloud-pair-primary" type="button" id="cloud-pair-go" ref={first} onClick={onBegin}>
+              {nextWord("cloudPairLinkGo")}
+            </button>
             <div className="buttons">
               <button className="chip" type="button" id="cloud-pair-close" onClick={onClose}>
                 {T.webCancel}
-              </button>
-              <button className="chip" type="button" id="cloud-pair-go" ref={first} onClick={onBegin}>
-                {nextWord("cloudPairLinkGo")}
               </button>
             </div>
           </>
@@ -275,8 +274,7 @@ export function PairPanel(props: {
       case "asking":
         return (
           <>
-            {offer && <p className="fine">{nextWord("cloudPairWhy")}</p>}
-            <p className="say calm">{nextWord("cloudPairAsking")}</p>
+            <p className="cloud-pair-wait" role="status"><span className="cloud-pair-spinner" aria-hidden="true" />{nextWord("cloudPairAsking")}</p>
             <div className="buttons">
               <button className="chip" type="button" id="cloud-pair-stop" ref={first} onClick={onStop}>
                 {T.webCancel}
@@ -328,15 +326,16 @@ export function PairPanel(props: {
           <>
             {offer && (
               <>
-                <div className="cloud-pair-code-path">
-                  <p className="cloud-pair-step" id="cloud-pair-code-step">{nextWord("cloudPairCodePaste")}</p>
-                  <label className="fine" htmlFor="cloud-pair-code">{nextWord("cloudPairCodeLabel")}</label>
+                <ol className="cloud-pair-steps cloud-pair-code-path">
+                  <li data-done={codeCopied === "yes" ? "true" : undefined}>
+                  <span id="cloud-pair-code-step">{nextWord("cloudPairCopyThis")}</span>
+                  <label className="sr-only" htmlFor="cloud-pair-code">{nextWord("cloudPairCodeLabel")}</label>
                   <textarea
-                    className="cloud-pair-command"
+                    className="cloud-pair-command cloud-pair-code"
                     id="cloud-pair-code"
                     ref={codeField}
                     readOnly
-                    rows={5}
+                    rows={3}
                     spellCheck={false}
                     autoCapitalize="off"
                     autoCorrect="off"
@@ -345,16 +344,22 @@ export function PairPanel(props: {
                   />
                   <div className="cloud-pair-copy">
                     <button className="chip" type="button" id="cloud-pair-code-copy" ref={first} onClick={() => copy(state.fragment, "code")}>
-                      {nextWord("cloudPairCodeCopy")}
+                      {nextWord(codeCopied === "yes" ? "cloudPairCopyDone" : "cloudPairCodeCopy")}
                     </button>
-                    {codeCopied && (
-                      <span className="cloud-pair-copied" role="status">
-                        {codeCopied === "yes" ? nextWord("cloudPairCopied") : nextWord("cloudPairCopyFailed")}
-                      </span>
+                    {codeCopied === "no" && (
+                      <span className="cloud-pair-copied" role="status">{nextWord("cloudPairCopyFailed")}</span>
                     )}
                   </div>
+                  </li>
+                  <li>{nextWord("cloudPairStepPaste")}</li>
+                </ol>
+                <div className="cloud-pair-wait" role="status">
+                  <span className="cloud-pair-spinner" aria-hidden="true" />
+                  <div>
+                    <b id="cloud-pair-said">{nextWord("cloudPairWaiting")}</b>
+                    <p className="fine cloud-pair-expires">{nextWord("cloudPairWaitKeepOpen", { time: clock(state.expiresAt) })}</p>
+                  </div>
                 </div>
-                <p className="fine">{nextWord("cloudPairWhy")}</p>
                 <details
                   className="cloud-pair-manual"
                   id="cloud-pair-agent-advanced"
@@ -402,13 +407,15 @@ export function PairPanel(props: {
                   )}
                   {manual}
                 </details>
-                <p className="fine cloud-pair-expires">{nextWord("cloudPairExpires", { time: clock(state.expiresAt) })}</p>
               </>
             )}
+            {!offer && (
+              <p className="cloud-pair-wait" role="status">
+                <span className="cloud-pair-spinner" aria-hidden="true" />
+                <b id="cloud-pair-said">{nextWord("cloudPairLinkWaiting")}</b>
+              </p>
+            )}
             {yourKey(state.fingerprint)}
-            <p className="say calm" id="cloud-pair-said">
-              {offer ? nextWord("cloudPairWaiting") : nextWord("cloudPairLinkWaiting")}
-            </p>
             <div className="buttons">
               <button className="chip" type="button" id="cloud-pair-stop" ref={offer ? undefined : first} onClick={onStop}>
                 {T.webCancel}
@@ -421,24 +428,27 @@ export function PairPanel(props: {
         const name = asked && asked.id === state.machineID ? asked.name : nameOf(state.machineID)
         return (
           <>
-            <p className="say calm" id="cloud-pair-said" data-paired={state.machineID}>
-              {nextWord("cloudPairDone", { machine: name })}
+            <p className="cloud-pair-question" id="cloud-pair-said" data-paired={state.machineID}>
+              {nextWord("cloudPairCompareTitle")}
             </p>
+            <p className="cloud-pair-intro">{nextWord("cloudPairCompareFine", { machine: name })}</p>
             {asked && asked.id !== state.machineID && (
               <p className="say">{nextWord("cloudPairOther", { other: name, machine: asked.name })}</p>
             )}
-            <div className="cloud-pair-key">
-              <p className="fine">
-                {nextWord("cloudPairMachineKey", { machine: name, fingerprint: "" })}
-                <b id="cloud-pair-machine-key">{state.machineFingerprint}</b>
-              </p>
-              <p className="fine">{nextWord("cloudPairMachineKeyCheck")}</p>
+            <div className="cloud-pair-fingerprint">
+              <span>{nextWord("cloudPairMachineFingerprint", { machine: name })}</span>
+              <b id="cloud-pair-machine-key">{state.machineFingerprint}</b>
             </div>
             {yourKey(state.fingerprint)}
-            <div className="buttons">
-              <button className="chip" type="button" id="cloud-pair-close" ref={first} onClick={onPaired}>
-                {T.webClose}
+            <div className="cloud-pair-answer">
+              <button className="go cloud-pair-primary" type="button" id="cloud-pair-close" ref={first} onClick={onPaired}>
+                {nextWord("cloudPairSame")}
               </button>
+              {onMismatch && (
+                <button className="chip cloud-pair-mismatch" type="button" id="cloud-pair-mismatch" onClick={() => onMismatch(state.machineID)}>
+                  {nextWord("cloudPairDifferent")}
+                </button>
+              )}
             </div>
           </>
         )
@@ -465,18 +475,19 @@ export function PairPanel(props: {
         const again = offer && state.phase !== "refused"
         return (
           <>
-            <p className={state.phase === "stopped" ? "say calm" : "say"} id="cloud-pair-said">
-              {said}
-            </p>
+            <div className="cloud-pair-result" data-tone={state.phase === "stopped" ? "calm" : "warn"}>
+              <b>{nextWord(resultTitle[state.phase])}</b>
+              <p id="cloud-pair-said">{said}</p>
+            </div>
+            {again && (
+              <button className="go cloud-pair-primary" type="button" id="cloud-pair-again" ref={first} onClick={onAgain}>
+                {nextWord("cloudPairAgain")}
+              </button>
+            )}
             <div className="buttons">
               <button className="chip" type="button" id="cloud-pair-close" ref={again ? undefined : first} onClick={onClose}>
                 {T.webClose}
               </button>
-              {again && (
-                <button className="chip" type="button" id="cloud-pair-again" ref={first} onClick={onAgain}>
-                  {nextWord("cloudPairAgain")}
-                </button>
-              )}
             </div>
           </>
         )
@@ -519,13 +530,11 @@ export function PairPanel(props: {
   function yourKey(fingerprint: string) {
     if (!fingerprint) return null
     return (
-      <div className="cloud-pair-key">
-        <p className="fine">
-          {nextWord("cloudPairYourKey", { fingerprint: "" })}
-          <b id="cloud-pair-browser-key">{fingerprint}</b>
-        </p>
-        <p className="fine">{nextWord("cloudPairYourKeyCheck")}</p>
-      </div>
+      <p className="fine cloud-pair-yourkey">
+        {nextWord("cloudPairYourKey", { fingerprint: "" })}
+        <b id="cloud-pair-browser-key">{fingerprint}</b>
+        <span>{nextWord("cloudPairYourKeyCheck")}</span>
+      </p>
     )
   }
 
@@ -554,6 +563,13 @@ export function PairPanel(props: {
     }
   }
 }
+
+const resultTitle = {
+  stopped: "cloudPairStoppedTitle",
+  expired: "cloudPairExpiredTitle",
+  refused: "cloudPairRefusedTitle",
+  failed: "cloudPairFailedTitle",
+} as const
 
 /** A time of day as this page's language writes one: when the code stops working. */
 function clock(ms: number): string {

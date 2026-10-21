@@ -1,4 +1,5 @@
 {
+  "http.84cc28107e831259": "這台機器必須允許 Cloud 操作並開啟直連，才能啟用同網路直連。",
   "http.002261325d82f433": "這項任務沒有可供提案的根 Session；其工作沒有任何人的工作線可接續。",
   "http.0035887da2a2da5a": "新的 Clawdfather 綁定必須來自機器工作區，而非 Project Session。",
   "http.009d6e05d9395474": "配對交接須指出機器，並附上提議內容。",
@@ -231,7 +232,6 @@
   "http.306e1ff5baba8f00": "persona 必須是以下其中之一：architect、backend、frontend、minimal-change、code-reviewer、reality-checker、security、technical-writer、seo、content-writer、ai-search、social-media、instagram、email、growth、pr、product-manager、sprint-prioritizer、feedback-synthesizer、trend-researcher、ux-researcher、test-automation、accessibility、performance、api-tester、evidence-collector、sre、devops、incident-commander、finops、secrets、ui-designer、ux-architect、brand-guardian、ui-finish-gate、image-prompt、pricing、customer-success、support、analytics、devrel、privacy、zero-review-lead",
   "http.30c507fd89347154": "Session 不會等待自己。",
   "http.314803a5b2bfc3b0": "圖片須以 GET 讀取。",
-  "http.3173e3f0ec56a918": "tunnel 須以 GET 讀取，並在設定中開啟或關閉。",
   "http.3204a7d685b1b418": "參考圖片須以 POST 新增。",
   "http.320c2f5b0da7bc3d": "必須提供 claims：列出這項任務可寫入、位於 project_dir 下的相對路徑。知道檔名時請列出檔案；不知道時請列出目錄；若任務不寫入任何內容，請傳送 \"claims\": []。隔離任務也要宣告相同清單：其租用會在私人檢出目錄中解除，但路徑仍保留為落地時的寫入範圍。不要列入儲存庫防護機制替你改寫的內容，例如逐步收緊的行數；那屬於負責落地變更的人員，不屬於這項任務的租用範圍。",
   "http.321ad5182d86b760": "沒有該名稱的 Session。",
@@ -672,6 +672,7 @@
   "http.8a43c9d840a07a92": "此裝置可以讀取 Project 檔案，但不能儲存。",
   "http.8a48fe15708ef652": "此裝置可以讀取小隊，但不能修改。",
   "http.8a4a0e27facea83a": "完成狀態修正原因最多 8 KiB。",
+  "http.8a4c2e73a979cdb4": "此專案不在這台機器的使用概況中。",
   "http.8a8f25da63ffecec": "這台機器已在處理兩項此類作業。請稍後重試。",
   "http.8aab82a1548e80c5": "此 Idempotency-Key 的有效期間已過。請求先前已回答一次，不會再次執行。",
   "http.8b16dab54c664721": "task_id 必須是一個小寫 UUID。",
@@ -754,6 +755,7 @@
   "http.9a8e16f2158697c9": "pid 必須是正數。",
   "http.9aa9fbc599eaf924": "提案須以 GET 讀取，並以 POST 回答。",
   "http.9b364f75d3c70a26": "決策屬於提供問題脈絡的 Board 項目；必須提供 work_id。",
+  "http.9bcb3b53981a1ac2": "使用概況的天數必須為 7 或 28。",
   "http.9bcf10c099d3535f": "啟動回呼需要協調器權杖。",
   "http.9c15ed81764c0fb4": "本機機密交付接收端無效。",
   "http.9c33c5bd0c7f833e": "這項任務已結束；其執行內容應寫入摘要。",
@@ -1188,6 +1190,7 @@
   "http.f7269a68e1533f94": "沒有該位址的報告。",
   "http.f752b317bf7ae8de": "驗證碼錯誤次數過多。配對目前已關閉。",
   "http.f75713e89f9307e5": "必須提供有大小上限的 JSON 指令和 Idempotency-Key。",
+  "http.f7d20a8803f71e7d": "使用概況僅接受各一個 days 與 project 值。",
   "http.f81797aebf2597fd": "Session 訊息必須傳給另一個 Session。",
   "http.f88af21de47d7308": "傳送 trigger_only 時應省略 at、days 和 on，不可與它們並列。",
   "http.f9490ff250624ea0": "沒有該 conversation id 的有效助理 Session。",
@@ -1223,5 +1226,11 @@
   "http.ff821b6116dd9e4a": "項目的階段不可直接編輯；必須透過該項目本身的動作轉換。",
   "http.ff9859775a615fc4": "這次關閉須記錄為何沒有任何交付指定此項目——請說明完成了什麼，以及在哪裡落地。否則這個狀態變更日後無從查證。",
   "http.ffd795cf51e7ebea": "place 必須是 board 或 backlog。",
-  "http.ffed8239d8e297e0": "請提供預期版本及文字內容。"
+  "http.ffed8239d8e297e0": "請提供預期版本及文字內容。",
+  "http.8ff321b2a3251e41": "請填寫撤回原因，長度須在便條文字上限內。",
+  "http.f0ef2e01b9a9a988": "這張便條已結束，將保留原本的處理結果。",
+  "http.c31ce37483923347": "SVG 圖示需要 RGB 主色，且像素格必須為空。",
+  "http.1df66f20c4f7b5fc": "SVG 圖示須在大小限制內、具有正尺寸的 viewBox，且僅使用靜態圖形與內部參照。",
+  "http.e34fa62ec75e26d8": "專案圖示內容無效。",
+  "http.2f4c75feb4744884": "第一次送出可能已經到達這個 Session。請先查看終端畫面，再決定是否傳送其他指令。"
 }

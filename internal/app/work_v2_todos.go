@@ -126,6 +126,11 @@ func (w *WorkSystemV2) EditDirectTodo(ctx context.Context, id, session, actor, t
 		if prev.SessionID != session {
 			return work.RefuseV2("todo_session_mismatch", "That to-do belongs to another Session.")
 		}
+		if exists, submitted, err := tx.FirstTodoSend(id); err != nil {
+			return err
+		} else if exists && !submitted {
+			return workV2Error(http.StatusConflict, "todo_delivery_unknown", "The first delivery may already have reached this Session. Check its screen before sending another instruction.")
+		}
 		if prev.Version != expectedVersion {
 			return store.ErrConflict
 		}
@@ -437,4 +442,83 @@ func refuseSecondWorkflow(tx *store.WorkV2Tx, session, text string) error {
 		}
 	}
 	return nil
+}
+
+// BindPendingTodos preserves the to-do id, receipt, images and delivery state
+// while the provider's first real conversation identity becomes available.
+func (w *WorkSystemV2) BindPendingTodos(ctx context.Context, owner, conversation string) error {
+	if !strings.HasPrefix(owner, "pending:") || conversation == "" {
+		return nil
+	}
+	return mapWorkV2Error(w.Store.WriteWorkV2(ctx, func(tx *store.WorkV2Tx) error {
+		texts, err := tx.OpenDirectTodoTexts(owner)
+		if err != nil {
+			return err
+		}
+		for _, text := range texts {
+			if err := refuseSecondWorkflow(tx, conversation, text); err != nil {
+				return err
+			}
+		}
+		return tx.BindDirectTodos(owner, conversation)
+	}))
+}
+
+// PrepareFirstTodoSend reserves only an unrecorded Session's first delivery.
+// An interrupted/ambiguous attempt remains durable and must never be retried
+// automatically, even after the Session acquires its conversation id.
+func (w *WorkSystemV2) PrepareFirstTodoSend(ctx context.Context, id, conversation string, expectedVersion int64) (first bool, err error) {
+	err = w.Store.WriteWorkV2(ctx, func(tx *store.WorkV2Tx) error {
+		td, err := tx.DirectTodo(id)
+		if err != nil {
+			return err
+		}
+		if td.Version != expectedVersion {
+			return store.ErrConflict
+		}
+		if err := CheckDirectTodoSend(td, conversation, w.now()); err != nil {
+			return err
+		}
+		exists, submitted, err := tx.FirstTodoSend(id)
+		if err != nil {
+			return err
+		}
+		if exists && !submitted {
+			return workV2Error(http.StatusConflict, "todo_delivery_unknown", "The first delivery may already have reached this Session. Check its screen before sending another instruction.")
+		}
+		if !strings.HasPrefix(conversation, "pending:") {
+			return nil
+		}
+		if exists {
+			return workV2Error(http.StatusConflict, "todo_awaiting_read", "This delivery was sent moments ago and the Session has not read it yet.")
+		}
+		first = true
+		return tx.ReserveFirstTodoSend(id)
+	})
+	return first, mapWorkV2Error(err)
+}
+
+// FinishFirstTodoSend clears a reservation only on proof that no bytes were
+// typed. A confirmed submission preserves an agent queue read racing the send.
+func (w *WorkSystemV2) FinishFirstTodoSend(ctx context.Context, id string, at time.Time, unsent bool) (out work.DirectTodoV2, err error) {
+	err = w.Store.WriteWorkV2(ctx, func(tx *store.WorkV2Tx) error {
+		td, err := tx.DirectTodo(id)
+		if err != nil {
+			return err
+		}
+		if err := tx.FinishFirstTodoSend(id, unsent); err != nil {
+			return err
+		}
+		out = td
+		if unsent {
+			return nil
+		}
+		out.SentAt = time.Unix(at.Unix(), 0)
+		if err := tx.PutDirectTodo(td, out); err != nil {
+			return err
+		}
+		out.Version++
+		return nil
+	})
+	return out, mapWorkV2Error(err)
 }

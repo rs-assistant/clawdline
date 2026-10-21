@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "squad.schema.json",
   "title": "AI squad catalog and settings",
-  "description": "Private GET /v1/squad/catalog, /v1/squad/settings, /v1/squad/scopes and versioned writes. GET /v1/personas remains the compatible summary.",
+  "description": "Private versioned Squad API. Local Agents may use the machine orchestrator credential for catalog GET/POST, definitions GET, settings GET/PUT and scopes GET; paired devices retain their existing permissions. See clawdline guide squad for runnable JSON examples, expected_version, Idempotency-Key, multicolor icons and recovery. AI drafts and Session telemetry are separate permissions. GET /v1/personas remains the compatible summary.",
   "$defs": {
     "SquadCandidates": {
       "type": "object",
@@ -407,6 +407,8 @@
         "scope_kind",
         "motion",
         "motion_settings_version",
+        "auto_dispatch",
+        "auto_dispatch_version",
         "personas"
       ],
       "properties": {
@@ -430,6 +432,8 @@
         "motion_settings_version": {
           "type": "integer"
         },
+        "auto_dispatch": { "$ref": "#/$defs/SquadFieldBool" },
+        "auto_dispatch_version": { "type": "integer" },
         "personas": {
           "type": "array",
           "items": {
@@ -528,8 +532,7 @@
     "SquadMotionRequest": {
       "type": "object",
       "required": [
-        "expected_version",
-        "motion"
+        "expected_version"
       ],
       "properties": {
         "place_id": {
@@ -541,7 +544,8 @@
         "expected_version": {
           "type": "integer"
         },
-        "motion": { "$ref": "#/$defs/SquadInputBool" }
+        "motion": { "$ref": "#/$defs/SquadInputBool" },
+        "auto_dispatch": { "$ref": "#/$defs/SquadInputBool" }
       }
     },
     "SquadWriteReply": {

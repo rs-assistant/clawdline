@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../LoadingSkeleton.js"
 import { catalogFormat } from "../../catalog.js"
 import { catalogWord } from "../../catalog.js"
 import { useEffect, useRef, useState } from "react"
@@ -38,7 +39,7 @@ function DirectoryRows({ listing, listings, loading, errors, selected, open, cho
       {entry.kind === "directory" ? <details className="project-explorer-folder" onToggle={event => { if (event.currentTarget.open) open(entry.path) }}>
         <summary><span aria-hidden="true" className="project-explorer-caret">▸</span><ProjectTreeIcon kind="folder" /><span>{entry.name}</span></summary>
         <div className="project-explorer-children">
-          {loading.has(entry.path) && <p role="status">{catalogWord("inline", "a58b39df6cd2")}</p>}
+          {loading.has(entry.path) && !listings[entry.path] && <LoadingSkeleton id="SK-15" label={catalogWord("inline", "a58b39df6cd2")} />}
           {errors[entry.path] && <p role="alert">{errors[entry.path]} <button type="button" onClick={() => retry(entry.path)}>{catalogWord("inline", "7e59d0f16293")}</button></p>}
           {listings[entry.path] && <DirectoryRows listing={listings[entry.path]} listings={listings} loading={loading} errors={errors} selected={selected} open={open} choose={choose} retry={retry} />}
         </div>
@@ -113,7 +114,7 @@ export function ProjectExplorer({ place }: { place: ProjectPlace }) {
     <div className="project-explorer-layout">
       <nav ref={nav} className="project-explorer-nav" aria-label={catalogFormat("template", "b744f91deceb", [place.label])}>
         <strong className="project-explorer-root">{place.label}</strong>
-        {loading.has("") && <p role="status">{catalogWord("inline", "3b92a032b6cc")}</p>}
+        {loading.has("") && (root ? <p role="status">{catalogWord("inline", "3b92a032b6cc")}</p> : <LoadingSkeleton id="SK-15" label={catalogWord("inline", "3b92a032b6cc")} />)}
         {errors[""] && <p role="alert">{errors[""]} <button type="button" onClick={() => void load("")}>{catalogWord("inline", "7e59d0f16293")}</button></p>}
         {root && <DirectoryRows listing={root} listings={listings} loading={loading} errors={errors} selected={selected}
           open={directory => { if (!listings[directory]) void load(directory) }} choose={entry => void choose(entry)} retry={directory => void load(directory)} />}
@@ -125,7 +126,7 @@ export function ProjectExplorer({ place }: { place: ProjectPlace }) {
             <div><h4 ref={heading} tabIndex={-1}>{selected.split("/").at(-1)}</h4><code>{selected}</code></div>
             <button type="button" onClick={() => { const row = nav.current?.querySelector<HTMLButtonElement>('button[aria-current="true"]'); row?.scrollIntoView({ block: "nearest" }); row?.focus({ preventScroll: true }) }}>{catalogWord("inline", "fdfd628f99b8")}</button>
           </div>
-          {fileLoading && <p role="status">{catalogWord("inline", "2b3d59f666b3")}</p>}
+          {fileLoading && <LoadingSkeleton id="SK-15" kind="text" label={catalogWord("inline", "2b3d59f666b3")} />}
           {fileError && <p role="alert">{fileError} <button type="button" onClick={() => void choose({ name: selected.split("/").at(-1) ?? selected, path: selected, kind: "file" })}>{catalogWord("inline", "7e59d0f16293")}</button></p>}
           {content && <pre className="project-explorer-text" tabIndex={0}>{content.text}</pre>}
         </>}

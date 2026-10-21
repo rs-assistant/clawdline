@@ -18,6 +18,7 @@ var generatedDecoders = map[string]genDecoder{
 	"default-models-update":              genDecodeDefaultModelsUpdate,
 	"diagnostics.events":                 genDecodeDiagnosticsEvents,
 	"diagnostics.report":                 genDecodeDiagnosticsReport,
+	"direct-local-network-enable":        genDecodeDirectLocalNetworkEnable,
 	"dismiss-restorable":                 genDecodeDismissRestorable,
 	"documents":                          genDecodeDocuments,
 	"end":                                genDecodeEnd,
@@ -114,6 +115,7 @@ var generatedDecoders = map[string]genDecoder{
 	"usage.compare-compaction":           genDecodeUsageCompareCompaction,
 	"usage.compare-handoff":              genDecodeUsageCompareHandoff,
 	"usage.item":                         genDecodeUsageItem,
+	"usage.overview":                     genDecodeUsageOverview,
 	"usage.session":                      genDecodeUsageSession,
 	"usage.task":                         genDecodeUsageTask,
 	"usage.work-samples":                 genDecodeUsageWorkSamples,
@@ -482,6 +484,26 @@ func genDecodeDiagnosticsReport(b body) (plan, LocalRequest, bool) {
 		return plan{}, LocalRequest{}, false
 	}
 	return p, LocalRequest{}, true
+}
+
+// genDecodeDirectLocalNetworkEnable is the `direct-local-network-enable` row's decode.
+//
+// Deliberately this machine (`local_exemption`): its route refuses every
+// caller but this machine's own token, which the in-process request carries.
+func genDecodeDirectLocalNetworkEnable(b body) (plan, LocalRequest, bool) {
+	if !b.hasOneOf(
+		[]string{"type", "request", "session"},
+	) {
+		return plan{}, LocalRequest{}, false
+	}
+	p, ok := actionPlan(b, false)
+	if !ok {
+		return plan{}, LocalRequest{}, false
+	}
+	path := "/v1/cloud/direct/local-network"
+	req := LocalRequest{Method: "POST", Path: path}
+	req.Body = b.genFields(map[string]genValue{"enabled": genValue{constant: true}})
+	return p, req, true
 }
 
 // genDecodeDismissRestorable is the `dismiss-restorable` row's decode.
@@ -874,6 +896,9 @@ func genDecodeNotificationSettingsUpdate(b body) (plan, LocalRequest, bool) {
 }
 
 // genDecodePairAgentStart is the `pair-agent-start` row's decode.
+//
+// Deliberately this machine (`local_exemption`): its route refuses every
+// caller but this machine's own token, which the in-process request carries.
 func genDecodePairAgentStart(b body) (plan, LocalRequest, bool) {
 	if !b.hasOneOf(
 		[]string{"type", "machine_id", "machine_name", "offer", "request", "session"},
@@ -904,6 +929,9 @@ func genDecodePairAgentStart(b body) (plan, LocalRequest, bool) {
 }
 
 // genDecodePairAgentStatus is the `pair-agent-status` row's decode.
+//
+// Deliberately this machine (`local_exemption`): its route refuses every
+// caller but this machine's own token, which the in-process request carries.
 func genDecodePairAgentStatus(b body) (plan, LocalRequest, bool) {
 	if !b.hasOneOf(
 		[]string{"type", "request", "session", "task_id"},
@@ -925,11 +953,15 @@ func genDecodePairAgentStatus(b body) (plan, LocalRequest, bool) {
 // genDecodePastSessions is the `past-sessions` row's decode.
 func genDecodePastSessions(b body) (plan, LocalRequest, bool) {
 	if !b.hasOneOf(
+		[]string{"type", "assistant", "cursor", "place", "request", "session"},
 		[]string{"type", "assistant", "place", "request", "session"},
 	) {
 		return plan{}, LocalRequest{}, false
 	}
 	if !b.genValid("assistant", genRule{kind: "string"}) {
+		return plan{}, LocalRequest{}, false
+	}
+	if !b.genValid("cursor", genRule{kind: "string"}) {
 		return plan{}, LocalRequest{}, false
 	}
 	if !b.genValid("place", genRule{kind: "string", nonEmpty: true}) {
@@ -944,6 +976,7 @@ func genDecodePastSessions(b body) (plan, LocalRequest, bool) {
 		path += "/" + segment(t)
 	}
 	req := LocalRequest{Method: "GET", Path: path}
+	req.Query = b.genQuery(map[string]genValue{"cursor": genValue{from: "cursor", omitEmpty: true}})
 	return p, req, true
 }
 
@@ -2543,6 +2576,32 @@ func genDecodeUsageItem(b body) (plan, LocalRequest, bool) {
 	}
 	path := "/v1/usage/items/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
+	return p, req, true
+}
+
+// genDecodeUsageOverview is the `usage.overview` row's decode.
+func genDecodeUsageOverview(b body) (plan, LocalRequest, bool) {
+	if !b.hasOneOf(
+		[]string{"type", "request", "session"},
+		[]string{"type", "days", "request", "session"},
+		[]string{"type", "project", "request", "session"},
+		[]string{"type", "days", "project", "request", "session"},
+	) {
+		return plan{}, LocalRequest{}, false
+	}
+	if !b.genValid("days", genRule{kind: "string"}) {
+		return plan{}, LocalRequest{}, false
+	}
+	if !b.genValid("project", genRule{kind: "string"}) {
+		return plan{}, LocalRequest{}, false
+	}
+	p, ok := machinePlan(b)
+	if !ok {
+		return plan{}, LocalRequest{}, false
+	}
+	path := "/v1/usage/overview"
+	req := LocalRequest{Method: "GET", Path: path}
+	req.Query = b.genQuery(map[string]genValue{"days": genValue{from: "days"}, "project": genValue{from: "project"}})
 	return p, req, true
 }
 

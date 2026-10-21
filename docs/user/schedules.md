@@ -7,7 +7,7 @@ result. You can tell it worked from the schedule's history.
 
 ## Availability
 
-Labels below use Traditional Chinese examples with their English meaning; the console supports other interface languages.
+Labels below follow the English interface; the console also supports other languages.
 
 | | Free (no account) | Clawdline Cloud Pro |
 | --- | --- | --- |
@@ -20,32 +20,32 @@ running when a schedule is due; see [platforms.md](platforms.md) for keeping it 
 
 ## Create a schedule
 
-1. Open the session list. Schedules are the **排程** (Schedules) fold at the bottom of it.
-2. Press **+** (**新增排程**, new schedule) in its heading.
+1. Open the session list. Schedules are the **Schedules** fold at the bottom of it.
+2. Press **+** (**New schedule**) in its heading.
 3. Fill in the form:
-   - **標題** (title)
-   - **不設時間——只由 webhook 或手動執行** (no time — runs only by webhook or by hand) — tick it
+   - **Title**
+   - **No time — runs only by webhook or by hand** — tick it
      for a task the clock never starts; the two fields below disappear.
-   - **時間** (at) — the time of day.
-   - **星期** (on) — **每天** (daily), or the days of the week.
-   - **機器** (machine) — shown only when your Cloud account has more than one machine.
-   - **專案** (where) — the project the session opens in.
-   - **助理** (with) — Claude Code or Codex.
-   - **第一則訊息** (first message) — the instructions the session starts with.
-4. Open **更多** (more) for the rest, all optional:
-   - **結束之後關掉分頁** (close the tab when it finishes) — **成功時** (if it worked, the default),
-     **一律** (always), or **不要關** (leave it open).
-   - **啟用** (enabled) and **失敗時通知我** (tell me if it fails) — both on by default.
-   - **錯過了，幾小時內還要補跑** (catch-up window, hours) — default 6, from 0 to 168.
-   - **跑多久沒完就放棄（分鐘）** (timeout, minutes) — default 30, from 1 to 240.
-   - **模型** (model)
-   - **權限** (permission) — **這台機器的預設** (this machine's default), **每一步都問我** (ask at
-     every step), **可以直接改檔案** (may edit files directly), or **完全權限（不再詢問）** (full
-     permission, never asks). Only a person can set this field; an agent that tries is refused.
-5. Press **建立** (create). Nothing is scheduled until you do.
+   - **At** — the time of day.
+   - **On** — **Daily**, the days of the week, or **Every N days**. For an interval, enter
+     **Every (days)** and **Starting on**. For example, every 3 days starting October 21 at
+     09:00 runs on October 21, 24, 27, 30, then November 2 in the schedule’s time zone.
+     **Run now** does not change those dates.
+   - **Machine** — shown only when your Cloud account has more than one machine.
+   - **Where** — the project the session opens in.
+   - **With** — Claude Code or Codex.
+   - **First message** — the instructions the session starts with.
+4. Open **More** for the rest, all optional:
+   - **Close the tab when it finishes** — **If it worked** (the default),
+     **Always**, or **Leave it open**.
+   - **Enabled** and **Tell me if it fails** — both on by default.
+   - **If it was missed, catch up within (hours)** — default 6, from 0 to 168.
+   - **Give up if it is not done in (minutes)** — default 30, from 1 to 240.
+   - **Model**
+   - **Permission** — **This machine's default**, **Ask me at every step**, **May edit files directly**, or **Full permission (never asks)**. Only a person can set this field; an agent that tries is refused.
+5. Press **Create**. Nothing is scheduled until you do.
 
-**Check:** the schedule is a row in the list. Click it to open its history, and press **立即執行**
-(run now) to try it at once. A new session opens and starts working on the first message.
+**Check:** the schedule is a row in the list. Click it to open its history, and press **Run now** to try it at once. A new session opens and starts working on the first message.
 If this schedule already has work running, Clawdline first protects it from an accidental duplicate.
 You can confirm **force run** to start another one while the earlier task keeps running. Project-claim,
 session-capacity, disabled-dispatch, and one-time-schedule checks still apply to the new run.
@@ -58,17 +58,16 @@ session-capacity, disabled-dispatch, and one-time-schedule checks still apply to
   Outside the window the occurrence is recorded as missed, and you get a notification if **Tell me
   if it fails** is on ([notifications.md](notifications.md)).
 - Each run is recorded in the schedule's history, with the session it ran in.
-- A schedule with no time is never due. Its row reads **只由 webhook 或手動執行** (runs only by
-  webhook or by hand) instead of a next time; it runs when you press **立即執行** (run now) or its
-  webhook is called, and only while it is **啟用** (enabled).
+- A schedule with no time is never due. Its row reads **Runs only by webhook or by hand** instead of a next time; it runs when you press **Run now** or its
+  webhook is called, and only while it is **Enabled**.
 
 ## Change, pause or delete
 
-Click the row, then **編輯排程** (edit schedule).
+Click the row, then **Edit schedule**.
 
-- To pause, turn **啟用** (enabled) off and press **儲存** (save). The row reads **停用** (disabled).
-- To delete, press **刪除** (delete). There is no undo.
-- With more than one machine on the account, changing **機器** moves the schedule to that one.
+- To pause, turn **Enabled** off and press **Save**. The row reads **Disabled**.
+- To delete, press **Delete**. There is no undo.
+- With more than one machine on the account, changing **Machine** moves the schedule to that one.
 
 ## Let a session create a schedule
 
@@ -84,8 +83,7 @@ event can open a full agent session on your machine instead of running a fixed s
 
 1. In the hosted console at app.clawdline.com, open the machine's session list and click the
    schedule's row.
-2. Under **雲端 Webhook** (Cloud webhook), press **產生 Webhook** (generate), then **複製網址** (copy
-   URL). The URL is shown once;
+2. Under **Cloud webhook**, press **Generate webhook**, then **Copy URL**. The URL is shown once;
    Clawdline does not show it again.
 3. Call it with an HTTP `POST`:
 
@@ -108,8 +106,8 @@ event can open a full agent session on your machine instead of running a fixed s
   expired. The result is also in the schedule's history.
 - To start it and wait for the answer from a script or another machine, use
   `clawdline webhook fire` (below).
-- **輪替網址** (rotate URL) replaces the address; **停用 Webhook** (disable) turns it off.
-- Moving the schedule to another machine (changing **機器**) moves its webhook too, and the URL stays
+- **Rotate URL** replaces the address; **Disable webhook** turns it off.
+- Moving the schedule to another machine (changing **Machine**) moves its webhook too, and the URL stays
   the same, so whatever calls it needs no change. A disabled webhook is not moved; generate a new one
   on the other machine if you need one.
 
@@ -133,7 +131,7 @@ returns at once. [schedules.md](../schedules.md) lists every final line.
 ## Troubleshooting
 
 - **Nothing ran.** The daemon must be running at the time, or come back within the catch-up
-  window. Check that the schedule is **啟用** (enabled).
+  window. Check that the schedule is **Enabled**.
 - **The generate button is unavailable.** Webhooks need the Pro plan.
 - The public guide for webhooks is at https://clawdline.com/docs/schedule-webhooks.
 

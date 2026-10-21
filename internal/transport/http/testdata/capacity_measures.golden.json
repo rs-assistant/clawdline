@@ -21,6 +21,21 @@
     "Note": true
   },
   {
+    "Name": "artifacts.report_image_pixels",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "artifacts.report_image_side",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "artifacts.report_total_image_pixels",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "audit.security",
     "Known": true
   },
@@ -134,12 +149,287 @@
     "Note": true
   },
   {
+    "Name": "cloud.content_key_epoch_record_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.header_read_diagnostic_rows",
     "Known": true,
     "Note": true
   },
   {
     "Name": "cloud.header_read_diagnostic_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_active_slots",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_capture_budget_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_capture_export_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_capture_frames",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_capture_raw_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_captures_per_minute",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_journal_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_journal_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_owner_incidents",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_pending_transitions",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_query_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_query_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_record_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_reserved_slots",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_attempt_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_ciphertext_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_life_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_queued_jobs",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_request_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_response_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_revisions",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_snapshot_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_snapshot_coverage",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_snapshot_field_chars",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_snapshot_frames",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_snapshot_sources",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_store_attachments",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_store_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_dir_entries",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_frame_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_lost_ranges",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_queue_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_queue_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_readers",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_segment_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_segments",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_attempt_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_batch_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_batch_events",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_hourly_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_hourly_requests",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_receipts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_response_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_retry_after_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_retry_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_state_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_step_pages",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.identity_pairing_decision_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.identity_pairing_poll_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.identity_pairing_run_seconds",
     "Known": true,
     "Note": true
   },
@@ -445,7 +735,122 @@
     "Note": true
   },
   {
+    "Name": "console.direct_history_hours",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.direct_history_machines",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.execution_recovery_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.health_live_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_budget_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_event_pages",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_export_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_id_characters",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_incident_export_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_incident_pages",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_incident_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_incident_window_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_page_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_parallel_reads",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_probe_claims",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_probe_hosts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_probe_targets",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_reads_per_load",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_refresh_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_request_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_trend_lanes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_trend_signals",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.machine_list_poll_seconds",
     "Known": true,
     "Note": true
   },
@@ -456,6 +861,16 @@
   },
   {
     "Name": "console.opened_row_restate_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.owner_retention_poll_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.owner_retention_request_seconds",
     "Known": true,
     "Note": true
   },
@@ -526,6 +941,71 @@
   },
   {
     "Name": "console.transcript_safety_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_backoff_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_batch_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_buffer_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_coalesce_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_count_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_elapsed_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_hourly_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_hourly_requests",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_request_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_retry_after_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_send_every_seconds",
     "Known": true,
     "Note": true
   },
@@ -1037,6 +1517,11 @@
     "Note": true
   },
   {
+    "Name": "session.codex_past_page",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "session.direct_todo_bytes",
     "Known": true,
     "Note": true
@@ -1436,6 +1921,20 @@
   },
   {
     "Name": "update.refresh_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "usage.daily_days",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "usage.daily_rows",
+    "Known": true
+  },
+  {
+    "Name": "usage.overview_tasks",
     "Known": true,
     "Note": true
   },

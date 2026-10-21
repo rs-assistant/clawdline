@@ -31,6 +31,7 @@ import { canOpenMachinePairing, openMachinePairing } from "../legacy/devices-bri
 import { watchMachinePaired } from "../cloud/pairing-completion.js"
 import { writeIsOff } from "./outcome.js"
 import { deliverUntilSeen, pendingSends } from "./send.js"
+import { MENU_FOLLOW } from "./menu-follow.js"
 import { Waiting } from "./Waiting.js"
 import { ImageMarkup } from "./ImageMarkup.js"
 import { ComposerBox } from "./ComposerBox.js"
@@ -80,6 +81,8 @@ import "./voice-source.css"
  * `useKeyboardBar` below is still a local rendering of `input/edges.js`, which
  * is not among the copied modules.
  */
+export type ComposerDraftHandoff = { current: { text: string; images: string[] } | null }
+
 export function Composer({
   row,
   onDid,
@@ -88,7 +91,9 @@ export function Composer({
   restoredDraft,
   suggestedDraft,
   remote,
+  draftHandoff,
 }: {
+  draftHandoff?: ComposerDraftHandoff
   row: SessionRow | null
   onDid: () => void
   /** After a delivered send; nothing when left out (`Detail`'s `onSent`). */
@@ -136,6 +141,10 @@ export function Composer({
     matches: [],
     selected: 0,
   })
+  // Retain only the last displayed rows for the exit picture. Selection logic
+  // still uses `skills`, which is cleared immediately when the picker closes.
+  const skillPicture = useRef(skills)
+  if (skills.shown) skillPicture.current = skills
   const skillMenu = useRef<HTMLDivElement>(null)
   // The session a catalog that arrives late is compared against.
   const rowRef = useRef(row)
@@ -165,8 +174,27 @@ export function Composer({
     Shots.clear()
     setEditingShot(null)
     // The menu was about the session that was open; `session/open.js` closes it.
+    skillPicture.current = { shown: false, matches: [], selected: 0 }
     setSkills({ shown: false, matches: [], selected: 0 })
   }, [openId])
+
+  // The detail is remounted for a new execution to discard old questions
+  // and confirmations. Only its unsent editor contents cross that boundary.
+  useLayoutEffect(() => {
+    if (!draftHandoff) return
+    const editor = msg.current
+    return () => {
+      draftHandoff.current = { text: editor?.innerText ?? "", images: Shots.urls().slice() }
+    }
+  }, [draftHandoff])
+  useEffect(() => {
+    const draft = draftHandoff?.current
+    if (!draft || !msg.current) return
+    msg.current.textContent = draft.text
+    setText(draft.text)
+    Shots.restore(draft.images)
+    draftHandoff.current = null
+  }, [draftHandoff])
 
   useEffect(() => {
     const draft = remote?.restoreDraft
@@ -497,7 +525,11 @@ export function Composer({
       // enough on its own to free the box when the first never arrives.
       const code = await deliverUntilSeen(pendingSends.add(row.id, said, pictures, Date.now()))
       if (writeIsOff(code)) setBlocked({ machine, code })
-      if (!code) onSent?.()
+      if (!code) {
+        if (said.trim() === "/model" && !pictures.length && row.assistant === "codex")
+          document.dispatchEvent(new CustomEvent(MENU_FOLLOW, { detail: row.id }))
+        onSent?.()
+      }
     } catch (err) {
       const code = err instanceof RefusalError ? err.code : "unexpected_error"
       if (writeIsOff(code)) setBlocked({ machine, code })
@@ -558,19 +590,20 @@ export function Composer({
       <div
         ref={skillMenu}
         className="skill-menu"
+        data-motion-id="AN-009"
         id="skill-menu"
         role="listbox"
         aria-label={`${(remote?.assistant ?? row?.assistant) === "codex" ? "Codex" : "Claude Code"} skills`}
         hidden={!skills.shown}
+        inert={!skills.shown}
       >
-        {skills.shown &&
-          skills.matches.map((skill, i) => (
+        {skillPicture.current.matches.map((skill, i) => (
             <button
               key={skill.name}
               type="button"
               className="skill-option"
               role="option"
-              aria-selected={i === skills.selected ? "true" : "false"}
+              aria-selected={i === skillPicture.current.selected ? "true" : "false"}
               // Keep the soft keyboard open: the click still arrives, only the focus stays.
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => acceptSkill(i)}

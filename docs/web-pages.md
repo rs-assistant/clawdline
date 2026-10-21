@@ -170,12 +170,11 @@ in the hidden SPA page.
 For a user reading through Clawdline Cloud, hand off the canonical
 `https://app.clawdline.com/` document link with the actual Cloud machine and Session identity.
 Use the document share helper and its strict locator contract above. Do not derive a delivery
-URL from `cloudflared.yml`, `remote_hostname`, a local preview address, or a remembered named
-tunnel. In particular, a successful local document read proves only local rendering and access;
+URL from a Tailscale address, a local preview address, or a remembered tunnel hostname. In particular, a successful local document read proves only local rendering and access;
 it does not prove that the user's phone can open that address through Cloud.
 
 If Cloud identity, pairing, or the document read is unavailable, report that specific gap and
-retain the Cloud locator. Do not silently substitute localhost, a LAN address, a named tunnel,
+retain the Cloud locator. Do not silently substitute localhost, a LAN address, a tunnel hostname,
 an absolute file link, or `machine=this-mac` as the user's delivery link. Local preview remains
 valid for development verification, but is not a Cloud handoff or evidence of Cloud acceptance.
 
@@ -291,7 +290,7 @@ none and the registry that does is swept), so what is drawn is the convention
 
 **Each card is headed by what the task was doing.** Until 2026-09-05 it was headed by the Feature's
 label, which is the *work line* a classifier grouped by: nine cards in a row read `Clawdfather —
-handoff 18bde7c3` and 「光看標題真的看不出來分別」. The heading is now the task's own stored title
+handoff 18bde7c3` and "the titles alone do not tell them apart" (translated). The heading is now the task's own stored title
 (`work` in the payload), and the label keeps its place one line down under a word saying which of
 the two it is. A task old enough for the registry to have swept it has no title anywhere, and then
 the label is the heading again rather than the card going blank.

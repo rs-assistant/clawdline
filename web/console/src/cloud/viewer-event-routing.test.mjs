@@ -194,3 +194,33 @@ test("the log keeps the newest sixteen delivery outcomes and lets the older ones
   const kept = log.snapshot().deliveries.map((entry) => entry.batch_id)
   assert.deepEqual(kept, Array.from({ length: 16 }, (_, i) => "batch-" + (i + 5)))
 })
+
+
+test("a deliberate diagnostic reaches its named machine despite an exhausted background budget and another tab's writer lock", async () => {
+  const { client, sent } = twoMacs()
+  const log = client.viewerEvents
+  for (let i = 0; i < log.limits.dailySends; i++) log.noteAttempt()
+  log.writer = false
+  await client.sendDiagnostic(SECOND, { code: "unexpected_error", connection: "ready" })
+  assert.equal(sent.length, 1)
+  assert.equal(sent[0].machine, SECOND)
+  assert.equal(sent[0].word, "diagnostics.events")
+  assert.equal(sent[0].batch.rows[0].event, "cloud.send.diagnostic_requested")
+  assert.equal(sent[0].batch.rows[0].data.code, "unexpected_error")
+  assert.ok(consistent(sent[0].batch))
+})
+
+test("a deliberate diagnostic does not call an unready or unsupported machine and never accepts the wrong receipt", async () => {
+  const { client, sent } = twoMacs()
+  client.ready = false
+  await assert.rejects(client.sendDiagnostic(SECOND, { code: "unexpected_error" }), { code: "cloud_reconnecting" })
+  client.ready = true
+  client._machineImplements = () => "no"
+  await assert.rejects(client.sendDiagnostic(SECOND, {}), { code: "cloud_feature_unavailable" })
+  assert.equal(sent.length, 0)
+  client._machineImplements = () => "yes"
+  client._machineRequestAs = async () => ({ batch_id: "wrong", rows: 1 })
+  await assert.rejects(client.sendDiagnostic(SECOND, {}), { code: "bad_payload" })
+  client._machineRequestAs = async () => { throw Object.assign(new Error("lost"), { code: "cloud_read_timeout" }) }
+  await assert.rejects(client.sendDiagnostic(SECOND, {}), { code: "cloud_read_timeout" })
+})

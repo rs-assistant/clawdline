@@ -1,4 +1,4 @@
-# Secret Handoff / 機密交付
+# Secret Handoff
 
 Use **Secret Handoff** when a Session needs a password, credential, or API key for a tool. The Session asks in a Note. You provide the value in that Note's dedicated field; it is never sent as a chat message.
 

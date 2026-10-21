@@ -20,6 +20,10 @@
           "description": "Where the file is, whether or not it exists.",
           "type": "string"
         },
+        "cloudflare_tunnel_retired": {
+          "description": "True while the file still holds the built-in Cloudflare tunnel's settings (`remote_tunnel`, `remote_tunnel_name`, `remote_hostname`, `cloudflared_path`), removed on 2026-10-20. They start nothing; the settings page explains once, and writing `cloudflare_tunnel_retired: false` takes them out of the file.",
+          "type": "boolean"
+        },
         "hotkey": {
           "description": "The file's `hotkey`, or null when the file does not carry one as a string. Null means the default, option+space, which the Swift app used to own and no longer does; an empty string means the person asked for none, and registers nothing.",
           "nullable": true,
@@ -160,13 +164,8 @@
           "nullable": true,
           "type": "boolean"
         },
-        "remote_tunnel": {
-          "description": "`off`, `quick` or `named`.",
-          "nullable": true,
-          "type": "string"
-        },
-        "remote_hostname": {
-          "description": "The hostname a named tunnel answers on.",
+        "tailscale_hostname": {
+          "description": "This machine's full Tailscale name (`<machine>.<tailnet>.ts.net`) that Tailscale Serve answers on; accepted only while `remote` is on.",
           "nullable": true,
           "type": "string"
         },
@@ -199,6 +198,8 @@
         "push_on_app_release_success": { "description": "Notify after the app release is verified.", "nullable": true, "type": "boolean" },
         "push_on_cloud_release_success": { "description": "Notify after the Cloud release is verified.", "nullable": true, "type": "boolean" },
         "push_on_release_failure": { "description": "Notify when an App install or Cloud verification fails.", "nullable": true, "type": "boolean" },
+        "cloud_health_upload": { "description": "Whether this daemon uploads its connection-health records to Cloud. Absent or false means off, and off makes no request. Only the local token may change it. Owner diagnostics (location, age, deadline) are never sent.", "nullable": true, "type": "boolean" },
+        "cloud_health_owner_retention": { "description": "Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud as ciphertext only paired owner devices can open. Separate from cloud_health_upload, which never permits it. Absent or false means off, and off makes no request. Only the local token may change it.", "nullable": true, "type": "boolean" },
         "orchestrator_agent_notify": {
           "description": "Whether an agent may push a sentence of its own.",
           "nullable": true,
@@ -410,15 +411,15 @@
           "nullable": true,
           "type": "boolean"
         },
-        "remote_tunnel": {
-          "description": "`off`, `quick` or `named`.",
+        "tailscale_hostname": {
+          "description": "A full Tailscale name ending in `.ts.net`, or empty.",
           "nullable": true,
           "type": "string"
         },
-        "remote_hostname": {
-          "description": "A hostname, or empty.",
+        "cloudflare_tunnel_retired": {
+          "description": "Only `false`: dismisses the retired Cloudflare tunnel notice by removing that tunnel's old keys from the file. The old keys themselves are refused as `retired_setting`.",
           "nullable": true,
-          "type": "string"
+          "type": "boolean"
         },
         "push_on_delivery": {
           "description": "Notify when a session reports a delivery.",
@@ -449,6 +450,8 @@
         "push_on_app_release_success": { "description": "Notify after the app release is verified.", "nullable": true, "type": "boolean" },
         "push_on_cloud_release_success": { "description": "Notify after the Cloud release is verified.", "nullable": true, "type": "boolean" },
         "push_on_release_failure": { "description": "Notify when an App install or Cloud verification fails.", "nullable": true, "type": "boolean" },
+        "cloud_health_upload": { "description": "Whether this daemon uploads its connection-health records to Cloud. Absent or false means off, and off makes no request. Only the local token may change it. Owner diagnostics (location, age, deadline) are never sent.", "nullable": true, "type": "boolean" },
+        "cloud_health_owner_retention": { "description": "Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud as ciphertext only paired owner devices can open. Separate from cloud_health_upload, which never permits it. Absent or false means off, and off makes no request. Only the local token may change it.", "nullable": true, "type": "boolean" },
         "orchestrator_agent_notify": {
           "description": "Whether an agent may push a sentence of its own.",
           "nullable": true,

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 // @ts-expect-error -- node's type-stripping runner resolves the source .ts file.
-import { statusProjection } from "./status-projection.ts"
+import { STATUS_FRESH_MS, statusProjection } from "./status-projection.ts"
 
 const INVENTORY = "__clawdline_inventory_v1__"
 const execution = "0123456789abcdef0123456789abcdef"
@@ -48,6 +48,24 @@ test("a complete ss pass with the same Session id on two machines stays scoped",
   assert.equal(a.rows[0].sourceProvenance, "session_watch")
   assert.equal(a.rows[0].inventoryComplete, true)
   assert.equal(a.snapshotGeneration, passOne)
+})
+
+test("a current machine task descriptor places a child when ss lacks its parent", () => {
+  const source = fleet("a", ["root", "child"])
+  const child = source.statusSnapshots.get(JSON.stringify(["a", "child"])) as { payload: Record<string, unknown> }
+  delete child.payload.parent_session_id
+  child.payload.machine_scope = false
+  const orch = new Map<string, unknown>([["a", { at: 2, tasks: [
+    { child: { terminalId: "child" }, root: { terminalId: "root" } },
+  ] }]])
+  const reading = statusProjection({ ...source, orchestratorSnapshots: orch }, "a", 2000)
+  assert.equal(reading.kind === "ready" && reading.rows.find((row) => row.destination.sessionID === "child")?.parentSessionID, "root")
+  child.payload.parent_session_id = "other"
+  const signed = statusProjection({ ...source, orchestratorSnapshots: orch }, "a", 2000)
+  assert.equal(signed.kind === "ready" && signed.rows.find((row) => row.destination.sessionID === "child")?.parentSessionID, "other")
+  delete child.payload.parent_session_id
+  const old = statusProjection({ ...source, orchestratorSnapshots: orch }, "a", STATUS_FRESH_MS + 3000)
+  assert.equal(old.rows?.find((row) => row.destination.sessionID === "child")?.parentSessionID, undefined)
 })
 
 test("a content-free row carries no name, and never the Session id as one", () => {

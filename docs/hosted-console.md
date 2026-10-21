@@ -195,3 +195,20 @@ grep 'cloud ack' ~/.config/clawdline-next/logs/daemon.log | tail -20
 and `fanout=0` on every ack say no viewer is subscribed — the relay had nobody to hand those
 publishes to. That pair separates "the Mac is down" from "the console cannot connect", and on
 2026-09-20 it is what showed the Mac was innocent.
+
+## Explicit send diagnostics
+
+A failed message card's **Record diagnostics** button sends a content-free
+`cloud.send.diagnostic_requested` row to the currently selected machine using
+`diagnostics.events`. This is one explicit request per press, separate from the
+background viewer-event log's daily budget and cross-tab writer lock. It contains
+the failure code and browser connectivity state, never message text or pictures.
+The button stays busy until the machine returns a receipt naming the same batch
+and row count. Only that receipt produces **Diagnostics delivered to the machine**.
+A timeout, unsupported machine, or mismatched receipt leaves a retry button; it
+makes no promise of an offline queue or automatic redelivery. Background viewer
+events keep their existing bounded outbox and automatic retry policy.
+
+On the machine, inspect `cloud: viewer reported: event=cloud.send.diagnostic_requested`
+and the batch's `cloud: viewer events delivered:` summary in the daemon log.
+A relay acknowledgement alone does not establish that the machine logged the row.

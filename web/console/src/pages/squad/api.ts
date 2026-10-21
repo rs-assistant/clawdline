@@ -30,7 +30,7 @@ export interface NewSquadPersona {
   body: string
   icon: Icon
   teams: { id: string; version: string }[]
-  skills: []
+  skills: { id: string; version: string; enabled: boolean }[]
 }
 
 export interface RoleDraft { name: string; summary: string; body: string }
@@ -69,6 +69,7 @@ export interface SquadAPI {
   restoreEnabled(scopeId: string, personaId: string, expectedVersion: number): Promise<void>
   saveMotion(scopeId: string, value: boolean, expectedVersion: number): Promise<void>
   restoreMotion(scopeId: string, expectedVersion: number): Promise<void>
+  saveAutoDispatch(value: boolean, expectedVersion: number): Promise<void>
   saveSkills(scopeId: string, personaId: string, choices: { id: string; version: string; enabled: boolean }[], expectedVersion: number): Promise<void>
   restoreSkills(scopeId: string, personaId: string, expectedVersion: number): Promise<void>
   preview(file: File, scopeId: string): Promise<PackPreview>
@@ -225,6 +226,9 @@ class HttpSquadAPI implements SquadAPI {
   }
   saveMotion(scopeId: string, value: boolean, expectedVersion: number) { return this.motionWrite(scopeId, value, true, expectedVersion) }
   restoreMotion(scopeId: string, expectedVersion: number) { return this.motionWrite(scopeId, false, false, expectedVersion) }
+  async saveAutoDispatch(value: boolean, expectedVersion: number): Promise<void> {
+    await request("/v1/squad/motion", write({ expected_version: expectedVersion, auto_dispatch: { present: true, value } }))
+  }
 
   async preview(file: File, scopeId: string): Promise<PackPreview> {
     if (file.size > 512 * 1024) throw new SquadError("archive_too_large", catalogWord("literal", "63c65dff6ab8"), 413)

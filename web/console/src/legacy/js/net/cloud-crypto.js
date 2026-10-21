@@ -341,3 +341,48 @@ export async function loadCryptoKeyID(name, indexedDBValue) {
         request.onerror = function () { db.close(); reject(request.error); };
     });
 }
+
+/*
+ * The identity handover's result (`cloud/health-owner/handover.ts`): the master secret as a
+ * non-extractable HKDF key and AES-GCM key, with the content-key epoch Cloud recorded for it.
+ * One record, one put, so a reload can never find the key without its epoch or the reverse.
+ * The caller validates the record's shape; this layer refuses anything extractable.
+ */
+export async function storeHealthHandover(name, record, indexedDBValue) {
+    if (typeof name !== "string" || !name) throw new TypeError("handover storage name is missing");
+    if (!record || !record.hkdfKey || record.hkdfKey.extractable !== false ||
+        !record.masterKey || record.masterKey.extractable !== false) {
+        throw new TypeError("only non-extractable handover CryptoKeys are stored");
+    }
+    var db = await keyDatabase(indexedDBValue);
+    return new Promise(function (resolve, reject) {
+        var tx = db.transaction("keys", "readwrite");
+        tx.objectStore("keys").put(record, name);
+        tx.oncomplete = function () { db.close(); resolve(record); };
+        tx.onerror = function () { db.close(); reject(tx.error); };
+        tx.onabort = tx.onerror;
+    });
+}
+
+export async function loadHealthHandover(name, indexedDBValue) {
+    var db = await keyDatabase(indexedDBValue);
+    return new Promise(function (resolve, reject) {
+        var tx = db.transaction("keys", "readonly");
+        var request = tx.objectStore("keys").get(name);
+        request.onsuccess = function () { db.close(); resolve(request.result || null); };
+        request.onerror = function () { db.close(); reject(request.error); };
+    });
+}
+
+/** Remove every handover record whose name starts with `prefix` (one account's). */
+export async function deleteHealthHandovers(prefix, indexedDBValue) {
+    if (typeof prefix !== "string" || !prefix) throw new TypeError("handover storage prefix is missing");
+    var db = await keyDatabase(indexedDBValue);
+    return new Promise(function (resolve, reject) {
+        var tx = db.transaction("keys", "readwrite");
+        tx.objectStore("keys").delete(IDBKeyRange.bound(prefix, prefix + "￿"));
+        tx.oncomplete = function () { db.close(); resolve(); };
+        tx.onerror = function () { db.close(); reject(tx.error); };
+        tx.onabort = tx.onerror;
+    });
+}

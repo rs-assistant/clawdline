@@ -1,5 +1,6 @@
+import type { SettingsPane } from "../navigation.js"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { SettingsSnapshot, TunnelStatus, VoiceLanguage, VoiceSetup } from "@clawdline/contract"
+import type { SettingsSnapshot, VoiceLanguage, VoiceSetup } from "@clawdline/contract"
 import {
   defaultModelOptions,
   readBrowserSettings,
@@ -30,7 +31,6 @@ import {
 } from "../cloud.js"
 import { directLocalNetworkShown } from "../direct-local.js"
 import { DEFAULTS, reading, type SettingKey } from "./defaults.js"
-import { readTunnelStatus } from "../tunnel.js"
 import { installVoiceModel, readVoiceLanguage, readVoiceSetup } from "../voice.js"
 import {
   APP_EVENT,
@@ -45,6 +45,8 @@ import {
 } from "./bridge.js"
 import { Block, Chip, Head, MemoField, Mono, Note, PopUp, Row, Slider, Switch, TabStrip } from "./controls.js"
 import { PairingQr, expiredFailure } from "./PairingQr.js"
+import { IdentityHandoverBlock } from "../../../cloud/health-owner/IdentityHandoverBlock.js"
+import { OwnerRetentionBlock } from "../../../cloud/health-owner/OwnerRetentionBlock.js"
 import { settingsFailureSentence } from "./failure.js"
 import { COMPACT_MAX, COMPACT_MIN, compactWindowText, compactWindowValue } from "./compact.js"
 import { gateModeOptions, gateModeText } from "./gate-mode.js"
@@ -95,12 +97,17 @@ const INPUT_BAR_ENABLED = false
 const VOICE_ENABLED = true
 const HOOKS_ENABLED = false
 
-export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}) {
+
+export function SettingsWindow({ embedded = false, pane, hideNavigation = false }: {
+  embedded?: boolean
+  pane?: SettingsPane
+  hideNavigation?: boolean
+} = {}) {
   const [snapshot, setSnapshot] = useState<SettingsSnapshot | null>(null)
   const [defaultModels, setDefaultModels] = useState<DefaultModelsSnapshot | null>(null)
   const [shell, setShell] = useState<ShellState | null>(null)
   const [draft, setDraft] = useState<Draft>({})
-  const [tab, setTab] = useState(0)
+  const [selectedTab, setTab] = useState(0)
   const [said, setSaid] = useState("")
   const [recording, setRecording] = useState(false)
   const [pendingHotkey, setPendingHotkey] = useState<string | null>(null)
@@ -111,19 +118,13 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   const [cloudLogin, setCloudLogin] = useState<CloudLogin | null>(null)
   const [cloudSetupBusy, setCloudSetupBusy] = useState(false)
   const [cloudSetupSaid, setCloudSetupSaid] = useState("")
-  // The tunnel's own reading, the same three ways: not asked, refused, an answer.
-  const [tunnel, setTunnel] = useState<TunnelStatus | null | undefined>(undefined)
-  // Whether the Remote tab's readings were refused because only this machine's
-  // own token may read them (cloud.ts MACHINE_ONLY). Then both cards say where
-  // Cloud and the tunnel are managed, once, instead of a read failure each.
+  // Whether the Remote tab's reading was refused because only this machine's
+  // own token may read it (cloud.ts MACHINE_ONLY). Then the card says where
+  // Cloud is managed instead of a read failure.
   const [remoteMachineOnly, setRemoteMachineOnly] = useState(false)
   const takeCloud = (answer: CloudStatus | MachineOnly | null) => {
     setRemoteMachineOnly(answer === MACHINE_ONLY)
     setCloud(answer === MACHINE_ONLY ? null : answer)
-  }
-  const takeTunnel = (answer: TunnelStatus | MachineOnly | null) => {
-    setRemoteMachineOnly(answer === MACHINE_ONLY)
-    setTunnel(answer === MACHINE_ONLY ? null : answer)
   }
   // Where the voice language landed, asked of the daemon while the voice tab is
   // open and again after every write — the General tab's language moves it too.
@@ -149,6 +150,11 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   const has = inShell()
   const voiceTab = INPUT_BAR_ENABLED ? 2 : 1
   const remoteTab = (INPUT_BAR_ENABLED ? 2 : 1) + (VOICE_ENABLED ? 1 : 0)
+  const paneIndices: Record<SettingsPane, number> = {
+    general: 0, voice: voiceTab, remote: remoteTab,
+    orchestrator: remoteTab + 1, "dispatch-policy": remoteTab + 2,
+  }
+  const tab = pane === undefined ? selectedTab : paneIndices[pane]
 
   const snapshotRef = useRef(snapshot)
   snapshotRef.current = snapshot
@@ -232,26 +238,6 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     return () => { live = false; if (timer) clearInterval(timer) }
   }, [tab, cloudLogin?.phase, remoteTab, embedded])
 
-  // The tunnel's reading, while the same tab is open. The Swift window asked
-  // its tunnel once a second, because "starting" turns into an address on its
-  // own; this asks every second and a half while it is starting and every five
-  // seconds otherwise, and nothing once the tab is left.
-  useEffect(() => {
-    if (tab !== remoteTab || embedded) return
-    let live = true
-    const pass = () => {
-      void readTunnelStatus().then((answer) => {
-        if (live) takeTunnel(answer)
-      })
-    }
-    pass()
-    const timer = setInterval(pass, tunnel?.state === "starting" ? 1_500 : 5_000)
-    return () => {
-      live = false
-      clearInterval(timer)
-    }
-  }, [tab, tunnel?.state, embedded, remoteTab])
-
   /**
    * Write, then tell the shell. The Swift app's `apply()`: save the file and
    * post `clawdlineConfigChanged`, and let the one place that re-applies things
@@ -271,11 +257,6 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
       })
       ask({ kind: "changed" })
       if (embedded && ("notch" in keys || "mascot" in keys)) askShell("changed")
-      // A Remote-tab switch moves the tunnel at once (the daemon applies it
-      // on the write); the card asks again rather than waiting its turn.
-      if (!embedded && ("remote" in keys || "remote_tunnel" in keys || "remote_hostname" in keys)) {
-        void readTunnelStatus().then(takeTunnel)
-      }
       return answer
     } catch (error) {
       setDraft((prior) => {
@@ -386,7 +367,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     ...(VOICE_ENABLED ? [W.settingsVoice] : []),
     W.settingsRemote,
     W.settingsOrchestrator,
-    /^zh(?:-|$)/i.test(document.documentElement.lang) ? "派工規則" : "Dispatch rules",
+    catalogWord("dispatchPolicy", "navTitle"),
     ...(HOOKS_ENABLED ? [W.settingsHooks] : []),
   ]
 
@@ -807,7 +788,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
    * daemon has no Cloud line at all; the switch is on and the line is up, in
    * which case the fingerprint is here to be read back to somebody; or this
    * caller may not ask, which is what a paired phone reading this window over
-   * a tunnel gets, and which is the honest card rather than an empty one.
+   * Tailscale Serve gets, and which is the honest card rather than an empty one.
    *
    * There is no switch here. Turning Cloud on is `clawdline cloud on`, which
    * writes `cloud_enabled` in the same file — deliberately not a control in
@@ -1142,6 +1123,8 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
           </div>
           {codeSaid ? <Note dot="warn">{codeSaid}</Note> : null}
         </Block>
+        <IdentityHandoverBlock />
+        <OwnerRetentionBlock />
       </>
     )
   }
@@ -1165,6 +1148,25 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
           <Row label={W.settingsRemoteServe} hint={W.settingsRemoteHint} first>
             <Switch label={W.settingsRemoteServe} on={!!now("remote")} onChange={flip("remote")} />
           </Row>
+          <Row label={W.settingsTailscaleHostname} hint={W.settingsTailscaleHint}>
+            <MemoField
+              label={W.settingsTailscaleHostname}
+              value={String(now("tailscale_hostname"))}
+              example="my-machine.your-tailnet.ts.net"
+              onCommit={(value) => {
+                if (value === String(reading(snapshotRef.current, "tailscale_hostname"))) return
+                void change({ tailscale_hostname: value })
+              }}
+            />
+          </Row>
+          {snapshot?.cloudflare_tunnel_retired ? (
+            <Block>
+              {/* Shown while the file still holds the removed Cloudflare
+                  tunnel's settings; "Got it" takes them out of the file. */}
+              <Note dot="warn">{W.settingsCloudflareRetired}</Note>
+              <Chip onClick={() => void change({ cloudflare_tunnel_retired: false })}>{W.settingsCloudflareRetiredDone}</Chip>
+            </Block>
+          ) : null}
         </div>
         <div className="sw-column">
           {!embedded && cloud !== undefined && cloud !== null && cloudSetupBlock()}
@@ -1175,79 +1177,8 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
             </Block>
           )}
           {!embedded && cloudPairingBlock()}
-          <Row label={W.settingsTunnel} hint={W.settingsTunnelHint} first>
-            <PopUp
-              label={W.settingsTunnel}
-              value={String(now("remote_tunnel"))}
-              options={[
-                { label: W.settingsOff, value: "off" },
-                { label: W.settingsTunnelQuick, value: "quick" },
-                { label: W.settingsTunnelNamed, value: "named" },
-              ]}
-              onPick={pick("remote_tunnel")}
-            />
-          </Row>
-          <Row label={W.settingsTunnelHostname}>
-            <MemoField
-              label={W.settingsTunnelHostname}
-              value={String(now("remote_hostname"))}
-              example="clawdline.example.com"
-              onCommit={(value) => {
-                if (value === String(reading(snapshotRef.current, "remote_hostname"))) return
-                void change({ remote_hostname: value })
-              }}
-            />
-          </Row>
-          {!embedded && tunnelBlock()}
         </div>
       </>
-    )
-  }
-
-  /**
-   * What the tunnel is doing, in the words the tunnel itself used
-   * (`Settings.swift` `refreshTunnel`). Its failures are sentences meant for a
-   * person — "pair a device first" — and passing them through unchanged is
-   * better than a generic "could not start": the useful part of each is the
-   * specific thing to go and do. The two literals are that function's own.
-   */
-  function tunnelBlock() {
-    if (tunnel === undefined) return null
-    if (tunnel === null) {
-      // Refused for the same reason as the Cloud card, which already says where
-      // both are managed; a second copy of that sentence would say nothing new.
-      if (remoteMachineOnly) return null
-      return (
-        <Block>
-          <Note dot="idle">{W.webCloudStatusReadFailed}</Note>
-        </Block>
-      )
-    }
-    let text = ""
-    let dot: "idle" | "warn" | "live" = "idle"
-    switch (tunnel.state) {
-      case "off":
-        text = tunnel.installed ? "" : "cloudflared is not installed."
-        break
-      case "starting":
-        text = "…"
-        break
-      case "up":
-        text = tunnel.url ?? ""
-        dot = "live"
-        break
-      case "failed":
-        text = tunnel.reason ?? ""
-        dot = "warn"
-        break
-    }
-    if (!text) return null
-    return (
-      <Block>
-        <Note dot={dot} mono>
-          {text}
-        </Note>
-      </Block>
     )
   }
 
@@ -1449,9 +1380,9 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   const Pane = panes[tab]
   return (
     <div className={embedded ? "sw-window embedded" : "sw-window"}>
-      <TabStrip titles={titles} current={tab} onPick={setTab} />
+      {!hideNavigation && <TabStrip titles={titles} current={tab} onPick={setTab} />}
       <div className="sw-scroll">
-        <div className="sw-pane" id={`sw-pane-${tab}`} role="tabpanel" aria-labelledby={`sw-tab-${tab}`}>
+        <div className="sw-pane" id={`sw-pane-${tab}`} role={hideNavigation ? undefined : "tabpanel"} aria-labelledby={hideNavigation ? undefined : `sw-tab-${tab}`}>
           {Pane()}
         </div>
       </div>

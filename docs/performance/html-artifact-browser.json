@@ -1,0 +1,290 @@
+{
+  "scope": "local real browser component verification, not authenticated Cloud acceptance",
+  "engines": [
+    {
+      "engine": "chromium",
+      "viewports": [
+        {
+          "width": 390,
+          "metric": {
+            "fetchMs": 2.299999952316284,
+            "mountMs": 14.5,
+            "bytes": 7565,
+            "readyMs": 91.70000004768372
+          },
+          "positive": {
+            "tables": 7,
+            "details": 2,
+            "bodyBackground": "rgb(16, 23, 34)",
+            "bodyText": true,
+            "scrollHeight": 3827
+          },
+          "documentFetches": 1,
+          "baselineHTML": "rejected as expected",
+          "markdown": {
+            "old": [
+              0.8000001907348633,
+              0,
+              0,
+              0.10000014305114746,
+              0,
+              0,
+              0.09999990463256836,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0.10000014305114746,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "candidate": [
+              0.09999990463256836,
+              0,
+              0.09999990463256836,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0.09999990463256836,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0.09999990463256836
+            ],
+            "memory": 10000000
+          },
+          "attacks": "PASS"
+        },
+        {
+          "width": 1280,
+          "metric": {
+            "fetchMs": 1.0999999046325684,
+            "mountMs": 4.400000095367432,
+            "bytes": 7565,
+            "readyMs": 31.399999856948853
+          },
+          "positive": {
+            "tables": 7,
+            "details": 2,
+            "bodyBackground": "rgb(16, 23, 34)",
+            "bodyText": true,
+            "scrollHeight": 1854
+          },
+          "documentFetches": 1,
+          "baselineHTML": "rejected as expected",
+          "markdown": {
+            "old": [
+              0.8000001907348633,
+              0,
+              0,
+              0.09999990463256836,
+              0,
+              0.09999990463256836,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0.09999990463256836,
+              0,
+              0.10000014305114746,
+              0,
+              0,
+              0
+            ],
+            "candidate": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0.10000014305114746,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "memory": 10000000
+          },
+          "attacks": "PASS"
+        }
+      ],
+      "attemptedResourceCount": 4,
+      "blockedReasons": [
+        "csp",
+        "csp",
+        "csp",
+        "csp"
+      ]
+    },
+    {
+      "engine": "webkit",
+      "viewports": [
+        {
+          "width": 390,
+          "metric": {
+            "fetchMs": 3,
+            "mountMs": 11,
+            "bytes": 7565,
+            "readyMs": 86
+          },
+          "positive": {
+            "tables": 7,
+            "details": 2,
+            "bodyBackground": "rgb(16, 23, 34)",
+            "bodyText": true,
+            "scrollHeight": 3742
+          },
+          "documentFetches": 1,
+          "baselineHTML": "rejected as expected",
+          "markdown": {
+            "old": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "candidate": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "memory": null
+          },
+          "attacks": "PASS"
+        },
+        {
+          "width": 1280,
+          "metric": {
+            "fetchMs": 2,
+            "mountMs": 7,
+            "bytes": 7565,
+            "readyMs": 51
+          },
+          "positive": {
+            "tables": 7,
+            "details": 2,
+            "bodyBackground": "rgb(16, 23, 34)",
+            "bodyText": true,
+            "scrollHeight": 1802
+          },
+          "documentFetches": 1,
+          "baselineHTML": "rejected as expected",
+          "markdown": {
+            "old": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "candidate": [
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "memory": null
+          },
+          "attacks": "PASS"
+        }
+      ],
+      "attemptedResourceCount": 0,
+      "blockedReasons": []
+    }
+  ],
+  "collectorHits": [],
+  "status": "PASS"
+}
