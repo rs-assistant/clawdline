@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
+	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/contract"
 )
@@ -467,5 +468,36 @@ func TestProductLanguageSettingDoesNotRewriteAgentOrVoicePreferences(t *testing.
 	}
 	if nextconfig.ProductLanguage(values) != "fr" {
 		t.Fatalf("rejected change altered saved product language: %#v", values.Raw)
+	}
+}
+
+func TestITermIntegrationRequiresFreshConsentAndCanBeRevoked(t *testing.T) {
+	previous := terminal.ITermIntegration()
+	t.Cleanup(func() { terminal.SetITermIntegration(previous); terminal.SetITermScan(true) })
+	for _, legacy := range []string{`{}`, `{"iterm_scan":true,"terminal":"iterm_native"}`, `{"iterm_scan":false}`, `{"iterm_integration":"true"}`, `{"iterm_integration":null}`} {
+		s := &Server{cfg: config.Config{Dir: filepath.Join(t.TempDir(), "next")}}
+		if err := os.MkdirAll(s.cfg.Dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(s.cfg.Dir, "config.json"), []byte(legacy), 0600); err != nil {
+			t.Fatal(err)
+		}
+		v, err := s.settingsFile().Read()
+		if err != nil {
+			t.Fatal(err)
+		}
+		terminal.SetITermIntegration(true)
+		applyITermScan(v)
+		if terminal.ITermIntegration() || terminal.ITermScan() {
+			t.Fatalf("legacy settings enabled iTerm2: %s", legacy)
+		}
+		rec, snap, _ := settingsCall(t, s, http.MethodPost, "application/json", `{"iterm_integration":true}`)
+		if rec.Code != http.StatusOK || snap.ItermIntegration == nil || !*snap.ItermIntegration || !terminal.ITermIntegration() {
+			t.Fatalf("opt-in failed: %d %s", rec.Code, rec.Body)
+		}
+		rec, snap, _ = settingsCall(t, s, http.MethodPost, "application/json", `{"iterm_integration":false}`)
+		if rec.Code != http.StatusOK || snap.ItermIntegration == nil || *snap.ItermIntegration || terminal.ITermIntegration() || terminal.ITermScan() {
+			t.Fatalf("revocation failed: %d %s", rec.Code, rec.Body)
+		}
 	}
 }

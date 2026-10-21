@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8751,
-  "riskKeys": 3880,
-  "nonRiskCount": 4871,
+  "englishContentKeys": 8755,
+  "riskKeys": 3883,
+  "nonRiskCount": 4872,
   "groups": [
     {
       "name": "admin / other",
@@ -4502,7 +4502,7 @@
     },
     {
       "name": "settings / other",
-      "count": 124,
+      "count": 125,
       "sources": [
         "src/pages/settings/window/copy.ts"
       ],
@@ -4544,6 +4544,7 @@
         "settings.settingsHooksLive",
         "settings.settingsHooksWhatHead",
         "settings.settingsHotkey",
+        "settings.settingsITermIntegration",
         "settings.settingsITermNative",
         "settings.settingsITermScan",
         "settings.settingsLanguage",
