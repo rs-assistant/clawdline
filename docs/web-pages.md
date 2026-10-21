@@ -478,3 +478,20 @@ That last branch replaced a second `keydown` listener inside `view/usage.js`. **
 own listener and nothing else**, so with the drawer open over Usage one press closed the drawer
 *and* left the page, while the same three steps over Settings were right — an edge that had not
 been connected rather than an order that was wrong.
+
+### Filling sparse conversation history
+
+The React transcript asks for up to 200 entries per page; the daemon still scans
+at most 8 MiB of raw JSONL for each page. Tool payloads and bookkeeping can occupy
+an entire window without yielding any visible conversation. A nonzero
+`nextBefore` means unread raw history remains, not that the newest page contains
+200 messages.
+
+After layout, the transcript automatically loads older pages while the content
+fits within the viewport, without requiring a scroll gesture. One opening or
+explicit load permits at most eight older reads (`console.transcript_fill_pages`).
+The loading control reports the current read and budget. At the limit it pauses
+with an explanation and the existing manual button. Polling and resize do not
+reset that budget. Errors and non-decreasing cursors stop automatic reads; leaving
+the Session prevents an outstanding response from starting another read. Loaded
+pages retain the existing chronological merge and scroll anchor behavior.

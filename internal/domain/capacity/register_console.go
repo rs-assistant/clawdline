@@ -4,6 +4,14 @@ package capacity
 func consoleBounds() []Entry {
 	return append(append(append(connectionHealthUIBounds(), viewerHealthBounds()...), ownerRetentionBounds()...), []Entry{
 		{
+			// HISTORY_FILL_PAGES in session/history-fill.ts bounds automatic
+			// older reads while the transcript does not fill its viewport.
+			// Polling and resize do not reset it; a manual request does.
+			Name: ConsoleTranscriptFillPages, Class: Buffer, Unit: Rows,
+			Limit: 8, AtLimit: Refuse,
+			Told: []Channel{Sender, Diagnostics}, EvictedBy: Person,
+		},
+		{
 			// Both opened-detail readers share one automatic recovery per
 			// user opening (SessionExecutionRecovery). At the limit the
 			// existing failure and manual recovery action remain visible.

@@ -1,4 +1,9 @@
 {
+  "next.transcriptFillingEarlier": "Reading earlier history… {count}/{limit}",
+  "next.transcriptFillPaused": "Paused after {count} pages. You can continue loading earlier messages.",
+  "next.transcriptEarlierStalled": "The history position did not move backward. Reload this Session before trying again.",
+  "capacityRow.console.transcript_fill_pages.what": "Earlier history pages read automatically while the conversation does not fill the screen. This bounds work on large raw records.",
+  "capacityRow.console.transcript_fill_pages.full": "After eight pages, automatic reading pauses with a progress note. Choose Load earlier messages to continue.",
   "capacityRow.session.codex_past_page.what": "How many Codex history records are requested for one page, so opening the picker does not wait for the whole project history.",
   "capacityRow.session.codex_past_page.full": "Load older sessions follows the next page. Background records may be filtered out; failed reads can be retried without losing loaded sessions.",
   "next.startPastFiltered": "This page has no resumable sessions. Load older sessions to continue.",

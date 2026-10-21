@@ -3576,6 +3576,24 @@
   },
   {
     "Register": "daemon",
+    "Name": "console.transcript_fill_pages",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "sender",
+      "diagnostics"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
     "Name": "console.transcript_follow_fast_seconds",
     "Class": "cache",
     "Unit": "seconds",
