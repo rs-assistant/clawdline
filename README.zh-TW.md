@@ -64,6 +64,8 @@ curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh 
 
 安裝腳本先核對壓縮檔雜湊，再執行下載的程式，由它驗證發行版簽章並啟動使用者服務。因此，首次安裝仍須信任 GitHub、HTTPS 與安裝腳本；後續更新則以已安裝程式內建的發布公鑰驗證簽署過的 manifest，完成後開啟主控台。你可以從主控台開 Session，或在 tmux 執行 `claude` 或 `codex`；需要時可用發行版內附的 tmux。[安裝與首次使用](docs/user/install.md)・[第一個 Session](docs/user/first-session.md)
 
+若要安裝你已審查的發行版，請同時固定**安裝腳本的來源版本**與 `--version`；預設指令會使用 `main` 腳本及最新發行版。[先審查再固定版本安裝](docs/user/install.md#review-and-pin-an-installation)說明操作方式與首次安裝的信任邊界。
+
 ## 支援範圍
 
 - 本機功能免費，不需要 Clawdline 帳號；Cloud 有 Free 與 Pro 方案。

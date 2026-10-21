@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	cloudwire "github.com/sainteye/clawdline/internal/domain/cloud"
 )
@@ -27,6 +28,9 @@ var incidentID = regexp.MustCompile(`^hi_[0-9a-f]{32}$`)
 var contentHash = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 var commitID = regexp.MustCompile(`^[0-9a-f]{40}$`)
 var evidenceID = regexp.MustCompile(`^he_[0-9a-f]{40}$`)
+
+// sourceMachine is Cloud's MACHINE_ID_PATTERN: a Mac id or a service id such as svc_api.
+var sourceMachine = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 
 type InvestigationRef struct {
 	InvestigationID string `json:"investigation_id"`
@@ -58,20 +62,74 @@ type InvestigationBundle struct {
 	Bundle    json.RawMessage    `json:"bundle"`
 }
 
+// InvestigationRefusal says which stage and field of a frozen bundle failed,
+// never the value: a daemon log line must not carry evidence, scope ids or
+// hashes. It unwraps to ErrInvestigationInvalid.
+type InvestigationRefusal struct {
+	Stage string
+	Field string
+}
+
+func (r *InvestigationRefusal) Error() string {
+	return ErrInvestigationInvalid.Error() + ": " + r.Field
+}
+
+func (r *InvestigationRefusal) Unwrap() error { return ErrInvestigationInvalid }
+
+func refuse(field string) error {
+	stage, _, _ := strings.Cut(field, ".")
+	return &InvestigationRefusal{Stage: stage, Field: field}
+}
+
+// ValidateInvestigationBundle checks the bundle against the claim's ref and
+// its own frozen manifest. The evidence source (scope.machine_id) and the
+// executor are deliberately separate: a Cloud service incident is sourced by
+// svc_api, not by a Mac. The executor is bound elsewhere — Claim.Validate
+// checks the delivery digest over identity, and Cloud serves the bundle only
+// to the leased machine with the live lease — so here identity must merely be
+// known, and the source must be a well-formed id equal to the manifest's.
 func ValidateInvestigationBundle(raw []byte, ref InvestigationRef, identity Identity) error {
-	if len(raw) > MaxInvestigationBundleBytes || ref.Validate() != nil {
-		return ErrInvestigationInvalid
+	if len(raw) > MaxInvestigationBundleBytes {
+		return refuse("envelope.bytes")
+	}
+	if ref.Validate() != nil {
+		return refuse("claim.investigation")
+	}
+	if identity.MachineID == "" {
+		return refuse("destination.machine_id")
 	}
 	if _, err := cloudwire.Parse(raw); err != nil {
-		return ErrInvestigationInvalid
+		return refuse("json")
 	}
 	var b InvestigationBundle
-	if json.Unmarshal(raw, &b) != nil || b.Schema != "clawdline.health_investigation.bundle.v1" || b.InvestigationRef != ref || b.HashBasis != "sha256 over key-sorted JSON of `bundle`" || b.Scope.MachineID != identity.MachineID || b.Scope.SourceID == "" || b.Scope.BootID == "" || b.Scope.SeqWatermark < 0 {
-		return ErrInvestigationInvalid
+	if json.Unmarshal(raw, &b) != nil {
+		return refuse("envelope")
+	}
+	switch {
+	case b.Schema != "clawdline.health_investigation.bundle.v1":
+		return refuse("envelope.schema")
+	case b.InvestigationID != ref.InvestigationID:
+		return refuse("envelope.investigation_id")
+	case b.IncidentID != ref.IncidentID:
+		return refuse("envelope.incident_id")
+	case b.Revision != ref.Revision:
+		return refuse("envelope.revision")
+	case b.ContentHash != ref.ContentHash:
+		return refuse("envelope.content_hash")
+	case b.HashBasis != "sha256 over key-sorted JSON of `bundle`":
+		return refuse("envelope.hash_basis")
+	case !sourceMachine.MatchString(b.Scope.MachineID):
+		return refuse("envelope.scope.machine_id")
+	case b.Scope.SourceID == "":
+		return refuse("envelope.scope.source_id")
+	case b.Scope.BootID == "":
+		return refuse("envelope.scope.boot_id")
+	case b.Scope.SeqWatermark < 0:
+		return refuse("envelope.scope.seq_watermark")
 	}
 	var group map[string]any
 	if json.Unmarshal(b.Scope.Group, &group) != nil || group == nil {
-		return ErrInvestigationInvalid
+		return refuse("envelope.scope.group")
 	}
 	var frozen struct {
 		Manifest struct {
@@ -81,24 +139,39 @@ func ValidateInvestigationBundle(raw []byte, ref InvestigationRef, identity Iden
 			Scope      InvestigationScope `json:"scope"`
 		} `json:"manifest"`
 	}
-	if json.Unmarshal(b.Bundle, &frozen) != nil || frozen.Manifest.Schema != "clawdline.health-incident-bundle/1" || frozen.Manifest.IncidentID != ref.IncidentID || frozen.Manifest.Revision != ref.Revision || frozen.Manifest.Scope.MachineID != b.Scope.MachineID || frozen.Manifest.Scope.SourceID != b.Scope.SourceID || frozen.Manifest.Scope.BootID != b.Scope.BootID {
-		return ErrInvestigationInvalid
+	if json.Unmarshal(b.Bundle, &frozen) != nil {
+		return refuse("manifest")
+	}
+	m := frozen.Manifest
+	switch {
+	case m.Schema != "clawdline.health-incident-bundle/1":
+		return refuse("manifest.schema")
+	case m.IncidentID != ref.IncidentID:
+		return refuse("manifest.incident_id")
+	case m.Revision != ref.Revision:
+		return refuse("manifest.revision")
+	case m.Scope.MachineID != b.Scope.MachineID:
+		return refuse("manifest.scope.machine_id")
+	case m.Scope.SourceID != b.Scope.SourceID:
+		return refuse("manifest.scope.source_id")
+	case m.Scope.BootID != b.Scope.BootID:
+		return refuse("manifest.scope.boot_id")
 	}
 	a, err := CanonicalInvestigationJSON(b.Scope.Group)
 	if err != nil {
-		return err
+		return refuse("envelope.scope.group")
 	}
-	z, err := CanonicalInvestigationJSON(frozen.Manifest.Scope.Group)
+	z, err := CanonicalInvestigationJSON(m.Scope.Group)
 	if err != nil || !bytes.Equal(a, z) {
-		return ErrInvestigationInvalid
+		return refuse("manifest.scope.group")
 	}
 	canonical, err := CanonicalInvestigationJSON(b.Bundle)
 	if err != nil {
-		return err
+		return refuse("bundle")
 	}
 	sum := sha256.Sum256(canonical)
 	if "sha256:"+hex.EncodeToString(sum[:]) != ref.ContentHash {
-		return ErrInvestigationInvalid
+		return refuse("bundle.content_hash")
 	}
 	return nil
 }
