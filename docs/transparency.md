@@ -1,12 +1,12 @@
 # What Clawdline changes
 
-The Console's **What Clawdline changes** page (`#page=transparency`) explains the instructions, files and launch parameters Clawdline adds. The sidebar and Settings → Workflow link to it. It uses the existing English and Taiwan Traditional Chinese catalogs, with English fallback for other interface languages. Original instruction excerpts stay in their source language.
+The public **What Clawdline changes** page lives at `https://clawdline.com/docs/transparency/`. It needs no Cloud account or paired machine. The Console sidebar and Settings → Workflow link there; old `#page=transparency` links forward their supported filters and interface language.
 
-The page is a description, not an inspection of a person's configuration. It sends no commands and makes no additional health poll. It shows the console's compiled source commit and the selected machine version from the existing health subscription. Different machine versions and personal configuration may behave differently. Source links point to the compiled commit; source archives without Git show an unconfirmed description version instead of inventing one.
+The page describes a reviewed product revision, not a person's configuration. English and Taiwan Traditional Chinese share the website's language control. Original excerpts stay in their source language. Source links point to the imported product commit; the website build refuses an outdated content snapshot.
 
 ## Content ownership
 
-`web/console/src/pages/transparency/catalog.json` owns stable entry IDs, filters, runtime locations, original excerpts, source locations and review receipts. Human copy lives under `transparency.*` in both `public/catalogs/en.json` and `zh-Hant.json`. The page is lazy-loaded so the instruction excerpts do not enter the initial Console bundle.
+`web/console/src/pages/transparency/catalog.json` owns stable entry IDs, filters, runtime locations, original excerpts, source locations and review receipts. Human copy lives under `transparency.*` in both `public/catalogs/en.json` and `zh-Hant.json`. The website imports this inventory, both language copies and filter logic at an exact public product commit using its `scripts/sync-transparency.mjs`. Its build compares the imported content with current product main. No instruction excerpts are shipped in the Console bundle.
 
 Separate loading from applicability. In normal Clawdline-launched Codex Sessions, Board language and the Note rule are startup defaults; language falls through the configured language, machine, bundled language and `zh-Hant`. Claude's language and existing Project memory are automatic startup decisions. Roles, Skills, Board assignments, todos, notices and handoffs have their own triggers. Reading a completion rule in a guide does not execute the completion action or reinject the guide every turn.
 
@@ -16,7 +16,7 @@ Separate loading from applicability. In normal Clawdline-launched Codex Sessions
 2. Review both English and Traditional Chinese, including loading behavior, agent, applicability and version scope. Existing user configuration and provider-native rules must not be described as Clawdline-installed defaults.
 3. Run `node tools/refresh-transparency.mjs` only after this review. It refreshes fingerprints of the registered producers, guides and both language copies; it does not write or translate explanations.
 4. Run `tools/check.sh`. Its unconditional `internal/config` repository guard refuses stale sources, missing source registrations, empty or missing card translations, and unreviewed copy changes. The Go AST scan also discovers new producers using known provider injection flags anywhere under `internal/` and `cmd/`.
-5. Run the filter tests and review desktop/mobile layout for a user-facing change. Hosted deployment follows [hosted-console.md](hosted-console.md).
+5. Run the filter tests and review desktop/mobile layout for a user-facing change. Publish the reviewed product change, run the website sync command, and deploy clawdline.com. Cloud entry changes separately follow [hosted-console.md](hosted-console.md).
 
 The inventory explicitly registers task-message composers, role/memory loaders and guide sources. The provider-sink scan catches the known `developer_instructions` and `--append-system-prompt` mechanisms, not arbitrary future protocols. A new transport or injection mechanism must register its producer and extend that discovery rule in the same change. A fingerprint requires human review; it does not prove a translation's meaning or automatically maintain prose.
 

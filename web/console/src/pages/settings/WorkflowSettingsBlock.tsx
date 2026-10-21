@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react"
 import type { WorkflowSettingsSnapshot } from "@clawdline/contract"
-import { catalogFormat, catalogWord } from "../../catalog.js"
+import { catalogFormat, catalogWord, catalogWordLanguage } from "../../catalog.js"
 import * as L from "../../legacy/bridge.js"
 import { readWorkflowSettings, writeWorkflowSettings } from "./api.js"
 import { Switch } from "./Switch.js"
+import { transparencyURL } from "../transparency/public-url.js"
 import "./workflow-settings.css"
 
 type Key = keyof WorkflowSettingsSnapshot
@@ -67,7 +68,7 @@ export function WorkflowSettingsBlock({ shown }: { shown: boolean }) {
         </div>
       </div>
     })}
-    <a className="workflow-transparency-link" href="./#page=transparency">{catalogWord("transparency", "settingsLink")}</a>
+    <a className="workflow-transparency-link" href={transparencyURL(catalogWordLanguage("transparency", "title"))}>{catalogWord("transparency", "settingsLink")}</a>
     <p className="say">{catalogWord("transparency", "settingsHint")}</p>
     <p className="said" role="status" aria-live="polite">{said}</p>
     {!snapshot && !busy && <button type="button" className="chip" onClick={() => setRetry(value => value + 1)}>{word("retry")}</button>}

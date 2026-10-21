@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process"
 import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite"
@@ -12,14 +11,8 @@ const here = fileURLToPath(new URL(".", import.meta.url))
 // either way and no build flag decides where the data comes from.
 const daemon = process.env.CLAWDLINE_NEXT_ORIGIN ?? "http://127.0.0.1:7727"
 
-function sourceCommit(): string {
-  try { return execFileSync("git", ["rev-parse", "HEAD"], { cwd: here, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() }
-  catch { return "" }
-}
-
 export default defineConfig({
   plugins: [react()],
-  define: { __CLAWDLINE_BUILD_COMMIT__: JSON.stringify(sourceCommit()) },
   // Hosted routes live below the origin root (/admin/accounts, for example),
   // while a daemon-served console still needs relative asset URLs.
   base: process.env.VITE_HOSTED_CONSOLE ? "/" : "./",

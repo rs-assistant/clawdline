@@ -4896,7 +4896,7 @@
       "name": "transparency / other",
       "count": 129,
       "sources": [
-        "src/pages/transparency/TransparencyPage.tsx"
+        "src/pages/transparency/catalog.json"
       ],
       "keys": [
         "transparency.agents",

@@ -2,7 +2,8 @@ import { SessionStateFilterControl } from "./session/SessionStateFilter.js"
 import { matchesLocalStateFilter, stateFilterCounts, type SessionStateFilter } from "./session/state-filter.js"
 import { SurveyCoordinator } from "./onboarding/Survey.js"
 import { useCloudAccount } from "./cloud/account-context.js"
-import { catalogWord } from "./catalog.js"
+import { catalogWord, catalogWordLanguage } from "./catalog.js"
+import { transparencyURL } from "./pages/transparency/public-url.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { SessionRow } from "@clawdline/contract"
 import { ClawdlineClient } from "@clawdline/core"
@@ -946,7 +947,11 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
     return () => document.removeEventListener("keydown", listener)
   }, [])
 
-  const sidebarPage = (p: typeof PAGES[number]) => (
+  const sidebarPage = (p: typeof PAGES[number]) => p.id === "transparency" ? (
+    <a key={p.id} className="sidebar-item" id={p.nav} href={transparencyURL(catalogWordLanguage("transparency", "title"))}>
+      <SidebarIcon name={p.icon} />{catalogWord("transparency", "title")}
+    </a>
+  ) : (
     <button
       key={p.id}
       className="sidebar-item"
@@ -959,7 +964,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
       title={tooOldTitle(p.id)}
     >
       <SidebarIcon name={p.icon} />
-      {p.id === "transparency" ? catalogWord("transparency", "title") : p.id === "usage" ? nextWord("usageOverview") : p.id === "notifications" ? nextWord("notificationNav") : p.id === "workflow" ? catalogWord("workflow", "workflow") : p.key ? T[p.key] : p.text}
+      {p.id === "usage" ? nextWord("usageOverview") : p.id === "notifications" ? nextWord("notificationNav") : p.id === "workflow" ? catalogWord("workflow", "workflow") : p.key ? T[p.key] : p.text}
       {tooOldMark(p.id)}
     </button>
   )
