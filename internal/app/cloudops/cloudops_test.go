@@ -826,6 +826,15 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		method: "POST", path: "/v1/settings/work-gates",
 		body2: `{"planning_gate":true,"verify_gate":true}`,
 	}, {
+		word:    "workflow-settings",
+		body:    map[string]any{"type": "workflow-settings", "session": machine, "request": "req-workflow"},
+		session: machine, name: "read:req-workflow", method: "GET", path: "/v1/settings/workflow",
+	}, {
+		word:    "workflow-settings-update",
+		body:    map[string]any{"type": "workflow-settings-update", "session": machine, "request": "req-workflow-write", "changes": map[string]any{"dispatch_full_permission": false, "session_auto_discovery": false}},
+		session: machine, name: "action:req-workflow-write", method: "POST", path: "/v1/settings/workflow",
+		body2: `{"dispatch_full_permission":false,"session_auto_discovery":false}`,
+	}, {
 		word:    "notification-settings",
 		body:    map[string]any{"type": "notification-settings", "session": machine, "request": "req-notifications"},
 		session: machine, name: "read:req-notifications",

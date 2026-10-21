@@ -7503,6 +7503,7 @@ export interface SettingsRequest {
    * Bundle identifiers separated by commas, or empty for every app.
    */
   scope_app: string | null
+  session_auto_discovery: boolean | null
 
   /**
    * Have a model write the sentence a notification carries.
@@ -7834,6 +7835,7 @@ export interface SettingsSnapshot {
    * com.googlecode.iterm2. Empty is every app.
    */
   scope_app: string | null
+  session_auto_discovery: boolean | null
 
   /**
    * Have a model write the sentence a notification carries.
@@ -11127,6 +11129,16 @@ export type WorkState =
   | "work_complete"
 
 export const WorkStateValues: readonly WorkState[] = ["ready", "working", "holding", "waiting_you", "waiting_session", "unknown", "milestone_complete", "work_complete"] as const
+
+export interface WorkflowSettingsRequest {
+  dispatch_full_permission: boolean | null
+  session_auto_discovery: boolean | null
+}
+
+export interface WorkflowSettingsSnapshot {
+  dispatch_full_permission: boolean
+  session_auto_discovery: boolean
+}
 
 export interface WorktreeCanonical {
   error: WorktreeIssue | null

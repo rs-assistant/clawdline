@@ -162,10 +162,12 @@ func StateFromAssistantStatus(status string) State {
 }
 
 type Session struct {
-	ID      string  `json:"id"`
-	Backend Backend `json:"backend"`
-	TTY     string  `json:"tty,omitempty"`
-	PID     int     `json:"pid,omitempty"`
+	// DiscoveryExcluded retains terminal presence without exposing an external conversation.
+	DiscoveryExcluded bool    `json:"-"`
+	ID                string  `json:"id"`
+	Backend           Backend `json:"backend"`
+	TTY               string  `json:"tty,omitempty"`
+	PID               int     `json:"pid,omitempty"`
 	// ExpectedStart pins a recovery close to the process the person saw.
 	ExpectedStart time.Time `json:"-"`
 	Assistant     Assistant `json:"assistant,omitempty"`

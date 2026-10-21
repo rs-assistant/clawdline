@@ -15,6 +15,18 @@ project, stop the turn it is on, and close it safely.
 
 Labels below follow the English interface; the console also supports other languages.
 
+## Workflow and control
+
+In **Settings → Workflow and control**, both switches start enabled. Select the ⓘ button beside
+one to expand its On, Off, and scope explanation. These are settings of the selected machine,
+including when changed from a paired Cloud browser with Send permission.
+
+- **Use full permission by default for dispatch**: off changes future dispatches that omit a
+  permission mode to Ask. An explicit task mode takes precedence; existing tasks keep their mode.
+- **Automatically discover other Sessions**: off keeps Sessions opened by Clawdline and stops
+  adding externally opened conversations. It takes effect on the next inventory refresh, without
+  closing conversations, deleting retained records, or changing pairing or Cloud command permission.
+
 ## Read the list
 
 Open **Sessions**. Each row is one session, marked with its project's pixel icon,

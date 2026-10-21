@@ -20,6 +20,7 @@ import { MACHINE_PANES, nextSettingsTab, settingsPanes } from "./settings/naviga
 import { W } from "./settings/window/copy.js"
 import "./settings/window/window.css"
 import "./settings/page.css"
+import { WorkflowSettingsBlock } from "./settings/WorkflowSettingsBlock.js"
 import { BoardBlock } from "./settings/BoardBlock.js"
 import { CapacityBlock } from "./settings/CapacityBlock.js"
 import { UpdatePanel } from "../machine/UpdatePanel.js"
@@ -99,6 +100,7 @@ function SettingsPage({ shown }: { shown: boolean }) {
     catalogWord("settings", "browserTab"),
     catalogWord("settings", "workTab"),
     catalogWord("settings", "statusTab"),
+    catalogWord("workflowSettings", "tab"),
     ...(!cloud ? [catalogWord("settings", "machineTab"), W.settingsVoice, W.settingsRemote,
       W.settingsOrchestrator, catalogWord("dispatchPolicy", "navTitle")] : []),
   ]
@@ -263,7 +265,7 @@ function SettingsPage({ shown }: { shown: boolean }) {
               type="button"
               role="tab"
               aria-selected={tab === index}
-              aria-controls={index >= 3 ? "settings-machine-pane" : `settings-pane-${index}`}
+              aria-controls={index >= 4 ? "settings-machine-pane" : `settings-pane-${index}`}
               tabIndex={tab === index ? 0 : -1}
               onClick={(event) => {
                 setTab(index)
@@ -469,8 +471,11 @@ function SettingsPage({ shown }: { shown: boolean }) {
           </div>
         </div>
 
-        {!cloud && <div className="settings-pane settings-machine-pane" id="settings-machine-pane" role="tabpanel" aria-labelledby={`settings-tab-${tab >= 3 ? tab : 3}`} hidden={tab < 3}>
-          {shown && tab >= 3 && <SettingsWindow embedded hideNavigation pane={MACHINE_PANES[Math.max(0, tab - 3)]} />}
+        <div className="settings-pane" id="settings-pane-3" role="tabpanel" aria-labelledby="settings-tab-3" hidden={tab !== 3}>
+          <WorkflowSettingsBlock shown={shown && tab === 3} />
+        </div>
+        {!cloud && <div className="settings-pane settings-machine-pane" id="settings-machine-pane" role="tabpanel" aria-labelledby={`settings-tab-${tab >= 4 ? tab : 4}`} hidden={tab < 4}>
+          {shown && tab >= 4 && <SettingsWindow embedded hideNavigation pane={MACHINE_PANES[Math.max(0, tab - 4)]} />}
         </div>}
         <div className="foot">
           <span id="settings-version" style={entered ? { cursor: "pointer" } : undefined} onClick={pressVersion}>

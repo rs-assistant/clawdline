@@ -45,7 +45,14 @@ var squadLaunchID = regexp.MustCompile(`(?:/|\\)squad(?:/|\\)launches(?:/|\\)([A
 // The column set deliberately excludes `lstart`, whose rendering follows the
 // locale and changes width during the month, so nothing here counts columns.
 // Subprocesses are pinned to LC_ALL=C for the same family of reasons.
-func (p *PS) Scan(ctx context.Context) (session.Inventory, error) {
+func (p *PS) Scan(ctx context.Context) (session.Inventory, error) { return p.scan(ctx, nil) }
+
+// ScanTTYs resolves only explicitly selected terminals, before reading provider records.
+func (p *PS) ScanTTYs(ctx context.Context, ttys map[string]bool) (session.Inventory, error) {
+	return p.scan(ctx, ttys)
+}
+
+func (p *PS) scan(ctx context.Context, ttys map[string]bool) (session.Inventory, error) {
 	inv := session.Inventory{
 		ObservedAt: time.Now(),
 		Provenance: "ps",
@@ -68,6 +75,9 @@ func (p *PS) Scan(ctx context.Context) (session.Inventory, error) {
 			continue
 		}
 		tty, pidText, pgidText, tpgidText := fields[0], fields[1], fields[2], fields[3]
+		if ttys != nil && !ttys[tty] {
+			continue
+		}
 		command := strings.Join(fields[4:], " ")
 
 		assistant := classify(command)

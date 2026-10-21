@@ -491,6 +491,12 @@
       "pattern": "/v1/settings/work-gates",
       "guide": "connect"
     },
+
+    {
+      "method": "*",
+      "pattern": "/v1/settings/workflow",
+      "guide": "connect"
+    },
     {
       "method": "*",
       "pattern": "/v1/snippets",

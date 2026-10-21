@@ -39,7 +39,7 @@ var browserSettings = map[string]bool{
 	"orchestrator_agent_notify": true, "orchestrator_enabled": true,
 	"orchestrator_max_children": true, "orchestrator_permission": true,
 	"orchestrator_notify_root": true, "orchestrator_child_linger": true,
-	"claude_auto_compact_window": true, "iterm_scan": true,
+	"claude_auto_compact_window": true, "iterm_scan": true, "session_auto_discovery": true,
 }
 
 // notificationSettings is the machine-wide event policy. A device's ability
@@ -252,6 +252,84 @@ func (s *Server) workGateSettingsRoute(w http.ResponseWriter, r *http.Request) {
 				writeRawRefusal(w, http.StatusBadRequest, "bad_request", "not a work gate setting key: "+name)
 				return
 			}
+		}
+		changes, refusal := settingsChanges(body)
+		if refusal != nil {
+			writeRawRefusal(w, http.StatusBadRequest, refusal.code, refusal.message)
+			return
+		}
+		var err error
+		if len(changes) == 0 {
+			_, err = f.Read()
+		} else {
+			_, err = f.Set(changes)
+		}
+		if err != nil {
+			writeSettingsFailure(w, f, err)
+			return
+		}
+		answer, err := read()
+		if err != nil {
+			writeSettingsFailure(w, f, err)
+			return
+		}
+		writeJSON(w, answer)
+	default:
+		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "GET or POST")
+	}
+}
+
+// workflowSettingsRoute exposes only dispatch defaults and Session discovery.
+func (s *Server) workflowSettingsRoute(w http.ResponseWriter, r *http.Request) {
+	f := s.settingsFile()
+	read := func() (contract.WorkflowSettingsSnapshot, error) {
+		v, err := f.Read()
+		if err != nil {
+			return contract.WorkflowSettingsSnapshot{}, err
+		}
+
+		return contract.WorkflowSettingsSnapshot{DispatchFullPermission: v.DispatchPermission() == "full", SessionAutoDiscovery: v.SessionAutoDiscovery()}, nil
+	}
+	switch r.Method {
+	case http.MethodGet, http.MethodHead:
+		answer, err := read()
+		if err != nil {
+			writeSettingsFailure(w, f, err)
+			return
+		}
+		writeJSON(w, answer)
+	case http.MethodPost:
+		if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+			writeRefusal(w, http.StatusUnsupportedMediaType, "unsupported_media_type",
+				"a workflow settings write is application/json")
+			return
+		}
+		var body map[string]json.RawMessage
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, settingsRequestBodyLimit))
+		if err := dec.Decode(&body); err != nil || body == nil {
+			writeRefusal(w, http.StatusBadRequest, "bad_request", "that body is not a workflow settings change")
+			return
+		}
+		for name := range body {
+			if name != "dispatch_full_permission" && name != "session_auto_discovery" {
+				writeRawRefusal(w, http.StatusBadRequest, "bad_request", "not a workflow setting key: "+name)
+				return
+			}
+		}
+		if raw, exists := body["dispatch_full_permission"]; exists {
+			if string(raw) != "null" {
+				var on bool
+				if err := json.Unmarshal(raw, &on); err != nil {
+					writeRefusal(w, http.StatusBadRequest, "bad_request", "dispatch_full_permission must be a boolean")
+					return
+				}
+				mode := "ask"
+				if on {
+					mode = "full"
+				}
+				body["orchestrator_permission"], _ = json.Marshal(mode)
+			}
+			delete(body, "dispatch_full_permission")
 		}
 		changes, refusal := settingsChanges(body)
 		if refusal != nil {

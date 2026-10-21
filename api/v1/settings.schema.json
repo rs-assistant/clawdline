@@ -12,6 +12,7 @@
         "path"
       ],
       "properties": {
+        "session_auto_discovery": { "type": "boolean", "nullable": true },
         "exists": {
           "description": "False before anything has been written. Every key then has the shell's default.",
           "type": "boolean"
@@ -271,6 +272,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "session_auto_discovery": { "type": "boolean", "nullable": true },
         "hotkey": {
           "description": "A combination the shell can register (`cmd+shift+k`), or empty for none.",
           "nullable": true,
@@ -537,6 +539,38 @@
         "verify_gate": {
           "nullable": true,
           "type": "boolean"
+        }
+      }
+    },
+    "WorkflowSettingsSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dispatch_full_permission": {
+          "type": "boolean",
+          "default": true
+        },
+        "session_auto_discovery": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": [
+        "dispatch_full_permission",
+        "session_auto_discovery"
+      ]
+    },
+    "WorkflowSettingsRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dispatch_full_permission": {
+          "type": "boolean",
+          "nullable": true
+        },
+        "session_auto_discovery": {
+          "type": "boolean",
+          "nullable": true
         }
       }
     }

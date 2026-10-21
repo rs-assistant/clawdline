@@ -272,6 +272,11 @@ func New(cfg config.Config) (*Server, error) {
 			Activity: app.NewActivityReads(),
 		},
 	}
+	srv.inventory.DiscoverExternal = func() bool {
+		v, err := srv.settingsFile().Read()
+		// An unreadable preference must not broaden discovery.
+		return err == nil && v.SessionAutoDiscovery()
+	}
 	// Background agents live beside the Session's own record, so they are
 	// found through the same resolver as the conversation itself.
 	agents.Record = srv.recordPath
@@ -654,6 +659,7 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/settings/notifications"}, s.notificationSettingsRoute},
 		{Route{"*", "/v1/settings/default-models"}, s.defaultModelsRoute},
 		{Route{"*", "/v1/settings/work-gates"}, s.workGateSettingsRoute},
+		{Route{"*", "/v1/settings/workflow"}, s.workflowSettingsRoute},
 		{Route{"*", "/v1/places"}, s.placesRoute},
 		{Route{"GET", "/v1/project-folders"}, s.projectFoldersRoute},
 		// The input bar's server list (devstacks.go): what the projects' own

@@ -73,6 +73,22 @@ func (v Values) WorkGates() WorkGates {
 	return out
 }
 
+// SessionAutoDiscovery includes externally opened Sessions unless explicitly disabled.
+func (v Values) SessionAutoDiscovery() bool {
+	on, set := v.Bool("session_auto_discovery")
+	return !set || on
+}
+
+// DispatchPermission follows the existing machine preference; absent means full.
+func (v Values) DispatchPermission() string {
+	mode, _ := v.String("orchestrator_permission")
+	switch mode {
+	case "ask", "edits", "full":
+		return mode
+	}
+	return "full"
+}
+
 // String returns a key's value when it is a JSON string, and whether it was.
 func (v Values) String(key string) (string, bool) {
 	raw, ok := v.Raw[key]
@@ -530,6 +546,7 @@ var Settables = []Settable{
 	// Whether the daemon polls iTerm2 over Apple Events; absent is on
 	// (docs/interface.md "Turning iTerm2 scanning off").
 	{Name: "iterm_scan", Kind: "bool"},
+	{Name: "session_auto_discovery", Kind: "bool"},
 	{Name: "orchestrator_enabled", Kind: "bool"},
 	{Name: "orchestrator_max_children", Kind: "int", Min: 1, Max: 10},
 	{Name: "orchestrator_permission", Kind: "string", Choices: []string{"ask", "edits", "full"},

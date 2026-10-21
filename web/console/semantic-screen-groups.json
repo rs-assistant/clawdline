@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8290,
-  "riskKeys": 3696,
-  "nonRiskCount": 4594,
+  "englishContentKeys": 8310,
+  "riskKeys": 3705,
+  "nonRiskCount": 4605,
   "groups": [
     {
       "name": "admin / other",
@@ -5372,6 +5372,26 @@
         "workflow.useSkill",
         "workflow.workflow",
         "workflow.zeroReviewTitle"
+      ]
+    },
+    {
+      "name": "workflowSettings / other",
+      "count": 11,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "workflowSettings.explain",
+        "workflowSettings.intro",
+        "workflowSettings.loading",
+        "workflowSettings.off",
+        "workflowSettings.on",
+        "workflowSettings.retry",
+        "workflowSettings.session_auto_discoveryOn",
+        "workflowSettings.session_auto_discoveryTitle",
+        "workflowSettings.tab",
+        "workflowSettings.whenOff",
+        "workflowSettings.whenOn"
       ]
     },
     {
