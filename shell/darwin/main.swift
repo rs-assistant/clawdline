@@ -639,10 +639,7 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
         let client = PairingPermissionClient(base: home)
         let flow = PairingPermissionFlow(
             pending,
-            screens: PairingScreens(
-                choose: { notice in Self.choosePairingPermission(notice) },
-                showCode: { notice, permission in Self.showPairingCode(notice, permission) },
-                showFailure: { notice, outcome in Self.showPairingFailure(notice, outcome) }),
+            screens: PairingDialogs.screens,
             save: client.save,
             finished: { [weak self] in
                 self?.pairingFlow = nil
@@ -650,50 +647,6 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
             })
         pairingFlow = flow
         flow.start()
-    }
-
-    private static func pairingAlert(_ notice: PairingNotice) -> NSAlert {
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = L.t.pairingAsks(notice.name)
-        alert.alertStyle = .informational
-        return alert
-    }
-
-    /// Operate is the first button, as the daemon's default is; Escape ignores.
-    private static func choosePairingPermission(_ notice: PairingNotice) -> PairingChoice {
-        let alert = pairingAlert(notice)
-        alert.informativeText = L.t.pairingChooseBody
-        alert.addButton(withTitle: L.t.pairingReadAndOperate)
-        alert.addButton(withTitle: L.t.pairingReadOnly)
-        alert.addButton(withTitle: L.t.pairingIgnore).keyEquivalent = "\u{1b}"
-        switch alert.runModal() {
-        case .alertFirstButtonReturn: return .grant(.readAndOperate)
-        case .alertSecondButtonReturn: return .grant(.readOnly)
-        default: return .ignore
-        }
-    }
-
-    private static func showPairingCode(_ notice: PairingNotice, _ permission: PairingPermission) {
-        let alert = pairingAlert(notice)
-        alert.informativeText = L.t.pairingSaved(permission) + "\n\n" + L.t.pairingCode(notice.code)
-        alert.addButton(withTitle: L.t.pairingIgnore)
-        alert.runModal()
-    }
-
-    /// True to try again. An expired pairing has nothing to retry.
-    private static func showPairingFailure(_ notice: PairingNotice, _ outcome: PairingPermissionOutcome) -> Bool {
-        let alert = pairingAlert(notice)
-        alert.alertStyle = .warning
-        alert.informativeText = L.t.pairingFailed(outcome)
-        if outcome == .expired {
-            alert.addButton(withTitle: L.t.dialogOK)
-            alert.runModal()
-            return false
-        }
-        alert.addButton(withTitle: L.t.pairingRetry)
-        alert.addButton(withTitle: L.t.pairingIgnore).keyEquivalent = "\u{1b}"
-        return alert.runModal() == .alertFirstButtonReturn
     }
 
     // MARK: - Where the hotkey applies
