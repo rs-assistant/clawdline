@@ -175,3 +175,31 @@ test("a missed pairing notification is repaired after the durable revision confl
   assert.equal((await s.session.machinePairing("machine-test")).epoch,2)
  } finally {c.stop()}
 })
+
+
+test("v2 strong storage without epoch or revision durably rekeys and survives a fresh session",async()=>{
+ const s=await storedPairing()
+ // v2.0.0 storePairingCryptoKeys persisted this synthetic binding shape;
+ // its nonextractable machine AES and Ed25519 CryptoKeys occupy the same names.
+ s.db.table.set(s.names.bindingName,{v:1,machineID:"machine-test",senderID:"machine-test",keyID:"ms-1",legacy:false})
+ s.pairing=await s.session.machinePairing("machine-test")
+ assert.equal(s.pairing.epoch,1);assert.equal(s.pairing.revision,undefined)
+ const r=await recoveryClient(s)
+ try {
+  assert.equal(await r.client.viewerRekey.request(s.pairing),true)
+  assert.equal(await r.client._receive(await r.answer()),true)
+  const reboot:any=new CloudViewerSession({config:{apiOrigin:"https://api.example.test",appOrigin:"https://app.example.test"},indexedDB:s.db.factory})
+  reboot.account="account-test"
+  const restored=await reboot.machinePairing("machine-test")
+  assert.equal(restored.epoch,2)
+  const clear=new TextEncoder().encode("future-canary"),iv=new Uint8Array(12)
+  const ciphertext=await crypto.subtle.encrypt({name:"AES-GCM",iv},restored.masterKey,clear)
+  assert.deepEqual(new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM",iv},restored.masterKey,ciphertext)),clear)
+  await assert.rejects(crypto.subtle.decrypt({name:"AES-GCM",iv},s.pairing.masterKey,ciphertext))
+  s.db.table.set(s.names.bindingName,{v:1,machineID:"machine-test",senderID:"machine-test",keyID:"ms-1",legacy:true})
+  const legacy=await reboot.machinePairing("machine-test")
+  assert.equal(legacy.legacy,true)
+  r.clock.now+=120000
+  assert.equal(await r.client.viewerRekey.request(legacy),false)
+ }finally{r.client.stop()}
+})

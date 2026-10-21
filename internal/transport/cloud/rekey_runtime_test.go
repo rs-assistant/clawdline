@@ -880,3 +880,89 @@ func TestRuntimePendingRevocationReadAndPinFailuresHalt(t *testing.T) {
 		})
 	}
 }
+
+// The persisted shape was produced by v2.0.0 (d2ed0c0633dec8dc7c4f0d2b8d78cf229a2795d4)
+// PinnedStore.Pin using synthetic data. Only B's public key is replaced per run.
+func TestRuntimeHistoricalStrongPinRekeysWithoutChangingScope(t *testing.T) {
+	for _, c := range []struct {
+		name, scope                                                  string
+		pending, revoked, missing, wrongAccount, badKey, wrongSigner bool
+		want                                                         bool
+	}{
+		{name: "v2-empty-scope", want: true}, {name: "operate", scope: "operate", want: true},
+		{name: "readonly", scope: "readonly", want: true}, {name: "unknown-scope", scope: "future"},
+		{name: "pending", scope: "operate", pending: true}, {name: "revoked", scope: "operate", revoked: true},
+		{name: "empty-scope-pending", pending: true}, {name: "empty-scope-revoked", revoked: true},
+		{name: "roster-only", missing: true}, {name: "wrong-account", wrongAccount: true},
+		{name: "bad-key", badKey: true}, {name: "wrong-signer", wrongSigner: true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			l, a, b := runtimeFixture(t)
+			if _, err := l.revokeContentViewer("A"); err != nil {
+				t.Fatal(err)
+			}
+			var doc map[string]any
+			if err := json.Unmarshal([]byte(`{"version":1,"account_id":"account","devices":[{"device_id":"B","public_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","fingerprint":"synthetic-public-fingerprint","paired_at":1700000000}]}`), &doc); err != nil {
+				t.Fatal(err)
+			}
+			row := doc["devices"].([]any)[0].(map[string]any)
+			row["public_key"] = base64.StdEncoding.EncodeToString(b.PublicKey())
+			if c.scope != "" {
+				row["scope"] = c.scope
+			}
+			if c.pending {
+				row["pairing_pending"] = true
+			}
+			if c.revoked {
+				row["revoked_at"] = 1700000001
+			}
+			if c.missing {
+				doc["devices"] = []any{}
+			}
+			if c.wrongAccount {
+				doc["account_id"] = "other"
+			}
+			if c.badKey {
+				row["public_key"] = "invalid"
+			}
+			raw, err := json.Marshal(doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(l.pinned.Path(), raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			l.pinned = adaptercloud.NewPinnedStore(l.keys.Dir())
+			signer := b
+			if c.wrongSigner {
+				signer = a
+			}
+			offer, private := runtimeOffer(t, "B", signer, time.Now().UnixMilli())
+			var answer []byte
+			err = l.answerRekey(offer, func(v []byte) error { answer = bytes.Clone(v); return nil })
+			if got := err == nil && len(answer) > 0; got != c.want {
+				t.Fatalf("answered=%v want %v: %v", got, c.want, err)
+			}
+			if c.want {
+				machine, _, _ := l.keys.DeviceKey()
+				state, err := domaincloud.OpenRekeyAnswer(answer, offer, domaincloud.RekeyAuthority{AccountID: "account", MachineID: "machine", ViewerDeviceID: "B", ActiveViewerKey: b.PublicKey()}, private, machine.PublicKey(), 1, "ms-1", time.Now().UnixMilli())
+				current, _ := l.contentEpoch.Current()
+				if err != nil || state.Epoch != 2 || !bytes.Equal(state.Key.Bytes(), current.Key.Bytes()) {
+					t.Fatalf("epoch 2 recovery: %v", err)
+				}
+				scope, err := l.pinned.ViewerScope("B")
+				want := c.scope
+				if want == "" {
+					want = "operate"
+				}
+				if err != nil || string(scope) != want {
+					t.Fatalf("scope changed: %s %v", scope, err)
+				}
+			}
+			after, err := os.ReadFile(l.pinned.Path())
+			if err != nil || !bytes.Equal(after, raw) {
+				t.Fatal("rekey mutated historical pin", err)
+			}
+		})
+	}
+}

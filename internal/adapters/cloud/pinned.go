@@ -265,7 +265,7 @@ func (s *PinnedStore) ActiveRekeyPin(account, viewer string) (ed25519.PublicKey,
 		return nil, ErrViewerNotPinned
 	}
 	for _, row := range s.record.Devices {
-		if row.DeviceID == viewer && row.Active() && !row.PairingPending && ValidViewerScope(row.Scope) {
+		if row.DeviceID == viewer && row.Active() && !row.PairingPending && ValidViewerScope(row.EffectiveScope()) {
 			if key, ok := row.Key(); ok {
 				return key, nil
 			}

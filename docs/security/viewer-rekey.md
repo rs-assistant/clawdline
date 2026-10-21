@@ -1,8 +1,9 @@
-# Browser content-key refresh (disabled by default)
+# Browser content-key refresh (hosted receiver enabled in source)
 
 The browser implementation composes the existing [v1 control contract](content-key-rekey.md)
 with the paired machine's durable state. It is preparation for the relay and daemon runtime;
-this change does not enable production rotation or establish future-content revocation.
+the hosted receiver is enabled in source, while the daemon producer remains disabled.
+This does not establish deployed rotation or future-content revocation.
 
 ## Authority and storage
 
@@ -79,7 +80,10 @@ subscription alone forces a disconnected machine to publish new data.
 ## Enable switch and deployment order
 
 `CloudViewerSession` and `CloudClient` accept `enableViewerRekey: true`; both default to false.
-Production boot does not set it. The client additionally requires the trusted public device key
+The hosted `newCloudSession` factory explicitly sets it to true. The daemon
+production caller still leaves `ContentKeyRuntime` disabled. Receiver deployment
+and acceptance are pending root verification; source enablement is not an online
+acceptance claim. The client additionally requires the trusted public device key
 and `persistMachineRekey` callback. Tests opt in explicitly with a synthetic relay and database.
 
 1. Integrate the native/crypto/epoch source branch and the root's Go envelope key ID compatibility
@@ -87,11 +91,12 @@ and `persistMachineRekey` callback. Tests opt in explicitly with a synthetic rel
 2. Deploy additive raw offer/answer validation and routing in the private relay. Its
    `DEFAULT_LIMITS.maxKeyIdLength` must accept 128 bytes before any producer emits these IDs.
    The browser's named `MAX_CONTENT_KEY_ID_BYTES` and Go `MaxKeyIDBytes` must both be 128.
-3. Deploy the hosted viewer with the switch off. Integrate daemon active-pin authorization,
-   rotation/publication barriers, answer handling and fresh snapshot recovery.
+3. Deploy and accept the hosted viewer with its receiver switch on. The source now
+   includes active-pin authorization, rotation/publication barriers, answer handling
+   and fresh snapshot recovery; the daemon producer stays off.
 4. Accept both ends with read-only B, revoked A, cross-tab races, persisted floors, restart,
-   dropped/duplicated frames and recovery. Only then opt production boot in and enable the
-   producer. Rollbacks must retain durable floors.
+   dropped/duplicated frames and recovery. Only after receiver deployment and acceptance
+   enable the daemon producer. Rollbacks must retain durable floors.
 
 ## Verification
 
@@ -103,3 +108,10 @@ answers, aborts, competing floors, pairing generations, legacy migration, accoun
 read resumption, subscription recovery, bounds and full-length durable IDs. The fake database
 does not establish real browser crash consistency or production relay support. Root owns final
 integration, browser/daemon acceptance, deployment and enabling production.
+
+Historical v2.0.0 strong browser bindings (`legacy:false`, `ms-1`, no epoch or
+revision) infer the epoch-1 floor and durably adopt authenticated answers without
+a migration. A fresh Session reads the adopted key after restart. `legacy:true`
+bindings remain ineligible to emit offers. Historical daemon strong pins without
+scope retain their existing effective operate ceiling; this does not promote
+readonly, resurrect pending/revoked pins or authorize roster-only viewers.

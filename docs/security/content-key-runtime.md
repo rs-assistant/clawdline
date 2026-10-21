@@ -1,6 +1,6 @@
 # Content-key runtime cutover (disabled by default)
 
-**Status: opt-in runtime integration; production remains disabled.**
+**Status: hosted receiver enabled in source; producer remains disabled.**
 `LinkOptions.ContentKeyRuntime` defaults to false; no production caller enables
 it. The foundation record below describes the original inactive implementation.
 Its remaining-obligations list is historical; the integration section at the end
@@ -184,9 +184,12 @@ allows one offer per two seconds globally. There is no unbounded nonce set;
 duplicate offers share the admission budget and can only receive the current
 key. Raw answers never enter retained publication or the spool.
 
-The answer handler uses configured account/machine context, an active local
-nonlegacy pin with explicit valid scope, its verified signature, a fresh roster
-fetch and matching active roster key with `read_transcript`. Readonly qualifies;
+The answer handler uses configured account/machine context, an active completed local
+pin with valid effective scope, its verified signature, a fresh roster
+fetch and matching active roster key with `read_transcript`. Historical v2.0.0
+strong pins with absent scope retain their existing operate ceiling; readonly stays readonly. Rekey does not write or migrate pins. Revoked,
+pending, foreign-account, malformed-key and unknown-scope pins remain refused,
+and roster membership alone never qualifies. Readonly qualifies;
 `send_prompt` is unnecessary. It re-reads the pin immediately before sealing,
 uses fresh `crypto/rand` ephemeral/nonce bytes, and sends the targeted signed raw
 answer inside the authority sequence and epoch fence. Contract expiry and epoch
@@ -271,3 +274,12 @@ adopt it into an ordinary relay binding or claim that Session access was granted
 Production `ContentKeyRuntime` remains off by default. Synthetic tests exercise
 real signatures and AEAD; production relay, real browser and phone acceptance
 remain separate integration requirements.
+
+## Receiver-first rollout status
+
+The hosted `newCloudSession` factory now explicitly enables `ViewerRekey` in source.
+The `CloudViewerSession` and `CloudClient` library defaults remain false, and
+`cmd/clawdline/main.go` still does not enable `ContentKeyRuntime`. This source
+change does not establish deployment or production acceptance. Root must deploy
+and accept the receiver before enabling the producer; browser/phone and relay
+acceptance remain pending.
