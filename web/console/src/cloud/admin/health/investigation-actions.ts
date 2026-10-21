@@ -19,7 +19,7 @@ const nat = (v: unknown): number | null => (typeof v === "number" && Number.isSa
 /* ---- the operator's own schedule webhooks ---------------------------------- */
 
 /** One hook as `GET /v1/schedule-webhooks` lists it; only what the picker shows. */
-export type HookChoice = { hook_id: string; machine_id: string; availability: string; generation: number | null; credential_fingerprint: string | null }
+export type HookChoice = { hook_id: string; machine_id: string; machine_name?: string; availability: string; generation: number | null; credential_fingerprint: string | null }
 export type HooksResult = { ok: true; hooks: HookChoice[]; more: boolean } | { ok: false; code: StoredFailure } | { refused: Refusal }
 
 /** The hooks a start may name: only `active` ones, because Cloud refuses every other (`hook_unavailable`).
@@ -32,7 +32,7 @@ export function parseHooks(body: unknown): { hooks: HookChoice[]; more: boolean 
     const id = ref(h.hook_id)
     const machine = ref(h.machine_id)
     if (id === null || machine === null || h.state !== "active" || h.availability !== "active") continue
-    hooks.push({ hook_id: id, machine_id: machine, availability: "active", generation: nat(h.generation), credential_fingerprint: ref(h.credential_fingerprint) })
+    hooks.push({ ...(typeof h.machine_name === "string" && h.machine_name.trim() ? { machine_name: h.machine_name.trim() } : {}), hook_id: id, machine_id: machine, availability: "active", generation: nat(h.generation), credential_fingerprint: ref(h.credential_fingerprint) })
   }
   return { hooks, more: typeof body.next_cursor === "string" }
 }

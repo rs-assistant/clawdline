@@ -566,7 +566,7 @@ const FIX_COMMIT = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c"
 /** The operator's own schedule webhooks: two active, one disabled (which the picker leaves out). */
 function hooksAnswer(now: number): Response {
   const hook = (id: string, machine: string, state: string) => ({
-    hook_id: id, machine_id: machine, state, availability: state, generation: 1, revision: 2,
+    hook_id: id, machine_id: machine, machine_name: machine === MAC_A ? "Investigation machine A" : "Investigation machine B", state, availability: state, generation: 1, revision: 2,
     created_at: new Date(now - 86_400_000).toISOString(), activated_at: new Date(now - 86_000_000).toISOString(),
     rotated_at: null, disabled_at: state === "disabled" ? new Date(now - 3_600_000).toISOString() : null, credential_fingerprint: `fp_${id.slice(-4)}`,
   })

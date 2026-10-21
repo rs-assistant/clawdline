@@ -118,7 +118,6 @@ function Start({ incidentId, revision, account, gate, say, actions }: { incident
   const [hooks, setHooks] = useState<HooksState>({ kind: "loading" })
   // The chosen hook is kept for this page only; nothing is stored or created.
   const [hookId, setHookId] = useState("")
-  const [bound, setBound] = useState(false)
   const ctl = useRef<AbortController | null>(null)
   useEffect(() => () => { ctl.current?.abort() }, [])
 
@@ -157,7 +156,7 @@ function Start({ incidentId, revision, account, gate, say, actions }: { incident
   if (st.kind === "closed" || st.kind === "done" || st.kind === "refused") {
     return (
       <div className="adm-notice-actions">
-        <button type="button" className="adm-btn adm-btn-small" onClick={() => { setSt({ kind: "picking" }); setBound(false); loadHooks() }}>{say("iv_start")}</button>
+        <button type="button" className="adm-btn adm-btn-small" onClick={() => { setSt({ kind: "picking" }); loadHooks() }}>{say("iv_start")}</button>
         <span role="status" className={st.kind === "refused" ? "adm-stale" : "adm-fine"}>
           {st.kind === "done" ? say(st.replayed ? "iv_replayed" : "iv_startedOk") : st.kind === "refused" ? <>{say("iv_refused", { reason: refusalWord(say, st.code) })} <span className="adm-code">({st.code})</span></> : ""}
         </span>
@@ -166,7 +165,7 @@ function Start({ incidentId, revision, account, gate, say, actions }: { incident
   }
   const locked = st.kind === "busy" || st.kind === "ambiguous"
   const chosen = locked ? st.pending.req.hook_id : hookId
-  const ready = hooks.kind === "ready" && hooks.hooks.some((h) => h.hook_id === hookId) && bound
+  const ready = hooks.kind === "ready" && hooks.hooks.some((h) => h.hook_id === hookId)
   return (
     <div className="adm-notice adh-iv-start" role="group" aria-label={say("iv_pickTitle")}>
       <p><strong>{say("iv_pickTitle")}</strong></p>
@@ -180,14 +179,10 @@ function Start({ incidentId, revision, account, gate, say, actions }: { incident
             {hooks.hooks.map((h) => (
               <label key={h.hook_id} className="adh-iv-hook">
                 <input type="radio" name={`iv-hook-${incidentId}`} value={h.hook_id} checked={chosen === h.hook_id} onChange={() => setHookId(h.hook_id)} />
-                <span><code className="adh-id">{h.hook_id}</code> <span className="adm-fine">{say("iv_hookMachine")} <code className="adh-id">{h.machine_id}</code></span></span>
+                <span><span className="adh-id">{h.machine_name ?? h.machine_id}</span><span className="adm-fine adh-id">{h.hook_id}</span></span>
               </label>
             ))}
             {hooks.more ? <p className="adm-fine">{say("iv_hooksMore", { n: hooks.hooks.length })}</p> : null}
-            <label className="adh-iv-hook">
-              <input type="checkbox" checked={bound || locked} onChange={(e) => setBound(e.target.checked)} />
-              <span>{say("iv_bindConfirm")}</span>
-            </label>
           </fieldset>
         )}
       <p className="adm-fine">{say("iv_frozenNote", { n: revision })}</p>

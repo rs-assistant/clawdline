@@ -2,11 +2,11 @@
   "version": 1,
   "englishKeys": 8545,
   "counts": {
-    "negation": 2497,
+    "negation": 2496,
     "state": 1404,
     "permission": 467,
     "deletion": 197,
-    "uncertainty": 265
+    "uncertainty": 266
   },
   "unionCount": 3812,
   "categories": {
@@ -647,7 +647,6 @@
       "health.incidentNotFound",
       "health.incidentsNone",
       "health.iv_ambiguous",
-      "health.iv_bindNote",
       "health.iv_conc_unknown",
       "health.iv_frozenNote",
       "health.iv_gate_expired",
@@ -4631,6 +4630,7 @@
       "health.inc_sum_missingTitle",
       "health.inc_why_released_outcome_unknown",
       "health.inc_why_sequence_gap",
+      "health.iv_bindNote",
       "health.iv_gate_unknown_state",
       "health.iv_next_delivery_unknown",
       "health.iv_next_report_needs_evidence",
