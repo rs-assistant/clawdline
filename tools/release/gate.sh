@@ -18,9 +18,10 @@
 #    binaries and SBOMs included,
 # 7. with --publish, and only when all of that passed, un-drafts the release.
 #
-# A -test.N release (--dir) was not built by the workflow and is not signed
-# for distribution, so steps 4 and 5 are skipped for it and say so. Every
-# other version fails closed: missing evidence is a failed gate, not a warning.
+# A -test.N release read with --dir was not built by the workflow and is not
+# signed for distribution, so steps 4 and 5 are skipped for it and say so. A
+# -test.N version is gated only that way: one drafted on GitHub is refused
+# rather than downloaded without those steps. Every other version fails closed: missing evidence is a failed gate, not a warning.
 # A release drafted before this gate existed has no SBOM or attestation and
 # cannot pass it; that is the intended answer, not a reason to loosen it.
 set -euo pipefail
@@ -39,6 +40,11 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 [ "$publish" = 0 ] || [ -z "$dir" ] || { echo "--publish is for a drafted GitHub release, not --dir" >&2; exit 2; }
+test_release=0
+if [[ "$version" =~ -test\.[0-9]+$ ]]; then
+  [ -n "$dir" ] || { echo "a -test release is gated only with --dir; it has no provenance or notarization to check" >&2; exit 2; }
+  test_release=1
+fi
 
 work=$(mktemp -d)
 # finished: macOS's /bin/bash 3.2 exits 0 after an unbound-variable error when
@@ -54,11 +60,9 @@ if [ -z "$dir" ]; then
 fi
 
 extra=()
-[[ "$version" =~ -test\.[0-9]+$ ]] && extra=(-pub "${CLAWDLINE_TEST_RELEASE_PUB:?a -test release is verified with CLAWDLINE_TEST_RELEASE_PUB}")
+[ "$test_release" = 0 ] || extra=(-pub "${CLAWDLINE_TEST_RELEASE_PUB:?a -test release is verified with CLAWDLINE_TEST_RELEASE_PUB}")
 go run ./tools/release verify ${extra[@]+"${extra[@]}"} "$dir"
 
-test_release=0
-[[ "$version" =~ -test\.[0-9]+$ ]] && test_release=1
 # The manifest must be this version's, and the release must hold nothing but
 # its archives, their SBOMs and the signed manifest: an asset nobody checks is
 # an asset nobody should publish.

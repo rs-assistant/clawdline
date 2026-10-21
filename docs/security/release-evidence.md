@@ -49,13 +49,18 @@ tools/release/provenance.sh "rel-$v"     # each asset's attestation, repository,
 
 `sbom.sh verify` regenerates each SBOM from the downloaded archive and the commit and requires an
 exact match, so a file, module or package added to or removed from either side fails it.
-`provenance.sh` runs `gh attestation verify` with `--repo`, `--signer-workflow`, `--source-ref`,
+`provenance.sh` runs `gh attestation verify` with `--repo`, `--cert-identity`, `--source-ref`,
 `--source-digest` and `--deny-self-hosted-runners` for every asset, and then re-reads the verified
-statement itself. A single asset can also be checked by hand:
+certificate identity and statement itself. `--cert-identity` is the certificate's exact SAN,
+`https://github.com/sainteye/clawdline/.github/workflows/release.yml@refs/heads/main`; gh turns
+`--signer-workflow` into a prefix pattern instead (`validateSignerWorkflow` in gh's
+`pkg/cmd/attestation/verify/policy.go`), which a workflow named `release.yml-anything.yml` also
+matches. The repository, workflow and ref are fixed in the script; no environment variable changes
+them. A single asset can also be checked by hand:
 
 ```sh
 gh attestation verify "rel-$v/manifest.json" --repo sainteye/clawdline \
-  --signer-workflow sainteye/clawdline/.github/workflows/release.yml \
+  --cert-identity https://github.com/sainteye/clawdline/.github/workflows/release.yml@refs/heads/main \
   --source-ref refs/heads/main --source-digest "$(jq -r .commit "rel-$v/manifest.json")"
 ```
 
@@ -93,7 +98,7 @@ build it the way the workflow does (`tools/release/build.sh`; an official build 
 identities, a rebuild without them signs ad hoc), and compare:
 
 ```sh
-tools/release/reproduce.sh compare "rel-$v" <rebuild-dir>
+tools/release/reproduce.sh compare "rel-$v" <rebuild-dir>   # paths relative to where it is run
 ```
 
 It reports each archive whose bytes differ (`archive-bytes`: tar and gzip record times and owners,

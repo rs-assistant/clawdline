@@ -24,6 +24,8 @@
 # build cache, and compares the two archives. It covers the Go build only,
 # not the console bundle, tmux or the app. Run it through tools/heavy.sh.
 set -euo pipefail
+# compare's paths are the caller's; they are made absolute before the cd.
+caller=$PWD
 cd "$(dirname "$0")/../.."
 
 usage() { echo "usage: tools/release/reproduce.sh compare <A> <B> | smoke" >&2; exit 2; }
@@ -48,6 +50,8 @@ unsigned_sha() {
 
 compare() {
   local a=$1 b=$2 names=() n diffs=0 sigs=0 same=0
+  case "$a" in /*) ;; *) a=$caller/$a ;; esac
+  case "$b" in /*) ;; *) b=$caller/$b ;; esac
   if [ -f "$a" ] && [ -f "$b" ]; then
     mkdir -p "$work/a" "$work/b"
     cp "$a" "$work/a/$(basename "$a")"
@@ -55,7 +59,7 @@ compare() {
     a=$work/a b=$work/b
   fi
   [ -d "$a" ] && [ -d "$b" ] || usage
-  while IFS= read -r n; do names+=("$n"); done < <( (cd "$a" && ls -- *.tar.gz 2>/dev/null; cd "$b" && ls -- *.tar.gz 2>/dev/null) | sort -u)
+  while IFS= read -r n; do names+=("$n"); done < <( { (cd "$a" && ls -- *.tar.gz 2>/dev/null); (cd "$b" && ls -- *.tar.gz 2>/dev/null); } | sort -u)
   [ "${#names[@]}" -gt 0 ] || { echo "reproduce: no archives to compare" >&2; exit 1; }
   for n in ${names[@]+"${names[@]}"}; do
     if [ ! -f "$a/$n" ] || [ ! -f "$b/$n" ]; then
@@ -81,7 +85,7 @@ compare() {
         if [ "$sa" = "$sb" ]; then echo "signature-only  $n:$f"; sigs=$((sigs + 1)); continue; fi
       fi
       echo "differs  $n:$f"; diffs=$((diffs + 1))
-    done < <( (cd "$ua" && find . \( -type f -o -type l \) | sed 's#^\./##'; cd "$ub" && find . \( -type f -o -type l \) | sed 's#^\./##') | sort -u)
+    done < <( { (cd "$ua" && find . \( -type f -o -type l \)); (cd "$ub" && find . \( -type f -o -type l \)); } | sed 's#^\./##' | sort -u)
   done
   echo "reproduce: $same identical, $sigs signature-only, $diffs different"
   [ "$diffs" = 0 ]

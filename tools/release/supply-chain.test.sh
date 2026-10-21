@@ -170,15 +170,15 @@ echo "== rebuild comparison"
 expect_ok "two identical builds compare clean" tools/release/reproduce.sh compare "$good" "$good"
 expect_fail "a different payload file is reported" '^differs .*dist/assets/extra.js|only-in-B .*extra.js' tools/release/reproduce.sh compare "$good" "$work/stale"
 d="$work/extra-archive"; cp -R "$good" "$d"; cp "$good/clawdline_${version}_linux_amd64.tar.gz" "$d/clawdline_${version}_linux_arm64.tar.gz"
-rel_good=$(node -e 'process.stdout.write(require("path").relative(process.cwd(), process.argv[1]))' "$good")
-rel_extra=$(node -e 'process.stdout.write(require("path").relative(process.cwd(), process.argv[1]))' "$d")
-expect_fail "an archive only the second build has is reported, with relative paths too" '^only-in-B +clawdline_.*_linux_arm64' tools/release/reproduce.sh compare "$rel_good" "$rel_extra"
+# Named relative to the directory it is run from, as a person types them.
+expect_fail "an archive only the second build has is reported, with relative paths too" '^only-in-B +clawdline_.*_linux_arm64' \
+  bash -c 'cd "$1" && "$2/tools/release/reproduce.sh" compare good extra-archive' _ "$work" "$root"
 if [ "$(uname -s)" = Darwin ]; then
   # A Mach-O file differs; it is signature-only only when the bytes left once
   # both signatures are removed are the same.
   mk_mach() { local d=$1 bin=$2 ident=$3 s="$work/mach.$RANDOM"; mkdir -p "$d" "$s"; cp "$bin" "$s/clawdline"; chmod u+w "$s/clawdline"
     codesign --force --sign - --identifier "$ident" "$s/clawdline" 2>/dev/null; COPYFILE_DISABLE=1 tar -C "$s" -czf "$d/clawdline_${version}_darwin_arm64.tar.gz" .; rm -rf "$s"; }
-  other="$(go env GOROOT)/pkg/tool/$(go env GOOS)_$(go env GOARCH)/addr2line"
+  other="$(go env GOROOT)/bin/go"
   mk_mach "$work/mach-a" "$gobin" one; mk_mach "$work/mach-b" "$gobin" two; mk_mach "$work/mach-c" "$other" two
   expect_ok "a Mach-O file re-signed with another identity is signature-only" tools/release/reproduce.sh compare "$work/mach-a" "$work/mach-b"
   expect_fail "a Mach-O file with another payload is not called signature-only" '^differs .*:clawdline$' tools/release/reproduce.sh compare "$work/mach-a" "$work/mach-c"

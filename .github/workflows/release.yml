@@ -118,7 +118,7 @@ jobs:
             for f in tmux tmux.json; do
               gh attestation verify "$tmux_dir/linux-$arch/$f" --repo "$GITHUB_REPOSITORY" \
                 --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/tmux.yml" \
-                --source-digest "$GITHUB_SHA" --deny-self-hosted-runners >/dev/null
+                --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA" --deny-self-hosted-runners >/dev/null
             done
             chmod +x "$tmux_dir/linux-$arch/tmux"
           done

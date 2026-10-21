@@ -20,9 +20,13 @@
 # the bundles `gh attestation download` saved (sha256:<digest>.jsonl) and
 # --trusted-root the output of `gh attestation trusted-root`.
 #
+# The signer is asked for with --cert-identity, the certificate's exact SAN:
+# gh turns --signer-workflow into a prefix pattern, which a workflow named
+# release.yml-anything.yml also matches. The repository, workflow and ref are
+# fixed here, not read from the environment, so nothing in the gate's
+# environment can point it at another signer.
+#
 # CLAWDLINE_GH names the gh to run (the supply-chain test passes a stub).
-# CLAWDLINE_PROVENANCE_REPO and CLAWDLINE_PROVENANCE_WORKFLOW exist for that
-# test only.
 set -euo pipefail
 
 [ "$#" -ge 1 ] || { echo "usage: tools/release/provenance.sh <release-dir> [--bundle-dir D --trusted-root F]" >&2; exit 2; }
@@ -39,9 +43,10 @@ done
 [ -z "$bundle_dir" ] || [ -n "$trusted_root" ] || { echo "--bundle-dir needs --trusted-root" >&2; exit 2; }
 
 gh=${CLAWDLINE_GH:-gh}
-repo=${CLAWDLINE_PROVENANCE_REPO:-sainteye/clawdline}
-workflow=${CLAWDLINE_PROVENANCE_WORKFLOW:-.github/workflows/release.yml}
+repo=sainteye/clawdline
+workflow=.github/workflows/release.yml
 ref=refs/heads/main
+identity="https://github.com/$repo/$workflow@$ref"
 
 [ -f "$dir/manifest.json" ] || { echo "provenance: $dir has no manifest.json" >&2; exit 1; }
 commit=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1])).commit||"")' "$dir/manifest.json")
@@ -60,7 +65,7 @@ done
 for f in ${assets[@]+"${assets[@]}"}; do
   name=$(basename "$f")
   digest=$(shasum -a 256 "$f" | cut -d' ' -f1)
-  args=(attestation verify "$f" --repo "$repo" --signer-workflow "$repo/$workflow"
+  args=(attestation verify "$f" --repo "$repo" --cert-identity "$identity"
     --source-ref "$ref" --source-digest "$commit" --deny-self-hosted-runners --format json)
   if [ -n "$bundle_dir" ]; then
     [ -f "$bundle_dir/sha256:$digest.jsonl" ] || { echo "provenance: no bundle for $name (sha256:$digest)" >&2; exit 1; }
@@ -71,9 +76,9 @@ for f in ${assets[@]+"${assets[@]}"}; do
     sed 's/^/  /' "$work/err" >&2
     exit 1
   fi
-  node - "$work/out.json" "$digest" "$commit" "$repo" "$workflow" "$ref" "$name" <<'JS'
+  node - "$work/out.json" "$digest" "$commit" "$repo" "$workflow" "$ref" "$name" "$identity" <<'JS'
 const fs = require("fs");
-const [file, digest, commit, repo, workflow, ref, name] = process.argv.slice(2);
+const [file, digest, commit, repo, workflow, ref, name, identity] = process.argv.slice(2);
 let results;
 try { results = JSON.parse(fs.readFileSync(file)); } catch { console.error(`provenance: gh printed no JSON for ${name}`); process.exit(1); }
 if (!Array.isArray(results) || results.length === 0) { console.error(`provenance: no verified attestation for ${name}`); process.exit(1); }
@@ -82,7 +87,9 @@ const ok = results.some((r) => {
   const st = (r.verificationResult || {}).statement || {};
   const bd = (st.predicate || {}).buildDefinition || {};
   const wf = ((bd.externalParameters || {}).workflow) || {};
+  const san = (((r.verificationResult || {}).signature || {}).certificate || {}).subjectAlternativeName;
   const checks = [
+    [san === identity, `signer ${san}`],
     [st.predicateType === "https://slsa.dev/provenance/v1", `predicate ${st.predicateType}`],
     [(st.subject || []).some((s) => (s.digest || {}).sha256 === digest), "subject digest"],
     [wf.repository === `https://github.com/${repo}`, `repository ${wf.repository}`],

@@ -78,7 +78,8 @@ may be newer than the program release; do not present them as the same source tr
    workflow, `refs/heads/main`, the manifest's commit, a GitHub-hosted runner), and, on a Mac,
    each macOS binary's Developer ID signature, hardened runtime and timestamp and the app's
    stapled ticket and Gatekeeper verdict. Any missing or wrong piece fails the gate; there is no
-   warning-only mode. A `-test.N` release skips provenance and the macOS check and says so.
+   warning-only mode. A `-test.N` release read with `--dir` skips provenance and the macOS check and
+   says so; a `-test.N` version is never gated from a GitHub draft.
 
    The scan reads every unpacked file and the printable strings of each binary. In a binary only
    a private word or this machine's home directory is a finding: a binary carries every literal of
@@ -103,8 +104,11 @@ go run ./tools/release sign -key /somewhere/outside/the/repo/test.key /tmp/rel/v
 
 A test release also carries SBOMs, so `tools/release/gate.sh <v> --dir <dir>` checks them on it.
 The evidence checks themselves are tested, with a synthetic release and a stub `gh`, by
-`tools/heavy.sh bash tools/release/supply-chain.test.sh`: a missing SBOM, a wrong digest, and an
-attestation from another repository, workflow or commit must each fail.
+`tools/heavy.sh bash tools/release/supply-chain.test.sh`: a missing SBOM, a wrong digest, an
+attestation from another repository, workflow, signer or commit, an environment that names another
+repository, a `-test.N` draft gated without `--dir`, and a Mach-O payload difference reported as
+signature-only must each fail. `tools/check.sh` runs it whenever `tools/release/` or the release
+workflows change, and in every full check.
 
 `--test-key` compiles one extra trusted key into those binaries. It is accepted only for a
 `-test.N` version, the workflow refuses such a version, and `--no-app` is required, so no
