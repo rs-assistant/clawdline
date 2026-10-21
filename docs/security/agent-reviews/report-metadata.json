@@ -9,6 +9,11 @@
       "round": 1,
       "date": "2026-10-21",
       "kind": "baseline"
+    },
+    {
+      "round": 2,
+      "date": "2026-10-21",
+      "kind": "Clawdline follow-up; source changes do not establish release or deployment acceptance"
     }
   ],
   "reviews": [
@@ -130,6 +135,36 @@
       "report": {
         "zh-TW": "orca.zh-TW.md",
         "en": "orca.md"
+      }
+    },
+    {
+      "project": "Clawdline",
+      "repository": "sainteye/clawdline",
+      "reviewed_sha": "dacb02ac15b673c48734c46fa2a777f698872a8c",
+      "reviewer": "Claude Code",
+      "original_language": "zh-TW",
+      "translation": "en",
+      "date": "2026-10-21",
+      "round": 2,
+      "scope": "install.sh, README, SECURITY.md and selected documentation; Go source and release binary not reviewed",
+      "report": {
+        "zh-TW": "clawdline-follow-up.zh-TW.md",
+        "en": "clawdline-follow-up.md"
+      }
+    },
+    {
+      "project": "Clawdline",
+      "repository": "sainteye/clawdline",
+      "reviewed_sha": "dacb02ac15b673c48734c46fa2a777f698872a8c",
+      "reviewer": "Codex",
+      "original_language": "zh-TW",
+      "translation": "en",
+      "date": "2026-10-21",
+      "round": 2,
+      "scope": "installer and selected documentation; no installation, full source audit, dependency scan or binary verification",
+      "report": {
+        "zh-TW": "clawdline-follow-up.zh-TW.md",
+        "en": "clawdline-follow-up.md"
       }
     }
   ]
