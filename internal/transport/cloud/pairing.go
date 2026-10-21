@@ -380,11 +380,21 @@ func (p *Pairing) deliver(ctx context.Context, offer domaincloud.PairingOffer, s
 	if err != nil {
 		return PairingState{}, err
 	}
+	// No scope chosen is not a choice of operate: a device this machine already
+	// holds keeps its own ceiling, read before the content key is released so
+	// an unreadable pin file or an unknown scope refuses the pairing outright.
+	kept := scope == ""
+	reserve := scope
+	if kept {
+		if reserve, err = p.Pinned.RepairScope(offer.ViewerDeviceID); err != nil {
+			return PairingState{}, err
+		}
+	}
 	// Reserve the readonly ceiling before releasing the content key. Otherwise a
 	// failed pin write after delivery would fall back to legacy roster authority.
-	if scope == adaptercloud.ScopeReadOnly {
+	if reserve == adaptercloud.ScopeReadOnly {
 		if err := p.Pinned.Pin(p.AccountID, adaptercloud.PinnedDevice{DeviceID: offer.ViewerDeviceID,
-			PublicKey: offer.ViewerSigningKey, Fingerprint: offer.ViewerFingerprint, Scope: scope,
+			PublicKey: offer.ViewerSigningKey, Fingerprint: offer.ViewerFingerprint, Scope: reserve,
 			PairedAt: p.now().Unix()}); err != nil {
 			return PairingState{}, err
 		}
@@ -405,13 +415,21 @@ func (p *Pairing) deliver(ctx context.Context, offer domaincloud.PairingOffer, s
 	}
 
 	now := p.now()
-	if err := p.Pinned.Pin(p.AccountID, adaptercloud.PinnedDevice{
+	pinned := adaptercloud.PinnedDevice{
 		Scope:       scope,
 		DeviceID:    offer.ViewerDeviceID,
 		PublicKey:   offer.ViewerSigningKey,
 		Fingerprint: offer.ViewerFingerprint,
 		PairedAt:    now.Unix(),
-	}); err != nil {
+	}
+	if kept {
+		// Kept under the write's own lock, so a grant that landed during the
+		// handover is what survives, not the scope read before it.
+		scope, err = p.Pinned.PinKeepingScope(p.AccountID, pinned)
+	} else {
+		err = p.Pinned.Pin(p.AccountID, pinned)
+	}
+	if err != nil {
 		// The browser already holds the key by now, so this is not "pairing
 		// failed"; it is "this machine will not remember it". Both halves of
 		// that go in the error rather than only the tidy one.
@@ -845,12 +863,14 @@ func (p *IdentityPairing) logf(format string, args ...any) {
 }
 
 // pairingScope keeps old callers compatible; scope is selected only on the machine.
+// Omitted answers "": deliver resolves it against the device's existing pin,
+// because "nobody chose" and "the person chose operate" are different requests.
 func pairingScope(scopes []string) (string, error) {
 	if len(scopes) > 1 {
 		return "", adaptercloud.ErrViewerScope
 	}
 	if len(scopes) == 0 || scopes[0] == "" {
-		return adaptercloud.ScopeOperate, nil
+		return "", nil
 	}
 	if len(scopes) != 1 || !adaptercloud.ValidViewerScope(scopes[0]) {
 		return "", adaptercloud.ErrViewerScope
