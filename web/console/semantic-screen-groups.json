@@ -1,8 +1,8 @@
 {
   "version": 1,
   "englishContentKeys": 8790,
-  "riskKeys": 3903,
-  "nonRiskCount": 4887,
+  "riskKeys": 3904,
+  "nonRiskCount": 4886,
   "groups": [
     {
       "name": "admin / other",
@@ -908,7 +908,7 @@
     },
     {
       "name": "health / other",
-      "count": 685,
+      "count": 684,
       "sources": [
         null
       ],
@@ -1159,7 +1159,6 @@
         "health.iv_destMachineId",
         "health.iv_destNext_ambiguous",
         "health.iv_destNext_offline",
-        "health.iv_destNext_ready",
         "health.iv_destReason",
         "health.iv_destTech",
         "health.iv_dest_ambiguous",
