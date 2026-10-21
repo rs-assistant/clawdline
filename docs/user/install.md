@@ -49,7 +49,7 @@ curl --proto '=https' --proto-redir '=https' -fL \
 Read the downloaded script, then run it:
 
 ```sh
-sh ./clawdline-install.sh --version v2.0.0
+sh ./clawdline-install.sh --version v2.1.0
 ```
 
 The installer checks local verification tools, downloads the release manifest and signatures,
@@ -92,7 +92,7 @@ generation's internal name; the product is Clawdline.
 Pass options to the downloaded script:
 
 ```sh
-sh ./clawdline-install.sh --version v2.0.0 --headless
+sh ./clawdline-install.sh --version v2.1.0 --headless
 ```
 
 | Option | Does |
@@ -117,9 +117,9 @@ answers with the version you installed.
 ### Review and pin an installation
 
 The steps above pin installer commit `74fc07e5bc8c8d092f216478f26d99b7ed1b77ee`
-and release `v2.0.0`. The release's signed manifest identifies program source commit
-`d2ed0c0633dec8dc7c4f0d2b8d78cf229a2795d4`. These are separate identities: the newer script verifies the
-existing signed release before it starts. Reading the installer does not amount to auditing
+and release `v2.1.0`. The release's signed manifest identifies program source commit
+`b2b81046dbf007e60be6997cdd8506be57166a12`. These are separate identities: the pinned script verifies the
+selected signed release before it starts. Reading the installer does not amount to auditing
 the release's program source or proving the binary reproducible.
 
 Calling the script without `--version` still selects the latest release; using a `main` URL
