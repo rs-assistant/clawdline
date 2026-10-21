@@ -6,7 +6,8 @@
  * derived" and there are no hypotheses unless Cloud derives one (it does not, and the adapter
  * refuses one). Recovery evidence and human acknowledgement are separate panels: closed means a
  * person reviewed it, never that it is healthy. Exported bytes live only inside the panel of the
- * revision they belong to, so a changed account, incident or revision drops them. */
+ * revision they belong to, so a changed account, incident or revision drops them. An agent
+ * investigation is its own card after the summary (investigation-view.tsx). */
 import { useEffect, useRef, useState } from "react"
 import type { BundleFact, IncidentDetailBody, IncidentListBody, IncidentRow, IncidentState } from "./stored"
 import type { Refusal, StoredState } from "./cloud"
@@ -19,6 +20,7 @@ import { stageRole } from "./stored"
 import { eventWords, finalObserved, readIncident, stageWords, type NextTarget } from "./incident-summary"
 import { HTable, Panel, Unknown } from "./parts"
 import { At, Id, Link, PartFailed, Stale, type StoredNav } from "./stored-screens"
+import { InvestigationPanel } from "./investigation-view"
 
 /** What the incident screens may do beyond reading: export and acknowledge, under the page's session. */
 export type IncidentActions = {
@@ -377,6 +379,8 @@ function IncidentDetail({ state, route, say, nav, actions }: { state: StoredStat
       {back}
       <Stale state={state} name="incident" say={say} />
       <SummaryPanel d={d} say={say} nav={nav} />
+      <InvestigationPanel key={`${d.incident.id}|${route.scope.account ?? ""}`} incidentId={d.incident.id} revision={d.incident.revision} latest={latest} expired={d.incident.expired}
+        investigations={d.investigations} account={route.scope.account} say={say} actions={actions} />
 
       <div className="adh-pair">
         <Panel title={say("inc_recoveryTitle")}>

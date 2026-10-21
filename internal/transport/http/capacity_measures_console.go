@@ -51,6 +51,12 @@ func (s *Server) consoleCapacityMeasures() map[string]func() capacity.Reading {
 		capacity.ConsoleHealthUIProbeClaims: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
 		},
+		capacity.ConsoleHealthUIInvestigations: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
+		capacity.ConsoleHealthUIInvestigationRefs: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
+		},
 		capacity.ConsoleHealthUITrendLanes: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console operator tab bound; daemon cannot measure another device's health page"}
 		},

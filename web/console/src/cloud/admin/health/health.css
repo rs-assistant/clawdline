@@ -389,3 +389,20 @@
 .adh-tech > summary .adm-h3 { margin: 0; }
 .adh-tech > * + * { margin-top: 12px; }
 .adh-tech > .adh-sum-h { margin-top: 20px; }
+
+/* M05 agent investigation: one card, newest first; long ids wrap, nothing forces the row wider. */
+.adh-iv-needs_you { color: var(--warn); }
+.adh-iv-investigating, .adh-iv-unknown { color: var(--ink); }
+.adh-iv-verified_recovered { color: var(--ok, var(--ink)); }
+.adh-iv-latest { display: grid; gap: 8px; min-width: 0; }
+.adh-iv-latest p { margin: 0; overflow-wrap: anywhere; }
+.adh-iv-earlier { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; min-width: 0; }
+.adh-iv-earlier li { display: grid; gap: 4px; min-width: 0; padding-top: 8px; border-top: 1px solid var(--line); }
+.adh-iv-earlier p { margin: 0; overflow-wrap: anywhere; }
+.adh-iv-start { display: grid; gap: 8px; min-width: 0; }
+.adh-iv-start p { margin: 0; overflow-wrap: anywhere; }
+.adh-iv-hooks { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; min-width: 0; }
+.adh-iv-hook { display: flex; gap: 8px; align-items: flex-start; min-width: 0; overflow-wrap: anywhere; }
+.adh-iv-hook > span { min-width: 0; }
+.adh-iv-hook input { margin-top: 3px; flex: none; }
+.adh-iv-hook input:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
