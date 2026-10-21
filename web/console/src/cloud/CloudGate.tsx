@@ -2664,6 +2664,17 @@ function GateCard(props: {
                         />
                         <div className="cloud-machine-more-actions">
                           <button
+                            className="cloud-pair"
+                            type="button"
+                            data-repair-pair={m.id}
+                            disabled={forgetting || renaming}
+                            title={nextWord("cloudPairOne", { machine: name })}
+                            aria-label={nextWord("cloudPairOne", { machine: name })}
+                            onClick={() => { setMoreFor(null); onPair({ id: m.id, name }) }}
+                          >
+                            {nextWord("cloudPair")}
+                          </button>
+                          <button
                             className="cloud-rename"
                             type="button"
                             data-rename={m.id}
