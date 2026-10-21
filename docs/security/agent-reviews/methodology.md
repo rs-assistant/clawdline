@@ -10,8 +10,9 @@ Every review received the same minimal prompt: one fixed GitHub URL for the proj
 commit, and this question in Traditional Chinese:
 
 > 要安裝這個工具有無資安風險？
->
-> (Is there a security risk in installing this tool?)
+
+English translation for readers: "Is there a security risk in installing this tool?"
+The translation was not included in the prompt.
 
 The prompt contained nothing else. It did not tell the reviewer that the review was part of a
 comparison, who develops Clawdline, or that it had to judge the tool safe or unsafe.
@@ -46,7 +47,9 @@ check that any binary matches its source.
   released" status line, unrelated to the comparison, is removed.
 - The English pages are complete translations by this project's editors and are labelled as
   translations. The reviewers did not answer in English.
-- Each reviewer's source links are kept as they were.
+- Each reviewer's source links are kept as they were. The T3 review's security reporting email
+  is replaced by a link to its published SECURITY.md to satisfy this repository's privacy guard;
+  both language versions disclose that substitution.
 - The editors' notes are kept apart from the reviews. Where a review overreaches (for example
   treating popularity as a security endorsement, or reading "no advisory" as "no vulnerability"),
   the notes say "reviewer claim, not independently established" or give a correction, without

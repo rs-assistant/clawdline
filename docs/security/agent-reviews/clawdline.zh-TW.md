@@ -69,7 +69,8 @@
 
 - **閱讀深度不同。** Claude Code 讀了兩個版本的 `install.sh`，明說沒有審查 daemon 與 `clawdline setup`。Codex 讀了安裝腳本、`internal/transport/http/gate.go` 與文件。兩份都沒有安裝或執行。
 - **已從一手來源核對：** 指定 commit 的 [`install.sh`](https://github.com/sainteye/clawdline/blob/31139d647cd821b70a875ec16455adf05a836deb/install.sh) 寫死一把 Ed25519 公鑰（`TRUSTED_KEYS`），設定 `umask 077`；該 commit 的 README 確實指向 `74fc07e` 的安裝腳本與 `v2.0.0`。
-- **`--purge` 的觀察成立。** 腳本的 `purge_state` 對 `CLAWDLINE_NEXT_DIR`（未設定時為 XDG 設定目錄下的 `clawdline-next`）執行 `rm -rf`。這是檢視者指出的真實使用風險，我們不以其他工具的狀況替它免責。
+- **`--purge` 的適用情境。** 在指定版本中，只有執行 `--uninstall --purge`、且安裝位置已沒有可執行的 binary 時，腳本才走 `purge_state` 備援路徑，對 `CLAWDLINE_NEXT_DIR`（未設定時為 XDG 設定目錄下的 `clawdline-next`）執行刪除。這是自訂目錄設錯的刪除風險，不是首次安裝會刪除該目錄的證據。
 - **「沒有遙測」只指安裝腳本。** 原文寫的是「腳本本身」；Codex 另外指出 Cloud 關閉時仍可能有更新檢查連線。
+- **連得上不等於獲得授權。** Claude 的「任何能連上 daemon 的人都能操作」省略了認證條件；同版本的 [gate](https://github.com/sainteye/clawdline/blob/31139d647cd821b70a875ec16455adf05a836deb/internal/transport/http/gate.go) 有憑證與操作權限檢查。這句應理解為取得足夠權限後的能力，不能當成匿名遠端執行漏洞。
 - **CSRF／DNS rebinding 是檢視者提出的待查問題，不是已證實的漏洞。** Codex 讀到 gate 有憑證與來源檢查，但同樣說尚未實測能否繞過。
-- **這是第一輪基準。** 兩份檢視指出的高權限、常駐服務、版本對應與信任邊界，是目前正在處理的安全工程範圍；改善落到公開 GitHub 後會用新的 SHA 增補報告，見[更新紀錄](./README.zh-TW.md#更新紀錄)。
+- **這是第一輪基準。** 這份基準已包含首次安裝前驗簽與固定版本安裝文件；後續安全工程仍在進行。產品所需的讀取與操作能力仍是持續的信任邊界，不能承諾改完後消失。改善落到公開 GitHub 後會用新的 SHA 增補報告，見[更新紀錄](./README.zh-TW.md#更新紀錄)。

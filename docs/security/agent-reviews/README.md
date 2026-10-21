@@ -2,8 +2,8 @@
 
 [繁體中文](./README.zh-TW.md) · [Security overview](https://clawdline.com/security/)
 
-When you ask an AI agent whether a tool is safe to install, it usually answers "there is risk".
-This page shows why that answer is common, so you can read it without alarm and still act on it.
+In these reviews, both agents raised risks across all four tools, while their opening conclusions
+differed. This comparison helps you interpret that conservative framing without unnecessary alarm.
 
 On 2026-10-21 we asked Claude Code and Codex the same question about four agent tools,
 Clawdline among them: "Is there a security risk in installing this tool?" Every review is
