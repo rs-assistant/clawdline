@@ -2564,3 +2564,20 @@ test("older history pages preserve their opaque cursor across the Cloud seam", a
  assert.equal(res.status,200)
  assert.deepEqual(client.calls, [["pastSessions", "p1", "codex", cursor]])
 })
+
+// A machine's `viewer_read_only` that arrives without a status of its own is
+// still 403, so the page treats it as a refusal of this device and not as a
+// machine that broke (502).
+test("a readonly viewer's refusal without a status of its own answers 403 viewer_read_only", async () => {
+  for (const code of ["viewer_read_only", "cloud_read_only"]) {
+    const client = new FakeClient()
+    client.rows = [row("s1")]
+    client.fail._read = refusal(code)
+    const { reader } = seam(client)
+    const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-ro-" + code }))
+    assert.equal(res.status, 403, code)
+    const body = await json(res)
+    assert.equal(body.error, code)
+    assert.equal(body.outcome, "not_done", code)
+  }
+})

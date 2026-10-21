@@ -15,8 +15,8 @@ Your agents and code stay on your machine whichever way you choose.
 The daemon itself listens on `127.0.0.1` only. None of these opens a port on your network.
 A device paired directly with this machine is either **read only** or **read and operate**, chosen
 per device on this machine (see [Read only or read and operate](#read-only-or-read-and-operate)).
-Clawdline Cloud has a separate switch for the whole machine (C below); per-viewer Cloud grants do
-not exist yet.
+Clawdline Cloud has a separate switch for the whole machine and a local grant for each pinned
+browser (C below). Both must allow operation before that browser can act.
 
 Clawdline no longer runs a Cloudflare tunnel of its own (removed on 2026-10-20; the automatically
 generated `trycloudflare.com` address went the day before). A settings file that still holds the
@@ -183,12 +183,17 @@ Both screens show the same fingerprint when pairing finishes; compare them.
 
 ### Let paired devices act
 
-A paired device can send text, answer, and start or close sessions on this machine while its
-Cloud command switch is on:
+A paired browser can send text, answer, and start or close Sessions only when both its local
+`operate` grant and this machine's Cloud command switch allow it:
 
 ```sh
 ./bin/clawdline cloud commands on     # takes effect on the next request; `off` stops it at once
 ```
+
+Choose a browser's grant on the machine with `clawdline cloud grant <device-id> readonly` or
+`operate`. Use `clawdline cloud pair --scope readonly` to pair a read-only browser. Omitting scope
+when pairing again preserves its existing grant; a never-pinned browser keeps the legacy
+`operate` default. A remote browser cannot promote itself. See [per-browser machine grants](../cloud.md#per-browser-machine-grants).
 
 ### See and remove devices
 
@@ -213,7 +218,7 @@ and needs no account.
 - **The Cloud line stays off**: `./bin/clawdline cloud status` says why. A broken Cloud setting
   never stops the daemon.
 - **A phone can read but not act**: check that it is paired with the selected machine and that
-  `clawdline cloud commands` is on there. Over Tailscale Serve, check that its sign-in is still valid.
+  `clawdline cloud commands` is on there and its local grant is `operate`. Over Tailscale Serve, check that its sign-in is still valid.
 - **Notifications on the phone**: [notifications.md](notifications.md).
 
 ## Deeper

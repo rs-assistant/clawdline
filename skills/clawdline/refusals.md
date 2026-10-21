@@ -63,7 +63,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `execution_target_required` | `internal/transport/http/images.go` |
 | `expired` | `internal/transport/http/auth.go` |
 | `file_permission` | `internal/transport/http/project_files.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_unify.go` |
-| `forbidden` | `internal/transport/http/actions.go`, `internal/transport/http/auth.go`, `internal/transport/http/board.go`, `internal/transport/http/callbacks.go`, `internal/transport/http/cloud_onboarding.go`, `internal/transport/http/cloud_peer.go`, `internal/transport/http/coordinator.go`, `internal/transport/http/focus.go`, `internal/transport/http/gate.go`, `internal/transport/http/handoffs.go`, `internal/transport/http/human_interventions.go`, `internal/transport/http/images.go`, `internal/transport/http/intent.go`, `internal/transport/http/orchestrator.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/runs.go`, `internal/transport/http/schedules.go`, `internal/transport/http/session_pauses.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/skill_install.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/start.go`, `internal/transport/http/todos.go`, `internal/transport/http/update.go`, `internal/transport/http/update_dev_release.go`, `internal/transport/http/voice.go`, `internal/transport/http/waits.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/workflow.go` |
+| `forbidden` | `internal/transport/http/actions.go`, `internal/transport/http/auth.go`, `internal/transport/http/board.go`, `internal/transport/http/callbacks.go`, `internal/transport/http/cloud.go`, `internal/transport/http/cloud_onboarding.go`, `internal/transport/http/cloud_peer.go`, `internal/transport/http/coordinator.go`, `internal/transport/http/focus.go`, `internal/transport/http/gate.go`, `internal/transport/http/handoffs.go`, `internal/transport/http/human_interventions.go`, `internal/transport/http/images.go`, `internal/transport/http/intent.go`, `internal/transport/http/orchestrator.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/runs.go`, `internal/transport/http/schedules.go`, `internal/transport/http/session_pauses.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/skill_install.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/start.go`, `internal/transport/http/todos.go`, `internal/transport/http/update.go`, `internal/transport/http/update_dev_release.go`, `internal/transport/http/voice.go`, `internal/transport/http/waits.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/workflow.go` |
 | `force_refused` | `internal/transport/http/agent_session_close.go` |
 | `gate_snapshot_required` | `internal/domain/work/v2.go` |
 | `git_failed` | `internal/transport/http/git.go` |
@@ -102,6 +102,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `invalid_title` | `internal/transport/http/work_v2_session_name.go` |
 | `invalid_track` | `internal/transport/http/tracks.go` |
 | `invalid_transition` | `internal/domain/work/v2.go` |
+| `invalid_viewer_scope` | `internal/transport/http/cloud.go`, `internal/transport/http/cloud_agent.go` |
 | `invalid_work_id` | `internal/transport/http/orchestrator.go` |
 | `item_terminal` | `internal/domain/work/v2.go` |
 | `item_unassigned` | `internal/domain/work/v2.go` |
@@ -248,6 +249,8 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `verification_gate_on` | `internal/domain/work/v2.go` |
 | `version_conflict` | `internal/transport/http/work_v2_persona_suggestion.go` |
 | `via_is_for_sessions` | `internal/transport/http/work.go` |
+| `viewer_not_pinned` | `internal/transport/http/cloud.go` |
+| `viewer_scope_applied_cleanup_failed` | `internal/transport/http/cloud.go` |
 | `voice_model_abandoned` | `internal/transport/http/voice_setup.go` |
 | `voice_model_busy` | `internal/transport/http/voice_setup.go` |
 | `voice_model_install_failed` | `internal/transport/http/voice_setup.go` |

@@ -2660,6 +2660,42 @@ export type CloseabilityState =
 
 export const CloseabilityStateValues: readonly CloseabilityState[] = ["safe", "blocked", "needs_attestation", "unknown"] as const
 
+export interface CloudPairingOfferRequest {
+  offer: string
+
+  /**
+   * Selected by the machine, never by the browser's encrypted offer.
+   */
+  scope?: CloudViewerScope
+}
+
+export interface CloudPairingRequest {
+  /**
+   * Omitted preserves the legacy operate default.
+   */
+  scope?: CloudViewerScope
+}
+
+export interface CloudViewerGrantRequest {
+  device: string
+  scope: CloudViewerScope
+}
+
+export interface CloudViewerGrantResponse {
+  device: string
+  scope: CloudViewerScope
+}
+
+/**
+ * The machine-local operation ceiling; the machine commands switch and account
+ * identity checks remain independent requirements.
+ */
+export type CloudViewerScope =
+    "readonly"
+  | "operate"
+
+export const CloudViewerScopeValues: readonly CloudViewerScope[] = ["readonly", "operate"] as const
+
 /**
  * GET /v1/orchestrator/completions?pending=true|false. `pending=true` (the default)
  * is every envelope not yet acknowledged, dead letters included; `pending=false`
@@ -8941,9 +8977,10 @@ export type TerminalRefusalCode =
   | "terminal_access_revoked"
   | "terminal_cloud_not_supported"
   | "terminal_socket_path_too_long"
+  | "viewer_read_only"
   | "terminal_invalid"
 
-export const TerminalRefusalCodeValues: readonly TerminalRefusalCode[] = ["terminal_forbidden", "not_controller", "terminal_controlled", "lease_superseded", "lease_expired", "input_gap", "input_state_unknown", "input_too_large", "terminal_busy", "terminal_closed", "terminal_unreachable", "terminal_unsupported", "terminals_full", "terminal_viewers_full", "terminal_access_revoked", "terminal_cloud_not_supported", "terminal_socket_path_too_long", "terminal_invalid"] as const
+export const TerminalRefusalCodeValues: readonly TerminalRefusalCode[] = ["terminal_forbidden", "not_controller", "terminal_controlled", "lease_superseded", "lease_expired", "input_gap", "input_state_unknown", "input_too_large", "terminal_busy", "terminal_closed", "terminal_unreachable", "terminal_unsupported", "terminals_full", "terminal_viewers_full", "terminal_access_revoked", "terminal_cloud_not_supported", "terminal_socket_path_too_long", "viewer_read_only", "terminal_invalid"] as const
 
 /**
  * POST /v1/terminals/{id}/resize. The holder only; the newest size asked for wins.

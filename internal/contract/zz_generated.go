@@ -2259,6 +2259,40 @@ const (
 // CloseabilityStateValues is every value the contract allows, in contract order.
 var CloseabilityStateValues = []CloseabilityState{CloseabilityStateSafe, CloseabilityStateBlocked, CloseabilityStateNeedsAttestation, CloseabilityStateUnknown}
 
+type CloudPairingOfferRequest struct {
+	Offer string `json:"offer"`
+
+	// Selected by the machine, never by the browser's encrypted offer.
+	Scope CloudViewerScope `json:"scope,omitempty"`
+}
+
+type CloudPairingRequest struct {
+	// Omitted preserves the legacy operate default.
+	Scope CloudViewerScope `json:"scope,omitempty"`
+}
+
+type CloudViewerGrantRequest struct {
+	Device string           `json:"device"`
+	Scope  CloudViewerScope `json:"scope"`
+}
+
+type CloudViewerGrantResponse struct {
+	Device string           `json:"device"`
+	Scope  CloudViewerScope `json:"scope"`
+}
+
+// The machine-local operation ceiling; the machine commands switch and account
+// identity checks remain independent requirements.
+type CloudViewerScope string
+
+const (
+	CloudViewerScopeReadonly CloudViewerScope = "readonly"
+	CloudViewerScopeOperate  CloudViewerScope = "operate"
+)
+
+// CloudViewerScopeValues is every value the contract allows, in contract order.
+var CloudViewerScopeValues = []CloudViewerScope{CloudViewerScopeReadonly, CloudViewerScopeOperate}
+
 // GET /v1/orchestrator/completions?pending=true|false. `pending=true` (the
 // default) is every envelope not yet acknowledged, dead letters included;
 // `pending=false` adds the acknowledged ones of the last seven days.
@@ -7375,11 +7409,12 @@ const (
 	TerminalRefusalCodeTerminalAccessRevoked     TerminalRefusalCode = "terminal_access_revoked"
 	TerminalRefusalCodeTerminalCloudNotSupported TerminalRefusalCode = "terminal_cloud_not_supported"
 	TerminalRefusalCodeTerminalSocketPathTooLong TerminalRefusalCode = "terminal_socket_path_too_long"
+	TerminalRefusalCodeViewerReadOnly            TerminalRefusalCode = "viewer_read_only"
 	TerminalRefusalCodeTerminalInvalid           TerminalRefusalCode = "terminal_invalid"
 )
 
 // TerminalRefusalCodeValues is every value the contract allows, in contract order.
-var TerminalRefusalCodeValues = []TerminalRefusalCode{TerminalRefusalCodeTerminalForbidden, TerminalRefusalCodeNotController, TerminalRefusalCodeTerminalControlled, TerminalRefusalCodeLeaseSuperseded, TerminalRefusalCodeLeaseExpired, TerminalRefusalCodeInputGap, TerminalRefusalCodeInputStateUnknown, TerminalRefusalCodeInputTooLarge, TerminalRefusalCodeTerminalBusy, TerminalRefusalCodeTerminalClosed, TerminalRefusalCodeTerminalUnreachable, TerminalRefusalCodeTerminalUnsupported, TerminalRefusalCodeTerminalsFull, TerminalRefusalCodeTerminalViewersFull, TerminalRefusalCodeTerminalAccessRevoked, TerminalRefusalCodeTerminalCloudNotSupported, TerminalRefusalCodeTerminalSocketPathTooLong, TerminalRefusalCodeTerminalInvalid}
+var TerminalRefusalCodeValues = []TerminalRefusalCode{TerminalRefusalCodeTerminalForbidden, TerminalRefusalCodeNotController, TerminalRefusalCodeTerminalControlled, TerminalRefusalCodeLeaseSuperseded, TerminalRefusalCodeLeaseExpired, TerminalRefusalCodeInputGap, TerminalRefusalCodeInputStateUnknown, TerminalRefusalCodeInputTooLarge, TerminalRefusalCodeTerminalBusy, TerminalRefusalCodeTerminalClosed, TerminalRefusalCodeTerminalUnreachable, TerminalRefusalCodeTerminalUnsupported, TerminalRefusalCodeTerminalsFull, TerminalRefusalCodeTerminalViewersFull, TerminalRefusalCodeTerminalAccessRevoked, TerminalRefusalCodeTerminalCloudNotSupported, TerminalRefusalCodeTerminalSocketPathTooLong, TerminalRefusalCodeViewerReadOnly, TerminalRefusalCodeTerminalInvalid}
 
 // POST /v1/terminals/{id}/resize. The holder only; the newest size asked for
 // wins.

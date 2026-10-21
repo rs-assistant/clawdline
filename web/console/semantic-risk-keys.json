@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8752,
+  "englishKeys": 8753,
   "counts": {
-    "negation": 2544,
+    "negation": 2545,
     "state": 1431,
-    "permission": 479,
+    "permission": 480,
     "deletion": 197,
     "uncertainty": 266
   },
-  "unionCount": 3881,
+  "unionCount": 3882,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -2272,6 +2272,7 @@
       "next.terminalRefusalNotController",
       "next.terminalRefusalUnreachable",
       "next.terminalRefusalUnsupported",
+      "next.terminalRefusalViewerReadOnly",
       "next.terminalRetrying",
       "next.terminalScreenLoadFailed",
       "next.terminalSessionNote",
@@ -4407,6 +4408,7 @@
       "next.terminalRefusalAccessRevoked",
       "next.terminalRefusalCloudNotSupported",
       "next.terminalRefusalForbidden",
+      "next.terminalRefusalViewerReadOnly",
       "next.workEmptyBody",
       "notifications.intro",
       "plan.fine",
@@ -8323,6 +8325,7 @@
     "next.terminalRefusalNotController",
     "next.terminalRefusalUnreachable",
     "next.terminalRefusalUnsupported",
+    "next.terminalRefusalViewerReadOnly",
     "next.terminalRetrying",
     "next.terminalScreenLoadFailed",
     "next.terminalSessionNote",

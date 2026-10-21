@@ -142,12 +142,17 @@ func (s *Server) terminalAccess(p terminals.Principal) error {
 
 // terminalOperate rechecks the current grant immediately before terminal effects.
 func (s *Server) terminalOperate(p terminals.Principal) error {
+	if p.Cloud {
+		if line, ok := s.cloudTerminalLine().(interface{ TerminalViewerOperate(string) error }); ok {
+			return line.TerminalViewerOperate(p.Device)
+		}
+		// Legacy in-process providers have only the original access callback.
+		return s.terminalAccess(p)
+	}
 	if err := s.terminalAccess(p); err != nil {
 		return err
 	}
-	if p.Cloud {
-		return nil
-	}
+
 	d, ok := s.gate().auth.Holds(p.Device)
 	if !ok || !d.Caps.Has(auth.Send) {
 		return terminal.Refuse(terminal.CodeForbidden, "This device may read, and not send.")
