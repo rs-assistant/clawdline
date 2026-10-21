@@ -194,9 +194,9 @@ type Session struct {
 	// wire in this shape; the transport puts it where a person reads it.
 	BindingDetail string `json:"-"`
 
-	// Persona is the built-in persona this session's process was launched
-	// with, read from its command line (persona.FromCommandLine); empty for
-	// none. The command line is the record: nothing else stores it.
+	// Persona is the role this session's process was launched with, read from
+	// its command line or verified immutable Squad launch; empty for
+	// none. A recorded role is used only for the matching live launch.
 	Persona string `json:"persona,omitempty"`
 	// SquadLaunchID is parsed from the immutable prompt path on the process
 	// command line. It is not sent on the session wire; the binding API joins
