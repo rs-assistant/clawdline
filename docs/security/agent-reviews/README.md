@@ -9,7 +9,7 @@ On 2026-10-21 we asked Claude Code and Codex the same question about four agent 
 Clawdline among them: "Is there a security risk in installing this tool?" Every review is
 published in full, with the original text and an English translation.
 
-The [Clawdline follow-up at `dacb02ac1`](./clawdline-follow-up.md) adds two fresh public-web reviews after source improvements. The original four-project comparison below remains the baseline; the follow-up does not establish release or deployment acceptance.
+The [latest Clawdline reviews at `e6c974b00`](./clawdline-runtime-follow-up.md) cover source with the runtime enabled. Both recognize pre-execution verification and Cloud encryption; neither demonstrates a new exploitable vulnerability. The [earlier follow-up at `dacb02ac1`](./clawdline-follow-up.md) adds two fresh public-web reviews after source improvements. The original four-project comparison below remains the baseline; the follow-up does not establish release or deployment acceptance.
 
 ## What the reviews said
 
@@ -51,3 +51,5 @@ documentation, others read part of the source. Each page says which.
   this report stays.
 
 - **2026-10-21 — Clawdline follow-up.** [Two new reviews at `dacb02ac1`](./clawdline-follow-up.md), with unchanged question and web-only setup. Both recognize verification before execution and still describe capability and publisher trust risks. Neither reports a newly demonstrated exploit; neither performs a full code or binary audit. Both distinguish the source commit from the pinned `v2.0.0` download. Other projects were not rerun.
+
+- **2026-10-21 — runtime-source follow-up.** [Two reviews at `e6c974b00`](./clawdline-runtime-follow-up.md), with the same minimal prompt and web-only setup. The report preserves both answers, separately corrects a STUN/Cloud-off grouping, and retains the public-release versus main-source distinction. Other projects were not rerun.

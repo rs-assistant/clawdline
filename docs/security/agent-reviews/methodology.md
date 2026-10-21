@@ -55,3 +55,7 @@ check that any binary matches its source.
   the notes say "reviewer claim, not independently established" or give a correction, without
   changing the review's text. Claims the notes call checked were checked against the reviewed
   project's own public files at the pinned commit, by web reading only.
+
+## Later rounds
+
+Round 2 reran only Clawdline at `dacb02ac1`; round 3 reran only Clawdline at `e6c974b00`. The minimal prompt and web-only isolation remained unchanged. The [index](./README.md) links both follow-ups; the eight baseline reports remain intact. Editors' source checks are separate from the blind reviews.

@@ -14,6 +14,11 @@
       "round": 2,
       "date": "2026-10-21",
       "kind": "Clawdline follow-up; source changes do not establish release or deployment acceptance"
+    },
+    {
+      "round": 3,
+      "date": "2026-10-21",
+      "kind": "Clawdline runtime-source follow-up; installed dev does not establish public release acceptance"
     }
   ],
   "reviews": [
@@ -165,6 +170,36 @@
       "report": {
         "zh-TW": "clawdline-follow-up.zh-TW.md",
         "en": "clawdline-follow-up.md"
+      }
+    },
+    {
+      "project": "Clawdline",
+      "repository": "sainteye/clawdline",
+      "reviewed_sha": "e6c974b00dc75cf45953d723a2c8601a83203c3d",
+      "reviewer": "Claude Code",
+      "original_language": "zh-TW",
+      "translation": "en",
+      "date": "2026-10-21",
+      "round": 3,
+      "scope": "install.sh, SECURITY.md, security/remote documentation and auth.go via summarized web reading; gate.go and setup explicitly not reviewed",
+      "report": {
+        "zh-TW": "clawdline-runtime-follow-up.zh-TW.md",
+        "en": "clawdline-runtime-follow-up.md"
+      }
+    },
+    {
+      "project": "Clawdline",
+      "repository": "sainteye/clawdline",
+      "reviewed_sha": "e6c974b00dc75cf45953d723a2c8601a83203c3d",
+      "reviewer": "Codex",
+      "original_language": "zh-TW",
+      "translation": "en",
+      "date": "2026-10-21",
+      "round": 3,
+      "scope": "installer, architecture/remote/Cloud/release documentation and some authentication entry points; no installation or binary verification",
+      "report": {
+        "zh-TW": "clawdline-runtime-follow-up.zh-TW.md",
+        "en": "clawdline-runtime-follow-up.md"
       }
     }
   ]
