@@ -62,10 +62,10 @@ func (l *Link) retireContent(old, next domaincloud.ContentKeyState) error {
 }
 
 func (l *Link) resumeRevocation(r cloudkeys.RevocationIntent) error {
-	if _, err := l.pinned.Revoke(r.Viewer, l.opts.Now()); err != nil {
-		return err
-	}
 	recoverRotation := func() (domaincloud.ContentKeyState, error) {
+		if _, err := l.pinned.Revoke(r.Viewer, l.opts.Now()); err != nil {
+			return domaincloud.ContentKeyState{}, err
+		}
 		if _, err := l.keys.RecoverContentKey(); err != nil {
 			return domaincloud.ContentKeyState{}, err
 		}
@@ -87,10 +87,20 @@ func (l *Link) resumeRevocation(r cloudkeys.RevocationIntent) error {
 }
 
 func (l *Link) revokeContentViewer(viewer string) (bool, error) {
+	return l.revokeContentViewerWithJournal(viewer, l.keys.BeginRevocation)
+}
+
+// The journal callback permits deterministic persistence-failure tests across
+// the adapter boundary. Production always uses Files.BeginRevocation.
+func (l *Link) revokeContentViewerWithJournal(viewer string, begin func(string, uint64) (cloudkeys.RevocationIntent, error)) (bool, error) {
 	l.contentAuthority.mu.Lock()
 	defer l.contentAuthority.mu.Unlock()
 	if r, pending, err := l.keys.PendingRevocation(); err != nil {
-		return false, err
+		// An unreadable journal may already contain a durable deny intent.
+		_, halted := l.contentEpoch.Recover(func() (domaincloud.ContentKeyState, error) {
+			return domaincloud.ContentKeyState{}, err
+		}, l.retireContent)
+		return false, halted
 	} else if pending {
 		if err := l.resumeRevocation(r); err != nil {
 			return false, err
@@ -115,17 +125,18 @@ func (l *Link) revokeContentViewer(viewer string) (bool, error) {
 	if !active {
 		return false, nil
 	}
-	state, err := l.contentEpoch.Current()
-	if err != nil {
-		return false, err
-	}
-	r, err := l.keys.BeginRevocation(viewer, state.Epoch)
-	if err != nil {
-		return false, err
-	}
-	// Recover holds the exclusive fence before touching durable deny/key state.
-	// On failure it halts all master-key publishers until this journal resumes.
+	var r cloudkeys.RevocationIntent
+	// Fence journal creation too: a failed directory sync can follow rename.
+	// Recover also permits a retry when creation failed before any intent existed.
 	_, err = l.contentEpoch.Recover(func() (domaincloud.ContentKeyState, error) {
+		state, err := l.keys.RecoverContentKey()
+		if err != nil {
+			return domaincloud.ContentKeyState{}, err
+		}
+		r, err = begin(viewer, state.Epoch)
+		if err != nil {
+			return domaincloud.ContentKeyState{}, err
+		}
 		if _, err := l.pinned.Revoke(viewer, l.opts.Now()); err != nil {
 			return domaincloud.ContentKeyState{}, err
 		}
