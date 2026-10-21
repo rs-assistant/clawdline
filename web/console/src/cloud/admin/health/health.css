@@ -402,10 +402,14 @@
 .adh-iv-start { display: grid; gap: 8px; min-width: 0; }
 .adh-iv-start p { margin: 0; overflow-wrap: anywhere; }
 .adh-iv-hooks { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; min-width: 0; }
-.adh-iv-hook { display: flex; gap: 8px; align-items: flex-start; min-width: 0; overflow-wrap: anywhere; }
-.adh-iv-hook > span { min-width: 0; }
-.adh-iv-hook input { margin-top: 3px; flex: none; }
+.adh-iv-hook { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.adh-iv-hook > p { margin: 0 0 0 24px; }
+.adh-iv-hook > .adh-disclose { margin-left: 24px; }
+.adh-iv-hook-pick { display: flex; flex-wrap: wrap; column-gap: 8px; row-gap: 2px; align-items: baseline; min-width: 0; }
+.adh-iv-hook-name { flex: 1 1 12ch; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.adh-iv-hook input { margin: 0; flex: none; align-self: flex-start; position: relative; top: 3px; }
 .adh-iv-hook input:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
+.adh-iv-hook-off .adh-iv-hook-name { font-weight: 400; }
 
 /* Waiting for you: the Cloud's actionable items, each with its one action. */
 .adh-attention { margin: 12px 0 16px; }
