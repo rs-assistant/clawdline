@@ -2660,6 +2660,42 @@ export type CloseabilityState =
 
 export const CloseabilityStateValues: readonly CloseabilityState[] = ["safe", "blocked", "needs_attestation", "unknown"] as const
 
+export interface CloudPairingOfferRequest {
+  offer: string
+
+  /**
+   * Selected by the machine, never by the browser's encrypted offer.
+   */
+  scope?: CloudViewerScope
+}
+
+export interface CloudPairingRequest {
+  /**
+   * Omitted preserves the legacy operate default.
+   */
+  scope?: CloudViewerScope
+}
+
+export interface CloudViewerGrantRequest {
+  device: string
+  scope: CloudViewerScope
+}
+
+export interface CloudViewerGrantResponse {
+  device: string
+  scope: CloudViewerScope
+}
+
+/**
+ * The machine-local operation ceiling; the machine commands switch and account
+ * identity checks remain independent requirements.
+ */
+export type CloudViewerScope =
+    "readonly"
+  | "operate"
+
+export const CloudViewerScopeValues: readonly CloudViewerScope[] = ["readonly", "operate"] as const
+
 /**
  * GET /v1/orchestrator/completions?pending=true|false. `pending=true` (the default)
  * is every envelope not yet acknowledged, dead letters included; `pending=false`

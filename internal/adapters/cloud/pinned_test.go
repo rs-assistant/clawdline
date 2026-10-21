@@ -200,3 +200,80 @@ func TestThePinFileIsOwnerOnly(t *testing.T) {
 		t.Fatalf("the pin file is %o, wanted 600", mode)
 	}
 }
+
+func TestViewerScopePersistsAndCannotBeExpandedByLegacyPinReads(t *testing.T) {
+	dir := t.TempDir()
+	s := NewPinnedStore(dir)
+	for _, id := range []string{"reader", "operator", "legacy"} {
+		d := freshPin(t, id)
+		if id == "reader" {
+			d.Scope = ScopeReadOnly
+		}
+		if id == "operator" {
+			d.Scope = ScopeOperate
+		}
+		if err := s.Pin("account", d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, store := range []*PinnedStore{s, NewPinnedStore(dir)} {
+		for id, want := range map[string]string{"reader": ScopeReadOnly, "operator": ScopeOperate, "legacy": ScopeOperate} {
+			if got, err := store.ViewerScope(id); err != nil || got != want {
+				t.Fatalf("%s: %q %v", id, got, err)
+			}
+		}
+	}
+	if err := s.SetScope("reader", "admin"); !errors.Is(err, ErrViewerScope) {
+		t.Fatal(err)
+	}
+	if err := s.SetScope("missing", ScopeOperate); !errors.Is(err, ErrViewerNotPinned) {
+		t.Fatal(err)
+	}
+	if err := s.SetScope("operator", ScopeReadOnly); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetScope("operator", ScopeReadOnly); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := NewPinnedStore(dir).ViewerScope("operator"); err != nil || got != ScopeReadOnly {
+		t.Fatalf("restart: %q %v", got, err)
+	}
+	if _, err := s.Revoke("reader", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetScope("reader", ScopeOperate); !errors.Is(err, ErrViewerNotPinned) {
+		t.Fatal(err)
+	}
+}
+
+func TestFailedScopeWriteDoesNotChangeLiveOrRestartedAuthority(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory write permissions")
+	}
+	dir := t.TempDir()
+	s := NewPinnedStore(dir)
+	d := freshPin(t, "reader")
+	d.Scope = ScopeReadOnly
+	if err := s.Pin("account", d); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0700) })
+	if err := s.SetScope("reader", ScopeOperate); err == nil {
+		t.Fatal("write unexpectedly succeeded")
+	}
+	for _, store := range []*PinnedStore{s, NewPinnedStore(dir)} {
+		if got, err := store.ViewerScope("reader"); err != nil || got != ScopeReadOnly {
+			t.Fatalf("failed write elevated: %q %v", got, err)
+		}
+	}
+	d.Scope = ScopeOperate
+	if err := s.Pin("account", d); err == nil {
+		t.Fatal("re-pin unexpectedly succeeded")
+	}
+	if got, err := s.ViewerScope("reader"); err != nil || got != ScopeReadOnly {
+		t.Fatalf("failed re-pin elevated: %q %v", got, err)
+	}
+}

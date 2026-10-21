@@ -43,6 +43,11 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/cloud/devices/grant",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/cloud/devices/revoke",
       "guide": "cloud"
     },
@@ -153,13 +158,13 @@
     },
     {
       "method": "*",
-      "pattern": "/v1/devstacks",
-      "guide": "project"
+      "pattern": "/v1/connection-health/",
+      "guide": "connect"
     },
     {
       "method": "*",
-      "pattern": "/v1/connection-health/",
-      "guide": "connect"
+      "pattern": "/v1/devstacks",
+      "guide": "project"
     },
     {
       "method": "*",
@@ -491,10 +496,19 @@
       "pattern": "/v1/settings/work-gates",
       "guide": "connect"
     },
-
     {
       "method": "*",
       "pattern": "/v1/settings/workflow",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/skill",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/skill/install",
       "guide": "connect"
     },
     {
@@ -570,16 +584,6 @@
     {
       "method": "*",
       "pattern": "/v1/update/apply",
-      "guide": "connect"
-    },
-    {
-      "method": "*",
-      "pattern": "/v1/skill",
-      "guide": "connect"
-    },
-    {
-      "method": "*",
-      "pattern": "/v1/skill/install",
       "guide": "connect"
     },
     {
