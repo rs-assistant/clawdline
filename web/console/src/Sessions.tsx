@@ -1,3 +1,4 @@
+import { SessionStateEmpty } from "./session/SessionStateEmpty.js"
 import { matchesLocalStateFilter, type SessionStateFilter } from "./session/state-filter.js"
 import { stateFilterLabel } from "./session/SessionStateFilter.js"
 import { catalogWord } from "./catalog.js"
@@ -355,8 +356,10 @@ export function SessionsPage({
                 />
               ))}
             </ul>
-            <div className={emptyClass} id="list-empty" hidden={!skeleton && !empty}>
-              {said.current === "skel" ? (
+            <div className={statusFilter !== "all" && !skeleton && offlineAt !== "empty" ? "session-state-empty-wrap" : emptyClass} id="list-empty" hidden={!skeleton && !empty}>
+              {statusFilter !== "all" && !skeleton && offlineAt !== "empty" ? (
+                <SessionStateEmpty filter={statusFilter} onReset={() => onStatusFilter?.("all")} />
+              ) : said.current === "skel" ? (
                 <ListSkeleton />
               ) : offerAt === "hero" && restore.offer ? (
                 <RestoreHero offer={restore.offer} onOpen={openRestore} />
@@ -364,9 +367,6 @@ export function SessionsPage({
                 <>
                   <b>{said.current[0]}</b>
                   <span className="empty-hint">{said.current[1]}</span>
-                  {statusFilter !== "all" && <button type="button" className="chip" onClick={() => onStatusFilter?.("all")}>
-                    {nextWord("sessionStateFilterAll")}
-                  </button>}
                   {homeEmpty && emptyAuthoritative && live && (
                     <button className="chip" type="button" onClick={() => Start.open()}>
                       {nextWord("firstSessionStart")}

@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8310,
+  "englishKeys": 8314,
   "counts": {
-    "negation": 2423,
+    "negation": 2426,
     "state": 1359,
     "permission": 463,
     "deletion": 197,
     "uncertainty": 254
   },
-  "unionCount": 3705,
+  "unionCount": 3708,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -2094,6 +2094,9 @@
       "next.sessionGone",
       "next.sessionNotStarted",
       "next.sessionNotStartedShort",
+      "next.sessionStateEmptyAttention",
+      "next.sessionStateEmptyIdle",
+      "next.sessionStateEmptyWorking",
       "next.sessionStateFilterAllHint",
       "next.sessionStateFilterEmpty",
       "next.sessionStateFilterIdleHint",
@@ -7816,6 +7819,9 @@
     "next.sessionNotStarted",
     "next.sessionNotStartedShort",
     "next.sessionPairToSend",
+    "next.sessionStateEmptyAttention",
+    "next.sessionStateEmptyIdle",
+    "next.sessionStateEmptyWorking",
     "next.sessionStateFilterAllHint",
     "next.sessionStateFilterAttentionHint",
     "next.sessionStateFilterEmpty",

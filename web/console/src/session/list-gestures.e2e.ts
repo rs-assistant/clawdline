@@ -1555,8 +1555,10 @@ test("the header state filter is quiet until applied and selects one state on ph
       await tab.press("#session-state-filter-open")
       await tab.press('[data-filter="attention"]')
       assert.equal(await tab.run(`document.querySelectorAll('#rows > li').length`), 0)
-      assert.match(await tab.run(`document.getElementById('list-empty').textContent`), /沒有符合|No Sessions match/)
-      await tab.press("#list-empty .chip")
+      assert.match(await tab.run(`document.getElementById('list-empty').textContent`), /目前沒有需要注意|No Sessions need your attention/)
+      assert.equal(await tab.run(`document.querySelectorAll('.session-state-empty').length`), 1)
+      await tab.shot("session-state-empty-" + layout)
+      await tab.press("#list-empty button")
       assert.equal(await tab.run(`document.querySelectorAll('#rows > li').length`), all)
     }
   }))

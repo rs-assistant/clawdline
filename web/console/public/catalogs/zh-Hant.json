@@ -8310,5 +8310,9 @@
   "next.sessionStateFilterActive": "篩選中：{state}。調整顯示哪些 Session",
   "next.sessionStateFilterIncomplete": "部分狀態還未讀取完成，讀取完整後才顯示數量。",
   "next.sessionStateFilterEmpty": "沒有符合「{state}」的 Session。",
-  "next.sessionStateFilterEmptyHint": "選擇「全部」以顯示所有 Session。"
+  "next.sessionStateFilterEmptyHint": "選擇「全部」以顯示所有 Session。",
+  "next.sessionStateEmptyAttention": "目前沒有需要注意的 Session",
+  "next.sessionStateEmptyWorking": "目前沒有工作中的 Session",
+  "next.sessionStateEmptyIdle": "目前沒有靜置的 Session",
+  "next.sessionStateShowAll": "顯示全部"
 }

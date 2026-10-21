@@ -13,6 +13,10 @@ import { catalogWord } from "./catalog.ts"
 
 const words = {
   en: {
+    sessionStateEmptyAttention: "No Sessions need your attention right now.",
+    sessionStateEmptyWorking: "No Sessions are working right now.",
+    sessionStateEmptyIdle: "No Sessions are idle right now.",
+    sessionStateShowAll: "Show all Sessions",
     sessionStateFilterTitle: "Show Sessions",
     sessionStateFilterClose: "Close filter",
     sessionStateFilterAll: "All",
@@ -1889,6 +1893,10 @@ const words = {
     ownerRetentionSettingUnknown: "Whether this switch is on could not be read ({why}). It cannot be changed until a read answers.",
   },
   "zh-Hant": {
+    sessionStateEmptyAttention: "目前沒有需要注意的 Session",
+    sessionStateEmptyWorking: "目前沒有工作中的 Session",
+    sessionStateEmptyIdle: "目前沒有靜置的 Session",
+    sessionStateShowAll: "顯示全部",
     sessionStateFilterTitle: "顯示哪些 Session",
     sessionStateFilterClose: "關閉篩選",
     sessionStateFilterAll: "全部",

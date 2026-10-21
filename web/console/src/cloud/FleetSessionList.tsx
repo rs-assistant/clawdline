@@ -1,5 +1,6 @@
+import { SessionStateEmpty } from "../session/SessionStateEmpty.js"
 import { createPortal } from "react-dom"
-import { SessionStateFilterControl, stateFilterLabel } from "../session/SessionStateFilter.js"
+import { SessionStateFilterControl } from "../session/SessionStateFilter.js"
 import { stateFilterCounts } from "../session/state-filter.js"
 import { totalSessionWords } from "../session-reading.js"
 import { LoadingSkeleton } from "../LoadingSkeleton.js"
@@ -395,10 +396,6 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
         counts={filterCounts} incomplete={filterIncomplete} onRefresh={refreshFromButton} refreshState={refreshFeedback}
         summary={<span id="counts">{filterCounts.working ? L.fillString(L.strings.webCountWorking, { n: filterCounts.working }) :
           filterIncomplete ? nextWord("sessionsListWaitTitle") : totalSessionWords(filterCounts.all)}</span>} />, filterSlot)}
-      {statusFilter !== "all" && groups.length === 0 && <div className="session-state-empty" role="status">
-        {filterIncomplete ? nextWord("sessionStateFilterIncomplete") : nextWord("sessionStateFilterEmpty", { state: stateFilterLabel(statusFilter) })}
-        <button type="button" onClick={() => setStatusFilter("all")}>{nextWord("sessionStateFilterAll")}</button>
-      </div>}
       <div className="cloud-all-groups">
         {groups.map(({ machine, reading, rows, presentationFailed, presentationLoading }) => {
           const carrier = machineLight(machine.freshness, carrierOf?.(machine.id) ?? null)
@@ -482,7 +479,9 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
         </section>
         })}
       </div>
-      {groups.length === 0 && <p>{nextWord("cloudAllNoMatch")}</p>}
+      {groups.length === 0 && (statusFilter !== "all"
+        ? <SessionStateEmpty filter={statusFilter} incomplete={filterIncomplete} onReset={() => setStatusFilter("all")} />
+        : <p>{nextWord("cloudAllNoMatch")}</p>)}
       <ScheduleSection arrived={true} waitForFleet onOpen={openScheduled} canOpen={canOpenScheduled} />
     </div>
     {/* Which machine, asked once for an action that needs one. Starting asks
