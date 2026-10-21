@@ -67,6 +67,8 @@ export function WorkflowSettingsBlock({ shown }: { shown: boolean }) {
         </div>
       </div>
     })}
+    <a className="workflow-transparency-link" href="./#page=transparency">{catalogWord("transparency", "settingsLink")}</a>
+    <p className="say">{catalogWord("transparency", "settingsHint")}</p>
     <p className="said" role="status" aria-live="polite">{said}</p>
     {!snapshot && !busy && <button type="button" className="chip" onClick={() => setRetry(value => value + 1)}>{word("retry")}</button>}
   </div>
