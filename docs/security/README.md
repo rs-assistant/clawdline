@@ -7,6 +7,7 @@ Use this index to check Clawdline's data, permission, and installation boundarie
 | Your question | Evidence |
 | --- | --- |
 | What data does Clawdline read, and what can Cloud see? | [Security overview and data-flow diagram](https://clawdline.com/security/) |
+| Which outbound flows have reproducible synthetic checks? | [Content and outbound data inventory](data-flows.md), [reproduction steps and exact test limits](egress-evidence.md) |
 | Which versions receive security fixes, and what was checked? | [Support policy and revision boundaries](support-policy.md) |
 | What do pairing and remote access allow? | [Remote access guide](../user/remote-access.md), [local authorization implementation](../../internal/domain/auth/authority.go), and [HTTP authentication gate](../../internal/transport/http/auth.go) |
 | Where does Cloud encryption happen? | [Go daemon and browser architecture](../cloud.md), [envelope implementation](../../internal/domain/cloud), and [browser implementation](../../web/console/src/cloud) |
