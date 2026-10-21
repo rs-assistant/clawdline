@@ -21,7 +21,7 @@
 #                                      `licenses/`, `libexec/tmux.json`), the
 #                                      layout `current` points at
 #   Clawdline-<v>-macos-arm64.tar.gz   the app bundle (macOS hosts with swiftc)
-#   SHA256SUMS                         for install.sh, which cannot read JSON
+#   SHA256SUMS                         for manual checks and older installers
 #   manifest.json                      what `tools/release sign` signs
 #
 # The tmux each archive carries is built by tools/release/tmux/build.sh

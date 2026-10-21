@@ -56,13 +56,13 @@ The machine can turn direct connections off in Settings → Remote or with `claw
 
 ## Install
 
-On macOS 13+ or Linux, install Claude Code or Codex, then run:
+On macOS 13+ or Linux, install Claude Code or Codex, trusted Python 3, and OpenSSL 3 or newer. The macOS bundled LibreSSL is not sufficient; see [verification prerequisites](docs/user/install.md#before-you-start). Then run:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
 ```
 
-The installer checks the archive checksum, then runs the downloaded program to verify the release signature and start a per-user service. The first install therefore trusts GitHub, HTTPS, and the installation script; subsequent updates verify signed manifests against release keys built into the installed program. It then opens the console. Start a Session there or run `claude` or `codex` in tmux; the release includes tmux if needed. [Install and first run](docs/user/install.md) · [First Session](docs/user/first-session.md)
+Before unpacking or executing downloaded code, the installer uses local OpenSSL to verify the manifest against public keys pinned in the reviewed script, then checks the archive against its signed size and SHA-256. Missing verification tools or failed checks stop the installation. You still need to trust the installer script and your local tools. The verified program then starts a per-user service and opens the console. Start a Session there or run `claude` or `codex` in tmux; the release includes tmux if needed. [Install and first run](docs/user/install.md) · [First Session](docs/user/first-session.md)
 
 To install the release you reviewed, pin **both** the installer source revision and `--version`; the default command follows `main` and the latest release. [Review and pin an installation](docs/user/install.md#review-and-pin-an-installation) explains the steps and the first-install trust boundary.
 

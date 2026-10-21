@@ -11,14 +11,23 @@ published, and how the signing key is kept. What a machine does with a release i
 | --- | --- |
 | `clawdline_<v>_<os>_<arch>.tar.gz` (linux amd64/arm64, darwin arm64/amd64) | `clawdline` and `dist/` (the local console, with `BUILD.json`) at the archive root — the layout `~/.local/share/clawdline-next/current` points at |
 | `Clawdline-<v>-macos-arm64.tar.gz` | `Clawdline Next.app` (tar, so modes, symlinks and the signature survive) |
-| `SHA256SUMS` | for `install.sh`, which cannot read JSON |
+| `SHA256SUMS` | manual checksum comparisons and compatibility with older installers; not a trust root |
 | `manifest.json` | version, commit, `committed_at`, channel, `min_version`, `non_additive_migration`, and each artifact's os, arch, kind, URL, size and sha256 |
 | `manifest.sig.json` | a list of `{key_id, sig}` Ed25519 signatures over `manifest.json`'s exact bytes |
 
 A daemon follows a manifest only when one signature in the list is by a key compiled into it
 (`internal/adapters/release/keys.go`), and installs an artifact only when its size and sha256 are
-the manifest's. The first install trusts HTTPS to github.com for the binary that then checks the
-signature; every later update trusts only the signature.
+the manifest's. The current `install.sh` verifies the manifest with trusted local OpenSSL 3
+and its pinned release public keys, parses it with Python 3, and checks the signed archive size
+and hash before unpacking or executing the release. The script's pinned keys must match
+`internal/adapters/release/keys.go`; the installer policy test holds that trust set and its
+copied release bounds to the Go reader and capacity register. A key rotation ships both keys
+in both places before an old key is removed.
+
+First installation still trusts the reviewed installer script and local tools. A compromised
+release host cannot substitute an unsigned archive, but a compromised installer or signing key
+remains a trust failure. Older installer revisions executed the downloaded binary before it
+checked its own signature; fixing `main/install.sh` does not change those historical scripts.
 
 Versions are `vX.Y.Z` on the `stable` channel and `vX.Y.Z-beta.N` on `beta`. The stable pointer is
 `https://github.com/sainteye/clawdline/releases/latest/download/manifest.json`, which GitHub serves
