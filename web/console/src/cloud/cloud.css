@@ -214,22 +214,7 @@
 .cloud-fleet-update-notices:empty { display: none; }
 .cloud-fleet-update-notice { margin: 0; }
 .cloud-all-group { min-width: 0; }
-.cloud-all-status-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 10px; }
-.cloud-all-status-filter { padding: 5px 10px; border: 1px solid var(--line);
-    border-radius: 999px; color: var(--dim); font-size: 12px; }
-.cloud-all-status-filter[aria-pressed="true"] { color: var(--accent); background: var(--card-hi); border-color: var(--accent-ed); }
-.cloud-all-refresh { display: inline-flex; align-items: center; gap: 6px; }
-.cloud-all-refresh svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor;
-    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.cloud-all-refresh[aria-busy="true"] svg { animation: cloud-all-refresh-turn .9s linear infinite; }
-.cloud-all-refresh[data-state="loading"] {
-    color: var(--accent); border-color: var(--accent-ed); }
-.cloud-all-refresh[data-state="done"] svg { color: var(--ok); }
-.cloud-all-refresh:disabled { cursor: default; }
-@keyframes cloud-all-refresh-turn { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-    .cloud-all-refresh[aria-busy="true"] svg { animation: none; opacity: .5; }
-}
+
 .cloud-all-group-heading { margin: 0; display: flex; align-items: center; gap: 8px; }
 .cloud-all-group-heading .cloud-all-connection { flex: 1; min-width: 0; }
 .cloud-all-group-heading .cloud-all-collapse { flex: 0 0 44px; width: 44px; justify-content: center; }

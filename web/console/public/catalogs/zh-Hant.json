@@ -8281,5 +8281,16 @@
   "capacityRow.console.health_ui_probe_hosts.what": "單次回應可描述的已登記與仍有留存紀錄的探測主機數量。",
   "capacityRow.console.health_ui_probe_hosts.full": "主機清單過長時，頁面會拒絕回應，不會宣稱探測覆蓋完整。",
   "capacityRow.console.health_ui_probe_claims.what": "每組探測聲明清單可接受的證據與限制說明數量。",
-  "capacityRow.console.health_ui_probe_claims.full": "聲明清單過長時會被拒絕，避免未支援的聲明被靜默隱藏。"
+  "capacityRow.console.health_ui_probe_claims.full": "聲明清單過長時會被拒絕，避免未支援的聲明被靜默隱藏。",
+  "next.sessionStateFilterTitle": "顯示哪些 Session",
+  "next.sessionStateFilterClose": "關閉篩選",
+  "next.sessionStateFilterAll": "全部",
+  "next.sessionStateFilterAllHint": "所有 Session，包含狀態未更新的",
+  "next.sessionStateFilterAttentionHint": "在等你回覆，或有事項待處理",
+  "next.sessionStateFilterWorkingHint": "正在執行，或有 shell 在跑",
+  "next.sessionStateFilterIdleHint": "沒有在做事，也沒有 shell 在跑",
+  "next.sessionStateFilterActive": "篩選中：{state}。調整顯示哪些 Session",
+  "next.sessionStateFilterIncomplete": "部分狀態還未讀取完成，讀取完整後才顯示數量。",
+  "next.sessionStateFilterEmpty": "沒有符合「{state}」的 Session。",
+  "next.sessionStateFilterEmptyHint": "選擇「全部」以顯示所有 Session。"
 }

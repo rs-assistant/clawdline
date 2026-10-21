@@ -1,3 +1,5 @@
+import { SessionStateFilterControl } from "./session/SessionStateFilter.js"
+import { matchesLocalStateFilter, stateFilterCounts, type SessionStateFilter } from "./session/state-filter.js"
 import { SurveyCoordinator } from "./onboarding/Survey.js"
 import { useCloudAccount } from "./cloud/account-context.js"
 import { catalogWord } from "./catalog.js"
@@ -276,6 +278,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
     return () => worker.removeEventListener("message", follow)
   }, [])
   const [menu, setMenu] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<SessionStateFilter>("all")
   // The wordmark opens this machine, or asks Cloud to choose one from the fleet.
   const [machine, setMachine] = useState(false)
   useEffect(() => {
@@ -493,7 +496,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
   // `move`: through the list as it is drawn, from the highlight, or from an
   // end when there is none.
   const move = (delta: number) => {
-    const list = L.orderedRows()
+    const list = L.orderedRows().filter((row) => matchesLocalStateFilter(row, statusFilter))
     if (!list.length) return
     const at = selectedRef.current ? list.findIndex((r) => r.id === selectedRef.current) : -1
     const next = at < 0 ? (delta > 0 ? 0 : list.length - 1) : Math.min(list.length - 1, Math.max(0, at + delta))
@@ -779,6 +782,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
   // to reverse here. The session menu answers its own Escape before this sees
   // it, as `detail-actions.js` does.
   const onKey = (ev: KeyboardEvent) => {
+    if (document.querySelector("#session-state-filter[open]")) return
     const key = ev.key
     const meta = ev.metaKey || ev.ctrlKey
     const rowsEl = document.getElementById("rows")
@@ -990,13 +994,17 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
           onClick={() => onChooseDashboardMachine ? onChooseDashboardMachine() : setMachine(true)}>
           <b>clawdline</b>
         </button>
-        {!hideSessionCounts && <Counts
+        {fleetList ? <div className="counts session-state-slot" id="session-state-filter-slot" /> : !hideSessionCounts && <SessionStateFilterControl
+          value={statusFilter} onChange={setStatusFilter}
+          counts={stateFilterCounts(fleet.snapshot?.sessions ?? [], matchesLocalStateFilter)}
+          incomplete={!fleet.snapshot || !fleet.snapshot.scan.complete}
+          onRefresh={fleet.refresh} summary={<Counts
           reading={sessionCountState(fleet)}
           recovering={!!fleet.snapshot && scanRecovering(fleet.snapshot.scan)}
           partialCloudList={fleet.snapshot?.scan.provenance === "cloud" && !fleet.snapshot.scan.complete &&
             fleet.snapshot.sessions.length > 0}
           offline={!!cloudMachineOffline}
-        />}
+        />} />}
         {typeof aside === "function" ? aside(light) : (
           <>
             {aside}
@@ -1121,6 +1129,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
 
       {cloudSessions ? (page === "sessions" ? cloudSessions : null) : <SessionsPage
         rows={rows}
+        statusFilter={statusFilter} onStatusFilter={setStatusFilter}
         loaded={fleet.loaded}
         arrived={fleet.snapshot !== null}
         live={fleet.live}
@@ -1250,7 +1259,7 @@ function Counts({
     bits.push({ cls: "part quiet", text: catalogWord("literal", "1b40e6344265") })
   }
   return (
-    <div
+    <span
       className="counts"
       id="counts"
       data-waiting={waiting > 0 ? "true" : undefined}
@@ -1261,7 +1270,7 @@ function Counts({
           {b.text}
         </span>
       ))}
-    </div>
+    </span>
   )
 }
 

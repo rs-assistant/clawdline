@@ -1516,6 +1516,51 @@ test("a confirmed new pane opens on the phone before an inventory row exists", (
     assert.doesNotMatch(empty, /Nothing to read|還沒有可讀內容/)
   }))
 
+test("the header state filter is quiet until applied and selects one state on phone and desktop", () =>
+  inTab(async (tab) => {
+    for (const layout of ["phone", "desktop"] as const) {
+      if (layout === "desktop") await tab.desktop()
+      await list(tab)
+      const all = await tab.run(`document.querySelectorAll('#rows > li').length`)
+      assert.equal(await tab.run(`document.querySelector('#session-state-filter-open').dataset.active`), "false")
+      await tab.press("#session-state-filter-open")
+      assert.equal(await tab.run(`document.getElementById('session-state-filter').open`), true)
+      const size = await tab.run(`(() => {const r=document.getElementById('session-state-filter').getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,w:innerWidth,h:innerHeight}})()`)
+      assert.ok(size.left >= 0 && size.right <= size.w && size.top >= 0 && size.bottom <= size.h)
+      await tab.shot("session-state-filter-" + layout)
+      const beforeRefresh = listReads
+      await tab.press(".session-state-refresh")
+      await tab.run(`new Promise(r => setTimeout(r, 100))`)
+      assert.ok(listReads > beforeRefresh, "Refresh reaches the list reading")
+      await tab.press('[data-filter="working"]')
+      assert.equal(await tab.run(`document.querySelector('#session-state-filter') === null`), true)
+      const applied = await tab.run(`({active:document.querySelector('#session-state-filter-open').dataset.active,
+        color:getComputedStyle(document.querySelector('.session-state-selected')).color,
+        expected:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
+        states:[...document.querySelectorAll('#rows > li')].map(e=>e.dataset.state),
+        focus:document.activeElement?.id})`)
+      assert.equal(applied.active, "true")
+      assert.equal(applied.focus, "session-state-filter-open")
+      assert.notEqual(applied.color, "rgb(154, 151, 143)")
+      assert.ok(applied.states.length > 0 && applied.states.length < all)
+      assert.ok(applied.states.every((state: string) => state === "working"))
+      await tab.press("#session-state-filter-open")
+      await tab.key("Escape")
+      assert.equal(await tab.run(`document.querySelector('#session-state-filter-open').dataset.active`), "true")
+      await tab.press("#session-state-filter-open")
+      await tab.press('[data-filter="all"]')
+      assert.equal(await tab.run(`document.querySelector('#session-state-filter-open').dataset.active`), "false")
+      assert.equal(await tab.run(`document.querySelectorAll('#rows > li').length`), all)
+      assert.equal(await tab.run(`document.querySelector('.session-state-selected') === null`), true)
+      await tab.press("#session-state-filter-open")
+      await tab.press('[data-filter="attention"]')
+      assert.equal(await tab.run(`document.querySelectorAll('#rows > li').length`), 0)
+      assert.match(await tab.run(`document.getElementById('list-empty').textContent`), /沒有符合|No Sessions match/)
+      await tab.press("#list-empty .chip")
+      assert.equal(await tab.run(`document.querySelectorAll('#rows > li').length`), all)
+    }
+  }))
+
 test("the machine dashboard owns Clawdfather creation on phone and desktop", () =>
   inTab(async (tab) => {
     for (const layout of ["phone", "narrow", "desktop"] as const) {
@@ -1527,6 +1572,7 @@ test("the machine dashboard owns Clawdfather creation on phone and desktop", () 
       await tab.press("#start-close")
       await tab.press("#counts")
       assert.equal(await tab.run(`document.querySelector('.machine-overlay') === null`), true)
+      await tab.press(".session-state-close")
       await tab.press("#brand")
       assert.equal(await tab.run(`document.getElementById('sidebar').hidden`), false)
       assert.equal(await tab.run(`document.querySelector('.machine-overlay') === null`), true)
