@@ -987,7 +987,7 @@ function hideBand(): void {
 function openMode(machine: boolean, requested: StartMode = "session", on: { id: string; name: string } | null = null): void {
   onMachine = on
   const active = document.activeElement
-  opener = machine ? el("counts") : active instanceof HTMLElement && active !== document.body ? active : el("start-go")
+  opener = machine ? el("machine-dashboard-open") : active instanceof HTMLElement && active !== document.body ? active : el("start-go")
   machineOnly = machine
   mode = machine ? "session" : requested
   editingProjects = false

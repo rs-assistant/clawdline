@@ -79,10 +79,11 @@
 }
 @media (max-width: 360px) {
     :root { --head-h: 76px; }
-    .top { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 32px 20px; align-content: center; row-gap: 2px; }
+    .top { display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-rows: 32px 20px; align-content: center; row-gap: 2px; }
     .top .brand { grid-column: 1; grid-row: 1; }
+    .top .brand-wordmark { grid-column: 2; grid-row: 1; }
     .top .counts { grid-column: 1 / -1; grid-row: 2; }
-    .top .cloud-switcher { grid-column: 2; grid-row: 1; justify-self: end; width: 100%; max-width: none; }
+    .top .cloud-switcher { grid-column: 3; grid-row: 1; justify-self: end; width: 100%; max-width: none; }
 }
 .cloud-switch {
     display: flex; align-items: center; gap: 6px;

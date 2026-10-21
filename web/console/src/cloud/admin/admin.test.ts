@@ -130,6 +130,30 @@ test("the source formatter retains named placeholders and Taiwan copy", () => {
   assert.equal(adminWords("zh-TW")("campaignsCapped", { shown: 50, total: 51 }), "共 51 個活動，只顯示最新的 50 個。")
 })
 
+test("nested operations routes load the root Taiwan catalog without a build prefix", async () => {
+  const originals = new Map(["document", "navigator", "localStorage"].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
+  try {
+    resetCatalogForTest()
+    Object.defineProperty(globalThis, "document", { configurable: true, value: { documentElement: { lang: "en", dir: "ltr", setAttribute() {} } } })
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: { languages: ["en"], language: "en" } })
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: () => "zh-Hant" } })
+    const catalog = JSON.parse(readFileSync(new URL("../../../public/catalogs/zh-Hant.json", import.meta.url), "utf8"))
+    const selected = await bootAdminCatalog({ build: "", strings: {} }, "https://example.test/admin/health/incidents/hi_example?window=3600", async (url: string | URL | Request) => {
+      return String(url) === "https://example.test/catalogs/zh-Hant.json"
+        ? new Response(JSON.stringify(catalog)) : new Response("<!doctype html><title>SPA fallback</title>")
+    })
+    assert.equal(selected, "zh-Hant")
+    assert.equal(document.documentElement.lang, "zh-Hant")
+    assert.equal(adminWords()("title"), catalog["admin.title"])
+  } finally {
+    resetCatalogForTest()
+    for (const [key, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor)
+      else Reflect.deleteProperty(globalThis, key)
+    }
+  }
+})
+
 test("standalone operations honors all nine saved languages without a paired machine", async () => {
   const originals = new Map(["document", "navigator", "localStorage"].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
   try {
