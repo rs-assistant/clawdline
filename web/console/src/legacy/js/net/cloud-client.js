@@ -254,7 +254,7 @@ function cloudPlaceID(machine, place) {
  * a second, quieter place to decide what a document is. `byte_count` is checked against the
  * bytes it counts because a truncated answer renders as the broken-image icon this path removes.
  */
-function imageAnswerBytes(id, body) {
+export function imageAnswerBytes(id, body) {
     if (!body || typeof body !== "object" || Array.isArray(body) || body.id !== id ||
         (body.media_type !== "image/png" && body.media_type !== "image/jpeg") ||
         typeof body.data !== "string" || !body.data) {

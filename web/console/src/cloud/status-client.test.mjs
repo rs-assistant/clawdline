@@ -1247,3 +1247,23 @@ test("the selected classic Session stays subscribed after recovery, including an
     assert.equal(client.socketSubscriptions.has("s/m/s"), false)
   }
 })
+
+
+test("thumbnails have a separate exact waiter and older machines keep their original image read", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  Object.assign(client, { imageReadQueue: [], imageReadsRunning: 0, imageReadsInFlight: 3 })
+  const calls = []
+  client.machineDescriptor = () => ({ machine: { image_thumbnails_v1: true } })
+  client._read = (...args) => { calls.push(args); return Promise.resolve({}) }
+  const target = { machineID: "m", sessionID: "s", executionGeneration: genA }
+  await client.imageForGeneration(target, "p", undefined, "thumb")
+  assert.equal(calls[0][2].size, "thumb")
+  assert.equal(calls[0][3], "image.p.thumb")
+  await client.imageForGeneration(target, "p")
+  assert.equal(calls[1][2].size, undefined)
+  assert.equal(calls[1][3], "image.p")
+  client.machineDescriptor = () => ({ machine: {} })
+  await client.imageForGeneration(target, "p", undefined, "thumb")
+  assert.equal(calls[2][2].size, undefined)
+  assert.equal(calls[2][3], "image.p")
+})

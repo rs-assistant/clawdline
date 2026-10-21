@@ -2049,3 +2049,26 @@ func TestWorkflowSettingsCrossOnlyTheirNarrowSettingsRoute(t *testing.T) {
 		}
 	}
 }
+
+func TestTranscriptThumbnailCarriesItsVariantAndKeepsTheOriginalRead(t *testing.T) {
+	for _, size := range []string{"", "thumb"} {
+		r := &router{body: "image-bytes", media: "image/jpeg"}
+		body := map[string]any{"type": "image", "session": pane, "id": "picture"}
+		expected := "image.picture"
+		if size != "" {
+			body["size"] = size
+			expected += ".thumb"
+		}
+		answer := open(r).Handle(context.Background(), request(t, ClassCtl, body))
+		if answer.Status != 200 || answerOf(t, answer)["read"] != expected || r.last().Query["size"] != size {
+			t.Fatalf("variant %q: answer=%s request=%+v", size, answer.Payload, r.last())
+		}
+	}
+	r := &router{body: "image-bytes", media: "image/jpeg"}
+	answer := open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "image", "session": pane, "id": "picture", "size": "full",
+	}))
+	if answer.Status != 400 || len(r.seen) != 0 {
+		t.Fatalf("unknown variant was read: %+v", answer)
+	}
+}

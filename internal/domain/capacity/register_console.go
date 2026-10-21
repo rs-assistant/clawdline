@@ -4,6 +4,18 @@ package capacity
 func consoleBounds() []Entry {
 	return append(append(append(connectionHealthUIBounds(), viewerHealthBounds()...), ownerRetentionBounds()...), []Entry{
 		{
+			// Encoded DataChannel answers waiting for authentication in wire order.
+			// Shared by this browser's machines; overflow closes only the affected carrier.
+			Name: "console.carrier_receive_bytes", Class: Buffer, Unit: Bytes,
+			Limit: 32 << 20, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+		},
+		{
+			Name: "console.carrier_receive_rows", Class: Buffer, Unit: Rows,
+			Limit: 32, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+		},
+		{
 			// HISTORY_FILL_PAGES in session/history-fill.ts bounds automatic
 			// older reads while the transcript does not fill its viewport.
 			// Polling and resize do not reset it; a manual request does.

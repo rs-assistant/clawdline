@@ -117,7 +117,7 @@ export interface CloudWriteClient extends CloudReadClient {
   infoSummary(identity: CloudIdentity): Promise<unknown>
   infoForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, signal?: AbortSignal): Promise<unknown>
   skillsForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, signal?: AbortSignal): Promise<unknown>
-  imageForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, id: string, signal?: AbortSignal): Promise<unknown>
+  imageForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, id: string, signal?: AbortSignal, size?: "thumb"): Promise<unknown>
   readForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string },
     word: string, fields: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>
   skills?(identity: CloudIdentity): Promise<unknown>
@@ -198,7 +198,7 @@ export interface CloudWriteClient extends CloudReadClient {
   updateSnippet?(id: string, snippet: unknown, identity: CloudIdentity): Promise<unknown>
   deleteSnippet?(id: string, identity: CloudIdentity): Promise<unknown>
   orderSnippets?(scope: string, project: string, order: string[], identity: CloudIdentity): Promise<unknown>
-  image?(identity: CloudIdentity, id: string): Promise<{ id: string; media_type: string; bytes: Uint8Array }>
+  image?(identity: CloudIdentity, id: string, size?: "thumb"): Promise<{ id: string; media_type: string; bytes: Uint8Array }>
   /**
    * The copied client's one read, which `answer` itself calls for a machine that
    * has shown `cloud_status`. See `RelayWriter.answer` for why it is called
@@ -1344,7 +1344,8 @@ export class RelayWriter {
         const exact = this.fleetTarget(session)
         if (exact) {
           if (!client.imageForGeneration) throw failure("cloud_not_carried", "Pinned Session images are unavailable.", 501)
-          const answer = await client.imageForGeneration(exact, route.artifact, init?.signal ?? undefined) as
+          const answer = await client.imageForGeneration(exact, route.artifact, init?.signal ?? undefined,
+            url.searchParams.get("size") === "thumb" ? "thumb" : undefined) as
             { id?: unknown; media_type?: unknown; byte_count?: unknown; data?: unknown } | null
           if (answer?.id !== route.artifact || typeof answer.media_type !== "string" ||
             typeof answer.data !== "string" || !Number.isSafeInteger(answer.byte_count) ||
@@ -1358,7 +1359,8 @@ export class RelayWriter {
         if (!session || typeof client.image !== "function") {
           throw failure("malformed_read", "a picture is read with the session it belongs to", 400)
         }
-        return client.image(await this.identity(client, session), route.artifact)
+        return client.image(await this.identity(client, session), route.artifact,
+          url.searchParams.get("size") === "thumb" ? "thumb" : undefined)
       }
       case "documents":
       case "document": {

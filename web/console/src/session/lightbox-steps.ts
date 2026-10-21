@@ -26,9 +26,9 @@ interface Tile {
   closest(selector: string): Element | null
 }
 
-// A tile the reader can open: `connectArtifactTile` sets this state when the
-// bytes have arrived, and only then does its click open the preview.
-const LIVE_TILE = '.message-image-tile[data-image-state="live"]'
+// A deferred thumbnail still has a full-size source. Gallery navigation may
+// open it directly without downloading offscreen thumbnails first.
+const LIVE_TILE = '.message-image-tile[data-image-state="live"], .message-image-tile[data-image-state="loading"][data-image-openable="true"]'
 // The transcript a tile belongs to. Two transcripts can be on screen (the
 // fleet view), and stepping out of one into another would be a surprise.
 const TRANSCRIPT = ".tx"

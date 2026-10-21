@@ -153,6 +153,8 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `cloud.viewer_events_line_bytes` | 1024 | `bytes` | `coalesce` | `diagnostics, log` | — |
 | `cloud.viewer_events_logged_rows` | 128 | `rows` | `coalesce` | `diagnostics, log` | — |
 | `cloud.viewer_events_seen_batches` | 256 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `console.carrier_receive_bytes` | 33554432 | `bytes` | `refuse` | `diagnostics, sender` | — |
+| `console.carrier_receive_rows` | 32 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `console.direct_history_hours` | 24 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `console.direct_history_machines` | 32 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `console.execution_recovery_attempts` | 1 | `rows` | `refuse` | `sender, diagnostics` | — |

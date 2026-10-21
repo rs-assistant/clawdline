@@ -363,16 +363,18 @@
       "kind": "read",
       "write_gate": false,
       "console": "carried",
-      "console_route": "GET /v1/artifacts/images/{id}?session={id}",
+      "console_route": "GET /v1/artifacts/images/{id}?session={id}[&size=thumb]",
       "console_seam": "writer",
       "local": {"method": "GET"},
       "special": ["content_read", "shaped_answer"],
-      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "id": "img_7f3a", "session": "%19"},
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "id": "img_7f3a", "session": "%19", "size": "thumb"},
       "shapes": [
         {"body": ["id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]},
-        {"body": ["expected_generation", "id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]}
+        {"body": ["expected_generation", "id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]},
+        {"body": ["id", "session", "size"], "path": "/v1/artifacts/images/{id}", "query": ["session", "size"]},
+        {"body": ["expected_generation", "id", "session", "size"], "path": "/v1/artifacts/images/{id}", "query": ["session", "size"]}
       ],
-      "decode": {"reply": "session", "name": "image.{id}", "fields": {"id": {"type": "string", "non_empty": true, "into": "id"}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/artifacts/images/{id}", "query": {"session": {"from": "session"}}}}
+      "decode": {"reply": "session", "name": "image.{id}", "name_suffix": {"field": "size", "text": ".{size}"}, "fields": {"size": {"type": "string", "enum": ["thumb"]}, "id": {"type": "string", "non_empty": true, "into": "id"}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/artifacts/images/{id}", "query": {"session": {"from": "session"}, "size": {"from": "size"}}}}
     },
     {
       "op": "info",

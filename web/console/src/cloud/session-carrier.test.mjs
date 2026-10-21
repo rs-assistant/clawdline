@@ -422,3 +422,42 @@ test("same-network enable waits for a confirmed receipt before retiring its sugg
   await client.enableSameNetwork("m")
   assert.equal(client.sameNetworkAvailable("m"), false)
 })
+
+
+test("concurrent carrier replies keep arrival order when the first key lookup is slow", async () => {
+  const { client, carrier, applied, envelope } = await sealedClient()
+  const first = await envelope(1, "image.first")
+  const second = await envelope(2, "image.second")
+  const pairing = client._machinePairing.bind(client)
+  let release
+  const held = new Promise((resolve) => { release = resolve })
+  let calls = 0
+  client._machinePairing = async (...args) => {
+    if (++calls === 1) await held
+    return pairing(...args)
+  }
+  const one = client.receiveCarrierEnvelope("m", first, 1)
+  const two = client.receiveCarrierEnvelope("m", second, 1)
+  await flush()
+  release()
+  await Promise.all([one, two])
+  assert.deepEqual(applied, [["transcript", "image.first"], ["transcript", "image.second"]])
+  assert.equal(carrier.closed, null)
+})
+
+
+test("a stalled authentication queue is bounded and drains without leaking held bytes", async () => {
+  const { client, carrier, envelope } = await sealedClient()
+  let release
+  const held = new Promise((resolve) => { release = resolve })
+  client._receiveCarrierEnvelope = () => held
+  const raw = await envelope(1, "transcript")
+  const reads = Array.from({ length: 33 }, () => client.receiveCarrierEnvelope("m", raw, 1))
+  assert.equal(client.carrierReceiveRows, 32)
+  assert.equal(carrier.closed, "carrier_receive_full")
+  release()
+  await Promise.all(reads)
+  assert.equal(client.carrierReceiveRows, 0)
+  assert.equal(client.carrierReceiveBytes, 0)
+  assert.equal(client.carrierReceiveQueues.size, 0)
+})

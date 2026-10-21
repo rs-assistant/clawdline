@@ -213,7 +213,7 @@ export interface SessionProjectionSource {
   /** Read slash-menu metadata only for the open, exact execution. */
   readSkills?(destination: SessionDestination, signal: AbortSignal): Promise<AssistantSkill[]>
   /** Resolve a visible transcript artifact only for the opened execution. */
-  readImage?(destination: SessionDestination, artifact: ArtifactRef): Promise<{ url: string; release: () => void }>
+  readImage?(destination: SessionDestination, artifact: ArtifactRef, size?: "thumb" | "full"): Promise<{ url: string; release: () => void }>
   /** Release both the rich Session and transcript channels on detail exit. */
   closeDetail?(destination: SessionDestination): void
   /** An event gap invalidates that machine's current projection and detail cache. */

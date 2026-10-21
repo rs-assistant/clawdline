@@ -114,6 +114,12 @@ func (s *Server) consoleCapacityMeasures() map[string]func() capacity.Reading {
 		capacity.ConsoleOwnerRetentionRequestSeconds: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Settings window read deadline; daemon cannot measure another window's wait"}
 		},
+		"console.carrier_receive_bytes": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser encoded carrier queue; daemon cannot measure another device's held bytes"}
+		},
+		"console.carrier_receive_rows": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-browser authentication queue; daemon cannot measure another device's pending envelopes"}
+		},
 		capacity.ConsoleExecutionRecoveryAttempts: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console opening recovery guard; daemon cannot measure another device's recovery attempts"}
 		},

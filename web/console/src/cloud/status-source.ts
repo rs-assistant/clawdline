@@ -33,7 +33,7 @@ type StatusClient = CloudClientHandle & {
   transcriptForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
   transcriptPageForGeneration?(destination: SessionDestination, before: number, signal: AbortSignal): Promise<unknown>
   skillsForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
-  imageForGeneration?(destination: SessionDestination, id: string, signal: AbortSignal): Promise<unknown>
+  imageForGeneration?(destination: SessionDestination, id: string, signal: AbortSignal, size?: "thumb"): Promise<unknown>
 }
 
 function reportListFailure(client: StatusClient, machineID: string, reason: string,
@@ -437,7 +437,7 @@ export function statusSource(current: () => StatusClient | null,
         return result
       } catch { return null }
     },
-    async readImage(destination, artifact): Promise<{ url: string; release: () => void }> {
+    async readImage(destination, artifact, size): Promise<{ url: string; release: () => void }> {
       const key = destinationKey(destination)
       const client = current()
       const controller = imageSignals.get(key)
@@ -450,7 +450,7 @@ export function statusSource(current: () => StatusClient | null,
       if (before.kind !== "ready" || destinationAvailable(destination, before) !== "ready") {
         throw Object.assign(new Error("Session execution changed"), { code: "execution_generation_changed" })
       }
-      const reply = record(await client.imageForGeneration(destination, artifact.id, controller.signal))
+      const reply = record(await client.imageForGeneration(destination, artifact.id, controller.signal, size === "thumb" ? "thumb" : undefined))
       const after = await readMachine(destination.machineID, controller.signal)
       if (controller.signal.aborted || opened.get(key) !== client || after.kind !== "ready" ||
         destinationAvailable(destination, after) !== "ready" || !supportsPinnedRead(client, destination.machineID)) {

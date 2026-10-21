@@ -735,6 +735,16 @@
     "Note": true
   },
   {
+    "Name": "console.carrier_receive_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.carrier_receive_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.direct_history_hours",
     "Known": true,
     "Note": true

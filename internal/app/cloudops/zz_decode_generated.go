@@ -677,6 +677,8 @@ func genDecodeImage(b body) (plan, LocalRequest, bool) {
 	if !b.hasOneOf(
 		[]string{"type", "id", "session"},
 		[]string{"type", "expected_generation", "id", "session"},
+		[]string{"type", "id", "session", "size"},
+		[]string{"type", "expected_generation", "id", "session", "size"},
 	) {
 		return plan{}, LocalRequest{}, false
 	}
@@ -686,9 +688,15 @@ func genDecodeImage(b body) (plan, LocalRequest, bool) {
 	if !b.genValid("id", genRule{kind: "string", nonEmpty: true}) {
 		return plan{}, LocalRequest{}, false
 	}
+	if !b.genValid("size", genRule{kind: "string", enum: []string{"thumb"}}) {
+		return plan{}, LocalRequest{}, false
+	}
 	p, ok := sessionPlan(b, "image."+genText(b["id"]))
 	if !ok {
 		return plan{}, LocalRequest{}, false
+	}
+	if _, named := b["size"]; named {
+		p.name += "." + genText(b["size"])
 	}
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
@@ -698,7 +706,7 @@ func genDecodeImage(b body) (plan, LocalRequest, bool) {
 	}
 	path := "/v1/artifacts/images/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
-	req.Query = b.genQuery(map[string]genValue{"session": genValue{from: "session"}})
+	req.Query = b.genQuery(map[string]genValue{"session": genValue{from: "session"}, "size": genValue{from: "size"}})
 	return p, req, true
 }
 

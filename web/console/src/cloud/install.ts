@@ -73,9 +73,10 @@ export function readThroughRelay(reader: RelayReader): void {
   }
   followFleetFrom(changingFleet)
   followFleetWriteAccess(() => activeReader?.mayWrite() === true)
-  carryPictures(async (artifact, session) => {
+  carryPictures(async (artifact, session, size) => {
     const res = await activeReader!.fetch(
-      "/v1/artifacts/images/" + encodeURIComponent(artifact.id) + "?session=" + encodeURIComponent(session),
+      "/v1/artifacts/images/" + encodeURIComponent(artifact.id) + "?session=" + encodeURIComponent(session) +
+        (size === "thumb" ? "&size=thumb" : ""),
     )
     if (!res.ok) {
       // The tile says the refusal in its own words, by its code

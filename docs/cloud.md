@@ -102,6 +102,9 @@ An incoming request arrives on `ctl/<machine>`. The transport verifies and decry
 
 Every signed-in viewer paired with the target machine may send. The machine verifies the viewer's account identity and decrypts its request with that machine's content key before handling it. A machine-local key pin, when present, takes precedence over the account roster; a local or account revocation refuses the viewer. This also admits older browsers that hold the machine key from a pairing completed before local pins existed. `cloud_commands` is checked for each effectful request. `clawdline cloud commands on|off` changes that machine switch without restarting the daemon. A Cloud command uses the same in-process HTTP handler and authorization gate as a direct request.
 
+Conversation picture previews, original reads, capacity boundaries and the relay follow-up are described in
+[Conversation image delivery](image-transfers.md).
+
 The separate `cloud_terminal_direct` switch controls the WebRTC carrier for Terminal and Session
 reads. It defaults on; `clawdline cloud direct on|off` or this machine's local Settings → Remote
 page changes it. The local-only `POST /v1/cloud/direct` route persists the choice and replaces the

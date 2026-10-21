@@ -658,8 +658,8 @@ export function TranscriptEntries({ entries, assistant, working = false, picture
   const latestPictureSource = useRef(pictureSource)
   latestPictureSource.current = pictureSource
   const queue = useRef<NonNullable<TranscriptEntry["artifacts"]>>([])
-  tiles.current ??= new ArtifactTiles((artifact, session) => latestPictureSource.current
-    ? latestPictureSource.current(artifact, session)
+  tiles.current ??= new ArtifactTiles((artifact, session, size) => latestPictureSource.current
+    ? latestPictureSource.current(artifact, session, size)
     : Promise.reject(Object.assign(new Error("No image reader"), { code: "read_failed" })))
   queue.current = []
   useLayoutEffect(() => { tiles.current?.settle(box.current, queue.current, sessionID) })

@@ -2946,6 +2946,42 @@
   },
   {
     "Register": "daemon",
+    "Name": "console.carrier_receive_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 33554432,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.carrier_receive_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
     "Name": "console.direct_history_hours",
     "Class": "observation",
     "Unit": "rows",

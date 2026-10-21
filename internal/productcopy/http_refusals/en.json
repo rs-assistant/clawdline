@@ -1,4 +1,6 @@
 {
+  "http.1c713ef2f5fafb46": "An image is read whole, or with size=thumb.",
+  "http.44d0e689bf3adef3": "The image could not be drawn small.",
   "http.84cc28107e831259": "This machine must allow Cloud operations and direct connections to enable same-network connections.",
   "http.002261325d82f433": "This task has no root session to propose to; its work is nobody's line to follow.",
   "http.0035887da2a2da5a": "A new Clawdfather binding must come from the machine workspace, not a Project Session.",

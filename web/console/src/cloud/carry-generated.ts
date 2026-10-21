@@ -43,7 +43,7 @@ export const CARRIED = {
   "forget-archived": "POST /v1/sessions/archived/forget",
   git: "GET /v1/sessions/{id}/git",
   "git-diff": "GET /v1/sessions/{id}/git/diff?path=",
-  image: "GET /v1/artifacts/images/{id}?session={id}",
+  image: "GET /v1/artifacts/images/{id}?session={id}[&size=thumb]",
   info: "GET /v1/sessions/{id}/info[?parts=summary]",
   intents: "POST /v1/intents",
   interrupt: "POST /v1/sessions/{id}/interrupt",

@@ -1,4 +1,6 @@
 {
+  "http.1c713ef2f5fafb46": "An image is read whole, or with size=thumb.",
+  "http.44d0e689bf3adef3": "The image could not be drawn small.",
   "next.transcriptEarlierStalled": "The history position did not move backward. Reload this Session before trying again.",
   "capacityRow.console.transcript_fill_pages.what": "Earlier history pages read automatically while the conversation does not fill the screen. This bounds work on large raw records.",
   "capacityRow.console.transcript_fill_pages.full": "Automatic loading pauses at the limit. Choose Load earlier messages to continue.",
@@ -8411,5 +8413,9 @@
   "next.sessionStateEmptyAttention": "No Sessions need your attention right now.",
   "next.sessionStateEmptyWorking": "No Sessions are working right now.",
   "next.sessionStateEmptyIdle": "No Sessions are idle right now.",
-  "next.sessionStateShowAll": "Show all Sessions"
+  "next.sessionStateShowAll": "Show all Sessions",
+  "capacityRow.console.carrier_receive_bytes.what": "Encoded direct-connection replies waiting for authentication in this browser. The 32 MiB budget is shared across its machines.",
+  "capacityRow.console.carrier_receive_bytes.full": "When the budget is full, the affected direct connection closes and its reads use the existing fallback policy. The daemon cannot measure another browser’s queue.",
+  "capacityRow.console.carrier_receive_rows.what": "Direct-connection replies waiting for authentication in this browser. Wire order is preserved so slower decryption cannot be mistaken for replay.",
+  "capacityRow.console.carrier_receive_rows.full": "At 32 pending replies, the affected direct connection closes instead of retaining an unbounded queue. The daemon cannot measure another browser’s pending replies."
 }
