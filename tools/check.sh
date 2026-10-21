@@ -201,6 +201,15 @@ if [ "$(uname -s)" = Darwin ]; then
   check "Swift native shell language" sh tools/test-shell-language.sh
 fi
 fi
+# The release evidence checks (docs/security/release-evidence.md) run in
+# every full check and whenever their scripts or the workflows that call them
+# change; nothing else exercises their failure cases before a release.
+release_evidence=$scope_full
+for path in ${private_paths[@]+"${private_paths[@]}"}; do
+  case "$path" in tools/release/*|tools/check.sh|.github/workflows/release.yml|.github/workflows/tmux.yml) release_evidence=true ;; esac
+done
+if [ "$release_evidence" = true ]; then check "release evidence (supply-chain.test.sh)" bash tools/release/supply-chain.test.sh
+else summary+=("SKIP  release evidence  (tools/release and the release workflows unchanged; full checks run it)"); fi
 if [ "$web" = yes ]; then
   check "web: npm run check" sh -c 'cd web && npm run deps && npm run check'
   check "web: npm run build" sh -c 'cd web && npm run build'
