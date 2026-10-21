@@ -14,6 +14,13 @@ published, and how the signing key is kept. What a machine does with a release i
 | `SHA256SUMS` | manual checksum comparisons and compatibility with older installers; not a trust root |
 | `manifest.json` | version, commit, `committed_at`, channel, `min_version`, `non_additive_migration`, and each artifact's os, arch, kind, URL, size and sha256 |
 | `manifest.sig.json` | a list of `{key_id, sig}` Ed25519 signatures over `manifest.json`'s exact bytes |
+| `<archive>.spdx.json` | the SPDX 2.3 SBOM of each archive (`tools/release/sbom.sh`) |
+
+Every asset also carries a GitHub artifact attestation of its build provenance, and the macOS
+binaries and app are notarized. What that evidence claims, how anyone verifies it, and what it
+does not prove is [security/release-evidence.md](security/release-evidence.md). The manifest
+schema is unchanged: the SBOMs are bound to the signed archives by the digest each one names, and
+to the workflow by their attestation, so older installers and updaters read releases as before.
 
 A daemon follows a manifest only when one signature in the list is by a key compiled into it
 (`internal/adapters/release/keys.go`), and installs an artifact only when its size and sha256 are
@@ -45,22 +52,33 @@ may be newer than the program release; do not present them as the same source tr
 1. Make sure `main` is green in CI and the commit is the one you mean.
 2. Run the **Release** workflow (`.github/workflows/release.yml`) from `main` with the version.
    It waits for approval of the `release` environment, which holds the signing key, then tests,
-   builds every artifact with `tools/release/build.sh`, signs with `tools/release sign`, verifies
-   against the keys compiled into that commit, and creates a **draft** Release. Nothing built
+   builds every artifact with `tools/release/build.sh` (macOS ones signed with the hardened
+   runtime and notarized, every archive with its SBOM), signs with `tools/release sign`, verifies
+   against the keys compiled into that commit, attests the provenance of every asset with the
+   pinned `actions/attest`, checks those attestations with `tools/release/provenance.sh`, and
+   creates a **draft** Release. Nothing built
    from this repository is uploaded as an Actions artifact: a public repository's artifacts are
    public. The one exception is the Linux tmux the archives carry: a macOS runner has no Docker,
    so `.github/workflows/tmux.yml` builds it on an Ubuntu runner of each architecture from the
    pinned, hash-checked tarballs in `tools/release/tmux/sources.sh`, checks it is a static binary
    that serves a session, and hands it over as an artifact kept one day. The release job builds
    the darwin tmux itself, and `build.sh --tmux-from` refuses any binary whose sha256 is not the
-   one its `tmux.json` records. The same workflow runs alone on every change to
+   one its `tmux.json` records. Each Linux tmux is attested by the tmux job, and the release job
+   refuses one without that attestation for its own commit. The same workflow runs alone on every change to
    `tools/release/tmux/`, so a broken build shows in the pull request.
 3. On a machine with the private word list (`.git/info/private-words`), run the gate:
 
    ```sh
-   tools/release/gate.sh vX.Y.Z            # download, verify, unpack, privacy scan
+   tools/release/gate.sh vX.Y.Z            # download, verify, evidence, unpack, privacy scan
    tools/release/gate.sh vX.Y.Z --publish  # the same, then un-draft it
    ```
+
+   Before the privacy scan the gate refuses any asset the manifest does not account for, checks
+   every SBOM against its archive, every asset's provenance attestation (repository, release
+   workflow, `refs/heads/main`, the manifest's commit, a GitHub-hosted runner), and, on a Mac,
+   each macOS binary's Developer ID signature, hardened runtime and timestamp and the app's
+   stapled ticket and Gatekeeper verdict. Any missing or wrong piece fails the gate; there is no
+   warning-only mode. A `-test.N` release skips provenance and the macOS check and says so.
 
    The scan reads every unpacked file and the printable strings of each binary. In a binary only
    a private word or this machine's home directory is a finding: a binary carries every literal of
@@ -82,6 +100,11 @@ tools/release/build.sh v0.10.0-test.1 /tmp/rel/v0.10.0-test.1 --channel beta --n
 go run ./tools/release sign -key /somewhere/outside/the/repo/test.key /tmp/rel/v0.10.0-test.1
 (cd /tmp/rel && python3 -m http.server 18080)
 ```
+
+A test release also carries SBOMs, so `tools/release/gate.sh <v> --dir <dir>` checks them on it.
+The evidence checks themselves are tested, with a synthetic release and a stub `gh`, by
+`tools/heavy.sh bash tools/release/supply-chain.test.sh`: a missing SBOM, a wrong digest, and an
+attestation from another repository, workflow or commit must each fail.
 
 `--test-key` compiles one extra trusted key into those binaries. It is accepted only for a
 `-test.N` version, the workflow refuses such a version, and `--no-app` is required, so no
@@ -107,6 +130,12 @@ compilation if the selected identity is not Developer ID Application.
   maintainer's Mac, `<state dir>/signing/codesign.p12` with `codesign.password` beside it (mode
   0600 in a 0700 directory), which `clawdline dev install` signs dev builds with so a dev build
   and a release stay one program. Keep an offline copy of the .p12 and its password.
+- **Notarization**: an official build signs every macOS binary with `--options runtime
+  --timestamp` and no entitlements, and submits them with `notarytool`
+  (`codesign_notarize` in `tools/release/codesign.sh`); the app is stapled. It needs an App
+  Store Connect API key in the `release` environment's `CLAWDLINE_NOTARY_KEY_P8_BASE64`,
+  `CLAWDLINE_NOTARY_KEY_ID` and `CLAWDLINE_NOTARY_ISSUER` secrets; without them the build fails
+  before compiling. Dev builds are neither hardened nor notarized.
 - **Without it**, a build signs ad hoc as before: a clone builds and runs with no one's certificate.
 - **Replacing it** changes the identity once: macOS can ask for the keychain
   password and Automation permission once after the transition. Validate two
