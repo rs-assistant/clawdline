@@ -1,3 +1,6 @@
+import { dashboardFetch } from "./dashboard-reader.js"
+import { readMachineUsage } from "../machine/read.js"
+import { Start } from "../session/Start.js"
 import { SurveyCoordinator } from "../onboarding/Survey.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { MachineSheet } from "../pages/devices/AccountMachines.js"
@@ -423,9 +426,14 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const [pendingTool, setPendingTool] = useState<PendingMachineAction | null>(pendingMachineTool)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [dashboardPicker, setDashboardPicker] = useState(false)
-  const [dashboardRequested, setDashboardRequested] = useState(false)
+  const [dashboardMachine, setDashboardMachine] = useState<CloudMachine | null>(null)
   const switchOpener = useRef<HTMLElement | null>(null)
-  const dashboardClosed = useCallback(() => setDashboardRequested(false), [])
+  const dashboardClosed = useCallback(() => setDashboardMachine(null), [])
+  const readDashboardUsage = useMemo(() => {
+    if (!dashboardMachine) return undefined
+    const fetchUsage = dashboardFetch(dashboardMachine.id, () => client.current)
+    return () => readMachineUsage(fetchUsage)
+  }, [dashboardMachine?.id])
   const switcherRef = useRef<HTMLDivElement>(null)
   const switchButtonRef = useRef<HTMLButtonElement>(null)
   const closeSwitcher = useCallback(() => {
@@ -1609,9 +1617,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [scheduleFleetKey])
 
   const switchMachine = (machine: CloudMachine) => {
-    const openDashboard = dashboardPicker
+    if (dashboardPicker) {
+      closeSwitcher()
+      setDashboardMachine(machine)
+      return
+    }
     closeSwitcher()
-    setDashboardRequested(openDashboard)
     setFleetScope(false)
     setFleetTarget(null)
     // The address names a fleet that is being left, or a Session on the machine
@@ -1952,7 +1963,25 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               setDashboardPicker(true)
               setSwitcherOpen(true)
             } : undefined}
-            dashboardRequested={!fleetScope && dashboardRequested}
+            dashboardRequested={!!dashboardMachine}
+            dashboardSource={dashboardMachine && readDashboardUsage ? {
+              name: dashboardMachine.name || dashboardMachine.label || dashboardMachine.id,
+              readUsage: readDashboardUsage,
+              sessions: [...fleetPresentations.current.values()].filter((row) =>
+                row.destination.machineID === dashboardMachine.id && row.projection?.freshness === "current")
+                .map((row) => ({ ...row.status, id: row.destination.sessionID, label: row.title,
+                  machine_scope: row.projection?.machineScope, coordinator_bound: row.projection?.coordinatorBound }) as SessionRow),
+              onClawdfather: (id) => {
+                const machine = dashboardMachine
+                const projection = fleetProjections.current.get(machine.id)?.reading
+                const steward = id && projection?.kind === "ready" ? projection.rows.find((row) =>
+                  row.destination.sessionID === id && row.freshness === "current") : null
+                if (steward) { openFleetSession(steward.destination); return }
+                // Opening Clawdfather is an explicit navigation action, unlike inspecting usage.
+                flushSync(() => { setDashboardMachine(null); switchMachine(machine) })
+                Start.openMachine()
+              },
+            } : undefined}
             onDashboardClosed={dashboardClosed}
             confirmedTitle={fleetTarget ? confirmedTitles.current.get(destinationKey(fleetTarget)) : undefined}
             onTitleSaved={(id, title) => {
