@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8301,
-  "riskKeys": 3699,
-  "nonRiskCount": 4602,
+  "englishContentKeys": 8312,
+  "riskKeys": 3705,
+  "nonRiskCount": 4607,
   "groups": [
     {
       "name": "admin / other",
@@ -3079,7 +3079,7 @@
     },
     {
       "name": "next / other",
-      "count": 352,
+      "count": 357,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3302,6 +3302,11 @@
         "next.sessionCallbacksActive",
         "next.sessionCountOne",
         "next.sessionLastActivity",
+        "next.sessionStateFilterActive",
+        "next.sessionStateFilterAll",
+        "next.sessionStateFilterClose",
+        "next.sessionStateFilterEmptyHint",
+        "next.sessionStateFilterTitle",
         "next.sessionStop",
         "next.sessionTrySendingAgain",
         "next.sessionWaitHeavyQueued",

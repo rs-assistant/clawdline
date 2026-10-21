@@ -8301,5 +8301,16 @@
   "workflowSettings.saved": "Saved.",
   "workflowSettings.readFailed": "Could not read workflow settings.",
   "workflowSettings.saveFailed": "Could not save workflow settings.",
-  "workflowSettings.retry": "Try again"
+  "workflowSettings.retry": "Try again",
+  "next.sessionStateFilterTitle": "Show Sessions",
+  "next.sessionStateFilterClose": "Close filter",
+  "next.sessionStateFilterAll": "All",
+  "next.sessionStateFilterAllHint": "All Sessions, including those without a current status",
+  "next.sessionStateFilterAttentionHint": "Waiting for your reply or something you need to handle",
+  "next.sessionStateFilterWorkingHint": "Working, or running a background shell",
+  "next.sessionStateFilterIdleHint": "Not working or running a background shell",
+  "next.sessionStateFilterActive": "Filter: {state}. Change which Sessions are shown",
+  "next.sessionStateFilterIncomplete": "Some statuses are still unavailable. Counts will appear once the reading is complete.",
+  "next.sessionStateFilterEmpty": "No Sessions match “{state}”.",
+  "next.sessionStateFilterEmptyHint": "Choose All to see every Session."
 }

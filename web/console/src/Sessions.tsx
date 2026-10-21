@@ -1,3 +1,5 @@
+import { matchesLocalStateFilter, type SessionStateFilter } from "./session/state-filter.js"
+import { stateFilterLabel } from "./session/SessionStateFilter.js"
 import { catalogWord } from "./catalog.js"
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react"
 import type { BearingsSource, RestorableSession, ScanSource, SessionRow, TaskList, TaskRow } from "@clawdline/contract"
@@ -43,6 +45,7 @@ import { machineSeenWord } from "./cloud/machine-seen.js"
  */
 export function SessionsPage({
   rows,
+  statusFilter = "all", onStatusFilter,
   loaded,
   arrived,
   live,
@@ -70,6 +73,8 @@ export function SessionsPage({
   fleetDetailProblem,
 }: {
   rows: SessionRow[]
+  statusFilter?: SessionStateFilter
+  onStatusFilter?: (value: SessionStateFilter) => void
   /** The first reading has been answered, with a list or with a failure. */
   loaded: boolean
   /** A list has arrived: the original's `S.arrived`. */
@@ -157,7 +162,7 @@ export function SessionsPage({
   // the place it is arriving for stands there until it does (`Start.arrange`,
   // `Start.placeholder`). Both change with the wait, which is not a prop.
   useSyncExternalStore(Start.subscribe, Start.version)
-  const shown = Start.arrange(L.orderedRows())
+  const shown = Start.arrange(L.orderedRows().filter((row) => matchesLocalStateFilter(row, statusFilter)))
   const arriving = Start.placeholder()
   // From the whole fleet, as `byId` looks it up: a filter that hides the open
   // row does not close it.
@@ -252,11 +257,15 @@ export function SessionsPage({
   // An offline machine's empty page is the offline sentence even while the list
   // would otherwise still be "arriving": nothing is on its way from a machine that is off.
   const empty = offlineAt === "empty" || (!skeleton && drawn.length === 0 && !arriving && !listUnknown)
-  const homeEmpty = empty && rows.length === 0 && !filter
+  const homeEmpty = empty && rows.length === 0 && !filter && statusFilter === "all"
   const said = useRef<"skel" | [string, string] | null>(null)
   if (offlineAt === "empty") said.current = [nextWord("sessionsMachineOfflineTitle"),
     nextWord("sessionsMachineOfflineHint", { machine: machineOffline?.machine ?? "", seen: offlineSeen })]
   else if (skeleton) said.current = "skel"
+  else if (empty && statusFilter !== "all") {
+    said.current = [nextWord("sessionStateFilterEmpty", { state: stateFilterLabel(statusFilter) }),
+      nextWord("sessionStateFilterEmptyHint")]
+  }
   else if (empty) {
     said.current = rows.length
       ? [L.fillString(T.webEmptyFilterTitle, { q: filter }), T.webEmptyFilterHint]
@@ -355,6 +364,9 @@ export function SessionsPage({
                 <>
                   <b>{said.current[0]}</b>
                   <span className="empty-hint">{said.current[1]}</span>
+                  {statusFilter !== "all" && <button type="button" className="chip" onClick={() => onStatusFilter?.("all")}>
+                    {nextWord("sessionStateFilterAll")}
+                  </button>}
                   {homeEmpty && emptyAuthoritative && live && (
                     <button className="chip" type="button" onClick={() => Start.open()}>
                       {nextWord("firstSessionStart")}

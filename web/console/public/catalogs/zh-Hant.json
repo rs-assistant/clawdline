@@ -8301,5 +8301,16 @@
   "workflowSettings.saved": "已儲存。",
   "workflowSettings.readFailed": "無法讀取工作流程設定。",
   "workflowSettings.saveFailed": "無法儲存工作流程設定。",
-  "workflowSettings.retry": "重試"
+  "workflowSettings.retry": "重試",
+  "next.sessionStateFilterTitle": "顯示哪些 Session",
+  "next.sessionStateFilterClose": "關閉篩選",
+  "next.sessionStateFilterAll": "全部",
+  "next.sessionStateFilterAllHint": "所有 Session，包含狀態未更新的",
+  "next.sessionStateFilterAttentionHint": "在等你回覆，或有事項待處理",
+  "next.sessionStateFilterWorkingHint": "正在執行，或有 shell 在跑",
+  "next.sessionStateFilterIdleHint": "沒有在做事，也沒有 shell 在跑",
+  "next.sessionStateFilterActive": "篩選中：{state}。調整顯示哪些 Session",
+  "next.sessionStateFilterIncomplete": "部分狀態還未讀取完成，讀取完整後才顯示數量。",
+  "next.sessionStateFilterEmpty": "沒有符合「{state}」的 Session。",
+  "next.sessionStateFilterEmptyHint": "選擇「全部」以顯示所有 Session。"
 }
