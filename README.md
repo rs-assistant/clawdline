@@ -46,6 +46,8 @@ The machine can turn direct connections off in Settings → Remote or with `claw
 
 **[Read the security overview: encryption, pairing, and what Cloud can see](https://clawdline.com/security/).** It includes a data-flow diagram and links to the source behind each step.
 
+We asked Claude Code and Codex whether Clawdline and three similar tools are risky to install; [read their full reviews and how to interpret them](docs/security/agent-reviews/README.md).
+
 - **On your machine:** Clawdline reads existing Claude Code and Codex records, terminal screens, and project files needed by its features. Sensitive content already in a conversation or terminal can appear in the console. The daemon listens on loopback by default; local use needs no Clawdline account.
 - **With Cloud off:** the Cloud connection is off by default. Update checks can still contact GitHub or the hosted version endpoint; Cloud off does not mean all network traffic is disabled.
 - **With Cloud on:** Session snapshots are published automatically; opening conversations, files, and attachments requests content from your machine. Content is encrypted locally before transmission. This does not create a Cloud backup of your entire conversation archive. The machine and paired browsers hold the content keys; Cloud forwards ciphertext and has no content decryption key. Account, device, routing, timing, and traffic information remain visible to the service.
