@@ -13,13 +13,23 @@ import { INCIDENT_ID } from "./stored.ts"
 export const ATTENTION_SCHEMA = "clawdline.health_attention.v1"
 export const ATTENTION_ACTIONS = ["investigate", "review_fix", "review_result"] as const
 export type AttentionAction = (typeof ATTENTION_ACTIONS)[number]
+/** Why the Cloud listed an item (Cloud rule `attention/1`), each with the one action it asks for.
+ *  A reason this console does not know reads as `unknown`, so its code is never shown as a sentence;
+ *  a known reason paired with another action is a contract failure. */
+export const ATTENTION_REASONS = {
+  no_investigation: "investigate",
+  fix_prepared: "review_fix",
+  verified_recovered: "review_result",
+  verification_failed: "review_result",
+} as const satisfies Record<string, AttentionAction>
+export type AttentionReason = keyof typeof ATTENTION_REASONS | "unknown"
 
 export type AttentionItem = {
   id: string
   incident_id: string
   incident_revision: number
   action: AttentionAction
-  reason: string
+  reason: AttentionReason
   href: string
 }
 
@@ -47,9 +57,11 @@ function parseItem(v: unknown): AttentionItem | null {
   if (typeof o.incident_revision !== "number" || !Number.isSafeInteger(o.incident_revision) || o.incident_revision < 1) return null
   if (typeof o.action !== "string" || !(ATTENTION_ACTIONS as readonly string[]).includes(o.action)) return null
   if (!str(o.reason, 2048) || !str(o.href, 512)) return null
+  const known = Object.hasOwn(ATTENTION_REASONS, o.reason) ? o.reason as keyof typeof ATTENTION_REASONS : null
+  if (known !== null && ATTENTION_REASONS[known] !== o.action) return null
   // Same-origin path only, and exactly the incident it names: no scheme, host, query or fragment.
   if (o.href !== attentionHref(o.incident_id)) return null
-  return { id: o.id, incident_id: o.incident_id, incident_revision: o.incident_revision, action: o.action as AttentionAction, reason: o.reason, href: o.href }
+  return { id: o.id, incident_id: o.incident_id, incident_revision: o.incident_revision, action: o.action as AttentionAction, reason: known ?? "unknown", href: o.href }
 }
 
 /** Null when the body is not exactly the declared contract. */

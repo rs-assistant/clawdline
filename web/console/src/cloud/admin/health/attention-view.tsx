@@ -28,7 +28,7 @@ export function AttentionBody({ value, say, go }: { value: Attention | null; say
       <ul className="adh-attention-list">
         {value.items.map((item) => (
           <li key={item.id} data-action={item.action}>
-            <p>{item.reason}</p>
+            <p>{say(`at_reason_${item.reason}`)}</p>
             <a className="adh-link" href={item.href}
               onClick={(e) => { if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); go(item.href) } }}>
               {say(`at_action_${item.action}`)}
