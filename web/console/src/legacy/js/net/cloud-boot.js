@@ -315,6 +315,7 @@ export class CloudViewerSession {
         this.deviceKind = ["browser", "ios", "android"].indexOf(options.deviceKind) >= 0
             ? options.deviceKind : "browser";
         this.returnTo = options.returnTo || this.config.appOrigin + "/";
+        this.operationsAccessChanged = typeof options.onOperationsAccess === "function" ? options.onOperationsAccess : function () {};
         this.account = null;
         this.deviceID = null;
         this.caps = [];
@@ -339,10 +340,12 @@ export class CloudViewerSession {
      * `web_devices` row invalidates the cookie that names it (`api/src/routes/guards.ts`).
      */
     async ensureSession() {
+        this.operationsAccessChanged(false);
         var existing = await json(this.fetch, this.config.apiOrigin + "/v1/auth/session");
         if (existing.status === 200 && existing.body && existing.body.device_id) {
             var restored = await this.restoreDeviceKey(existing.body.device_id);
             if (restored) {
+                this.operationsAccessChanged(existing.body.operations_access === true);
                 this.account = existing.body.account_id;
                 this.deviceID = existing.body.device_id;
                 this.caps = await this.readCapabilities();
@@ -386,6 +389,7 @@ export class CloudViewerSession {
                 created.status >= 500 ? "session_unavailable" : "session_failed",
                 "Clawdline could not create this browser's session", created.status < 500);
         }
+        this.operationsAccessChanged(created.body.operations_access === true);
         this.account = created.body.account_id;
         this.deviceID = created.body.device_id;
         this.caps = Array.isArray(created.body.caps) ? created.body.caps : VIEWER_CAPABILITIES;

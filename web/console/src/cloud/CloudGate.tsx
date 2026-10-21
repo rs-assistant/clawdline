@@ -402,6 +402,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       reader.current.attach(client.current)
   }, [])
   /** A console is on screen, for a machine this browser can read. */
+  const [operationsAccess, setOperationsAccess] = useState(false)
   const consoleUp = !!chosen && screen.at === "console"
   /**
    * The machine the console is reading.
@@ -1226,6 +1227,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           return
         }
         case "sign_in":
+          setOperationsAccess(false)
           handover.stop()
           setHandoverAccount(null)
           ownerDiagnostics.clear("sign_out")
@@ -1269,6 +1271,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           ownerDiagnostics.clear("revoked")
           const revokedAccount = session.current?.account
           if (revokedAccount) void forgetHandovers(revokedAccount).catch(() => undefined)
+          setOperationsAccess(false)
           setScreen({ at: "revoked", url: session.current?.signInURL() ?? "" })
           return
         }
@@ -1291,7 +1294,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     }
     if (!session.current) {
       const device = cloudViewerDeviceMetadata(window)
-      session.current = newCloudSession({ config: transport.config, deviceKind: device.kind, deviceName: device.name })
+      session.current = newCloudSession({ config: transport.config, deviceKind: device.kind, deviceName: device.name, onOperationsAccess: setOperationsAccess })
     }
     line.current?.stop()
     if (!reader.current) setScreen({ at: "checking" })
@@ -1943,7 +1946,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         productVersion={transport.config.build || "unknown"} /> : null}
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
-          <App key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
+          <App cloudOperationsAccess={operationsAccess} key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
             onChooseDashboardMachine={fleetScope ? () => {
               switchOpener.current = document.getElementById("machine-dashboard-open")
               setDashboardPicker(true)

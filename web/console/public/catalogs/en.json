@@ -128,6 +128,7 @@
   "next.ownerRetentionLocalUnknown": "Records kept on this machine have not been counted yet.",
   "next.ownerRetentionSaveFailed": "The setting was not changed ({why}).",
   "next.ownerRetentionSettingUnknown": "Whether this switch is on could not be read ({why}). It cannot be changed until a read answers.",
+  "next.adminDashboardNav": "Admin dashboard",
   "http.84cc28107e831259": "This machine must allow Cloud operations and direct connections to enable same-network connections.",
   "bar.hintFullscreen": "Full screen",
   "bar.hintKeys": "Keyboard shortcut",

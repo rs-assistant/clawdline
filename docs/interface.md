@@ -669,3 +669,8 @@ the same shipped catalogs.
 A single-operation trace does not infer missing records from producer sequence jumps: the
 producer assigns sequences across all operations. Source-wide coverage remains the authority
 for stored sequence gaps.
+
+The hosted main Console shows an Admin dashboard link in its Manage sidebar group only after
+the cookie session explicitly reports `operations_access: true`. Missing/false values and session
+revocation hide it. The link opens `/admin/health` directly, including on mobile. Local-only
+Consoles do not show it; operations endpoints independently recheck the superuser binding.
