@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +27,11 @@ func TestScheduleWebhookClientUsesMachineCredentialAndIdempotencyKeys(t *testing
 			"hook": map[string]any{"hook_id": "swh_test", "state": "active", "revision": 1}})
 	})
 	mux.HandleFunc("/v1/schedule-webhook-deliveries/claim", func(w http.ResponseWriter, r *http.Request) {
+		var request map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		if request["protocol"] != "clawdline.schedule_webhook.v2" {
+			t.Errorf("claim protocol: %v", request)
+		}
 		if r.Header.Get("Authorization") != "Bearer machine-secret" {
 			t.Errorf("claim authorization: %v", r.Header)
 		}
@@ -58,6 +64,53 @@ func TestScheduleWebhookClientUsesMachineCredentialAndIdempotencyKeys(t *testing
 		Kind: "mac_durable_accepted", OccurredAt: "2026-09-21T00:00:00Z", MacBuild: "test"}
 	if ack, err := client.Receipt(context.Background(), "swd_test", receipt); err != nil || ack.ReceiptVersion != 1 {
 		t.Fatalf("receipt: %+v %v", ack, err)
+	}
+}
+
+func TestInvestigationBundleReadIsLeasedBoundedAndNeverRedirected(t *testing.T) {
+	for _, mode := range []string{"ok", "too_large", "refused", "redirect", "timeout"} {
+		t.Run(mode, func(t *testing.T) {
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if r.Method != "GET" || r.URL.Path != "/v1/schedule-webhook-deliveries/swd_fixture/investigation-bundle" || r.Header.Get("X-Clawdline-Lease") != "fixture-lease" || r.Header.Get("Authorization") != "Bearer fixture-machine" {
+					t.Error("wrong machine lease transport")
+				}
+				switch mode {
+				case "too_large":
+					_, _ = w.Write([]byte(strings.Repeat(" ", schedulewebhook.MaxInvestigationBundleBytes+1)))
+				case "refused":
+					w.WriteHeader(404)
+					_, _ = w.Write([]byte(`{"error":{"code":"investigation_unavailable","message":"Unavailable"}}`))
+				case "redirect":
+					w.Header().Set("Location", "/credential-sink")
+					w.WriteHeader(302)
+				case "timeout":
+					<-r.Context().Done()
+				default:
+					_, _ = w.Write([]byte(`{"schema":"fixture"}`))
+				}
+			}))
+			defer server.Close()
+			client := NewScheduleWebhookClient(server.URL, "fixture-machine")
+			ctx := context.Background()
+			if mode == "timeout" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 20*time.Millisecond)
+				defer cancel()
+			}
+			raw, err := client.InvestigationBundle(ctx, schedulewebhook.Claim{DeliveryID: "swd_fixture", Lease: schedulewebhook.Lease{Token: "fixture-lease"}})
+			if mode == "ok" {
+				if err != nil || string(raw) != `{"schema":"fixture"}` {
+					t.Fatalf("%s %v", raw, err)
+				}
+			} else if err == nil {
+				t.Fatal("accepted failed/oversized/redirected read")
+			}
+			if calls != 1 {
+				t.Fatalf("made %d requests, want exactly one", calls)
+			}
+		})
 	}
 }
 

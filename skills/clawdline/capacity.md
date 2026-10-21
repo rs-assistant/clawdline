@@ -44,6 +44,10 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `cloud.health_capture_frames` | 64 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_capture_raw_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics` | — |
 | `cloud.health_captures_per_minute` | 4 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_investigation_bundle_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_investigation_read_seconds` | 5 | `seconds` | `disconnect` | `diagnostics` | — |
+| `cloud.health_investigation_report_bytes` | 2048 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_investigation_report_refs` | 8 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_journal_bytes` | 4194304 | `bytes` | `evict_oldest` | `diagnostics` | — |
 | `cloud.health_journal_rows` | 4096 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cloud.health_owner_incidents` | 32 | `rows` | `refuse` | `diagnostics` | — |

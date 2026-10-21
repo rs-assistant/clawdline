@@ -12,6 +12,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/adapters/taskdir"
+	"github.com/sainteye/clawdline/internal/domain/schedulewebhook"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
@@ -397,6 +398,12 @@ func (b *Broker) collect(ctx context.Context, r Record) (bool, error) {
 // this task's directory, and settling on it would close a task whose child is
 // still working.
 func (b *Broker) authentic(ctx context.Context, r Record, result taskdir.Result) bool {
+	if len(result.InvestigationReport) != 0 {
+		report, err := schedulewebhook.ParseInvestigationReport(result.InvestigationReport)
+		if err != nil || r.Investigation == nil || r.ScheduleID == "" || report.InvestigationID != r.Investigation.InvestigationID {
+			return false
+		}
+	}
 	if result.Protocol != Protocol || result.TaskID != r.ID || result.GateVerdict != nil {
 		return false
 	}

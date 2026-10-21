@@ -20,6 +20,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/domain/schedule"
+	"github.com/sainteye/clawdline/internal/domain/schedulewebhook"
 	"github.com/sainteye/clawdline/internal/domain/work"
 )
 
@@ -1043,6 +1044,27 @@ func (b *ScheduleBook) run(ctx context.Context, id string, force bool) ScheduleR
 // by the delivery journal. Unlike a manual validation press, a webhook honors
 // enabled: it is unattended execution and must not revive a paused schedule.
 func (b *ScheduleBook) RunWebhook(ctx context.Context, id, taskID string) ScheduleReply {
+	return b.runWebhook(ctx, id, taskID, nil, nil)
+}
+
+func (b *ScheduleBook) InvestigationBound(ctx context.Context, id string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	h, ok, err := b.named(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !ok || !h.s.When.TriggerOnly || h.s.TaskString("kind") != schedulewebhook.InvestigationKind {
+		return schedulewebhook.ErrInvestigationInvalid
+	}
+	return nil
+}
+
+func (b *ScheduleBook) RunInvestigationWebhook(ctx context.Context, id, taskID string, ref schedulewebhook.InvestigationRef, evidence []byte) ScheduleReply {
+	return b.runWebhook(ctx, id, taskID, &ref, evidence)
+}
+
+func (b *ScheduleBook) runWebhook(ctx context.Context, id, taskID string, investigation *schedulewebhook.InvestigationRef, evidence []byte) ScheduleReply {
 	if !b.dispatchEnabled() {
 		return refusedSchedule(403, "orchestrator_disabled", "Task dispatch is switched off in Settings.")
 	}
@@ -1060,11 +1082,13 @@ func (b *ScheduleBook) RunWebhook(ctx context.Context, id, taskID string) Schedu
 		return refusedSchedule(500, "binding_store_unavailable", "The schedule's runs could not be read.")
 	}
 	replay := false
+	recordedReplay := false
 	for _, run := range runs {
 		if run.TaskID == taskID {
 			// The broker is idempotent by task id. Let it replay the exact
 			// dispatch so a crash after admission advances the receipt journal.
 			replay = true
+			recordedReplay = run.State != ""
 			continue
 		}
 		if run.State != "" && !finished(run.State) {
@@ -1074,8 +1098,11 @@ func (b *ScheduleBook) RunWebhook(ctx context.Context, id, taskID string) Schedu
 	if !replay && !h.s.Enabled {
 		return refusedSchedule(409, "schedule_disabled", "This schedule is disabled.")
 	}
+	if !recordedReplay && ((investigation == nil && h.s.TaskString("kind") == schedulewebhook.InvestigationKind) || (investigation != nil && (!h.s.When.TriggerOnly || h.s.TaskString("kind") != schedulewebhook.InvestigationKind))) {
+		return refusedSchedule(409, "schedule_invalid", "The schedule is not investigation-bound.")
+	}
 	b.audit("orchestrator.schedule.run", map[string]string{"schedule": id, "how": "webhook"})
-	id, dir, replayed, warning, err := b.dispatchID(ctx, h.s, time.Time{}, "webhook", taskID)
+	id, dir, replayed, warning, err := b.dispatchInvestigationID(ctx, h.s, time.Time{}, "webhook", taskID, investigation, evidence)
 	if err != nil {
 		var refusal orchestrator.Refusal
 		if errors.As(err, &refusal) {
@@ -1134,6 +1161,10 @@ func (b *ScheduleBook) dispatch(ctx context.Context, s schedule.Schedule, fire t
 }
 
 func (b *ScheduleBook) dispatchID(ctx context.Context, s schedule.Schedule, fire time.Time, how, id string) (string, string, bool, string, error) {
+	return b.dispatchInvestigationID(ctx, s, fire, how, id, nil, nil)
+}
+
+func (b *ScheduleBook) dispatchInvestigationID(ctx context.Context, s schedule.Schedule, fire time.Time, how, id string, investigation *schedulewebhook.InvestigationRef, evidence []byte) (string, string, bool, string, error) {
 	if b.Broker == nil {
 		return id, "", false, "", errors.New("this daemon has no broker to run a schedule through")
 	}
@@ -1147,9 +1178,13 @@ func (b *ScheduleBook) dispatchID(ctx context.Context, s schedule.Schedule, fire
 	defer cancel()
 	out, err := b.Broker.DispatchScheduled(opening, orchestrator.ScheduledRun{
 		TaskID: id, ScheduleID: s.ID, Title: s.Title, Template: s.Task, CloseTab: string(s.CloseTab),
+		Investigation: investigation, InvestigationBundle: evidence,
 	})
 	if out.Absent {
 		_ = b.Store.ForgetScheduleRun(ctx, id)
+	}
+	if err != nil && !out.Absent {
+		return id, "", false, "", orchestrator.Refusal{Status: 503, Code: "outcome_unknown", Message: "The broker could not confirm the scheduled dispatch."}
 	}
 	if err != nil {
 		return id, "", false, "", err

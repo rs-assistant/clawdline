@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8411,
-  "riskKeys": 3752,
-  "nonRiskCount": 4659,
+  "englishContentKeys": 8423,
+  "riskKeys": 3759,
+  "nonRiskCount": 4664,
   "groups": [
     {
       "name": "admin / other",
@@ -275,7 +275,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 247,
+      "count": 251,
       "sources": [
         null
       ],
@@ -295,6 +295,10 @@
         "capacityRow.cloud.health_capture_frames.what",
         "capacityRow.cloud.health_capture_raw_bytes.what",
         "capacityRow.cloud.health_captures_per_minute.what",
+        "capacityRow.cloud.health_investigation_bundle_bytes.what",
+        "capacityRow.cloud.health_investigation_read_seconds.what",
+        "capacityRow.cloud.health_investigation_report_bytes.what",
+        "capacityRow.cloud.health_investigation_report_refs.what",
         "capacityRow.cloud.health_journal_bytes.what",
         "capacityRow.cloud.health_journal_rows.what",
         "capacityRow.cloud.health_owner_incidents.what",
@@ -1512,7 +1516,7 @@
     },
     {
       "name": "http / other",
-      "count": 563,
+      "count": 564,
       "sources": [
         "internal/productcopy/http_refusals/en.json"
       ],
@@ -1807,6 +1811,7 @@
         "http.86ec13dfc02c8bdf",
         "http.87481698fc6c4904",
         "http.8768e57310a116fd",
+        "http.87cdc6f672c5e3a4",
         "http.883ab34a982800c7",
         "http.88923f7e3568dcbd",
         "http.8924121abe71d8d4",

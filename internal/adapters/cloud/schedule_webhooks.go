@@ -2,7 +2,9 @@ package cloud
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -66,7 +68,7 @@ func (c ScheduleWebhookClient) Claim(ctx context.Context, waitSeconds int) (sche
 		PollAfter  int                    `json:"poll_after_ms"`
 	}
 	if err := c.Client.post(ctx, "/v1/schedule-webhook-deliveries/claim", c.Credential,
-		map[string]any{"protocol": schedulewebhook.ProtocolSchema, "wait_seconds": waitSeconds}, &out); err != nil {
+		map[string]any{"protocol": schedulewebhook.ClaimProtocol, "wait_seconds": waitSeconds}, &out); err != nil {
 		return schedulewebhook.ClaimResult{}, err
 	}
 	if out.Schema != schedulewebhook.ClaimSchema || out.ServerTime == "" || out.PollAfter < 0 || out.PollAfter > 300000 {
@@ -97,4 +99,39 @@ func (c ScheduleWebhookClient) Receipt(ctx context.Context, deliveryID string, r
 	}
 	return schedulewebhook.ReceiptAck{DeliveryID: out.DeliveryID, ReceiptVersion: out.ReceiptVersion,
 		State: out.State, AcknowledgedAt: out.AcknowledgedAt, Duplicate: out.Duplicate}, nil
+}
+
+// InvestigationBundle reads only through the leased machine transport. There
+// is one request per claim, a hard deadline and no transport-level retry.
+func (c ScheduleWebhookClient) InvestigationBundle(ctx context.Context, claim schedulewebhook.Claim) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(schedulewebhook.MaxInvestigationReadSeconds)*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Client.BaseURL+"/v1/schedule-webhook-deliveries/"+url.PathEscape(claim.DeliveryID)+"/investigation-bundle", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Credential)
+	req.Header.Set("X-Clawdline-Lease", claim.Lease.Token)
+	// Refuse redirects so credentials and leases cannot follow a supplied URL.
+	client := *c.Client.HTTP
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, schedulewebhook.MaxInvestigationBundleBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > schedulewebhook.MaxInvestigationBundleBytes {
+		return nil, schedulewebhook.ErrInvestigationInvalid
+	}
+	if resp.StatusCode >= 400 {
+		return nil, decodeAPIError("investigation-bundle", resp.StatusCode, raw)
+	}
+	if resp.StatusCode != http.StatusOK || !json.Valid(raw) {
+		return nil, schedulewebhook.ErrInvestigationInvalid
+	}
+	return raw, nil
 }
