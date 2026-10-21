@@ -433,9 +433,6 @@ final class CloudWeb: NSObject, WKNavigationDelegate, WKUIDelegate, ASWebAuthent
     /// The bar's cue: something about where this view is has changed.
     var onNavigation: (() -> Void)?
 
-    /// Pairs this view with this Mac when Cloud asks it to; see CloudPairing.swift.
-    private var selfPairing: CloudSelfPairing?
-
     /// A fixed identifier, so signing in to Cloud survives a relaunch, and an
     /// identifier *of its own*, so this is a different jar from the one the
     /// local token is written into. The same one the Cloud tab used until
@@ -453,12 +450,14 @@ final class CloudWeb: NSObject, WKNavigationDelegate, WKUIDelegate, ASWebAuthent
             // nuisance, a shared jar is a leak.
             config.websiteDataStore = .nonPersistent()
         }
-        // The one page-to-shell message this view answers: carrying a pairing
+        // The assistant hand-off is separate from direct local pairing. Carrying a pairing
         // offer to another machine through this Mac's assistant, after the
         // person says yes (CloudPairing.swift `CloudPairAgent`). On this
         // view's controller only; the console tab never has it.
         config.userContentController.addScriptMessageHandler(
             CloudPairAgent(), contentWorld: .page, name: CloudPairAgent.name)
+        config.userContentController.addScriptMessageHandler(
+            CloudPairLocal(), contentWorld: .page, name: CloudPairLocal.name)
         view = WKWebView(frame: .zero, configuration: config)
         super.init()
         view.navigationDelegate = self
@@ -734,8 +733,6 @@ final class CloudWeb: NSObject, WKNavigationDelegate, WKUIDelegate, ASWebAuthent
         shellLog("cloud: loaded \(loggable(webView.url)) title=\(webView.title ?? "?")")
         onNavigation?()
         report(webView, attempt: 0)
-        if selfPairing == nil { selfPairing = CloudSelfPairing(view: webView) }
-        selfPairing?.look()
     }
 
     /// What Cloud drew, once it has drawn: the page is rendered by script, so

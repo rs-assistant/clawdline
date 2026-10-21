@@ -243,6 +243,19 @@ struct ShellPairingPermissionTest {
     }
 
     static func main() throws {
+        let cloud = URL(string: "https://app.clawdline.com")!
+        func admitted(_ main: Bool = true, _ scheme: String = "https", _ host: String = "app.clawdline.com",
+                      _ port: Int = 0, _ page: URL? = URL(string: "https://app.clawdline.com/#machines")) -> Bool {
+            CloudPairingAccess.allows(mainFrame: main, scheme: scheme, host: host, port: port, page: page, trusted: cloud)
+        }
+        check(admitted(), "Cloud main frame can request native confirmation")
+        check(!admitted(false), "Cloud iframe cannot pair")
+        check(!admitted(true, "http"), "HTTP cannot impersonate HTTPS Cloud")
+        check(!admitted(true, "https", "app.clawdline.com.attacker.example"), "host suffix cannot pair")
+        check(!admitted(true, "https", "attacker.example"), "foreign frame cannot pair")
+        check(!admitted(true, "https", "app.clawdline.com", 8443), "another port cannot pair")
+        check(!admitted(true, "https", "app.clawdline.com", 0, URL(string: "https://attacker.example")), "navigation away revokes bridge admission")
+        check(!admitted(true, "https", "app.clawdline.com", 0, nil), "missing top-level page cannot pair")
         try requests()
         outcomes()
         client()

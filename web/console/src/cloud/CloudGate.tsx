@@ -1962,9 +1962,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         <CloudReadProblem message={nextWord(problem.code === "machine_pairing_required" ? "cloudReadPairingRequired" : "cloudReadUnknownFailure", {
           machine: machinesRef.current?.find((row) => row.id === problem.machine)?.label ?? problem.machine,
         })} code={problem.code} trace={problem.trace} pairLabel={nextWord("cloudPairStart")} retryLabel={nextWord("cloudRetry")}
-          onPair={problem.code === "machine_pairing_required" ? () => pairOffer({
+          onPair={() => openPairing({
             id: problem.machine, name: machinesRef.current?.find((row) => row.id === problem.machine)?.label ?? problem.machine,
-          }) : undefined} onRetry={() => { line.current?.retry(); listMachines() }} />
+          })} onRetry={() => { line.current?.retry(); listMachines() }} />
       )}
       {words && who && transport.kind === "cloud" ? <SurveyCoordinator key={who.account}
         account={{ id: who.account, apiOrigin: transport.config.apiOrigin }}
