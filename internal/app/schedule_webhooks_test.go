@@ -218,6 +218,9 @@ func TestInvestigationFailureNeverDispatchesAnOrdinarySchedule(t *testing.T) {
 			} else if err == nil {
 				t.Fatal("missing injected failure")
 			}
+			if mode == "corrupt" && !strings.Contains(fmt.Sprint(err), "investigation_invalid: envelope.schema") {
+				t.Fatalf("refusal does not name its stage and field: %v", err)
+			}
 			if f.term.opened() != 0 {
 				t.Fatal("failed investigation opened a task")
 			}
@@ -563,5 +566,36 @@ func TestEveryTerminalTaskStateHasAWebhookOutcome(t *testing.T) {
 		if got != want[s] || (got != "") != s.Terminal() {
 			t.Fatalf("state %q reported as %q, want %q", s, got, want[s])
 		}
+	}
+}
+
+// Cloud's real shape: a svc_api incident's evidence, leased to this Mac. The
+// executor stays the Mac; only the evidence source differs.
+func TestInvestigationOfACloudServiceIncidentRunsOnThisMachine(t *testing.T) {
+	f, cloud, runtime, claim := investigationRuntimeFixture(t, true)
+	raw := bytes.ReplaceAll(cloud.bundle, []byte(`"machine_id": "`+runtime.Identity.MachineID+`"`), []byte(`"machine_id": "svc_api"`))
+	var b schedulewebhook.InvestigationBundle
+	if err := json.Unmarshal(raw, &b); err != nil {
+		t.Fatal(err)
+	}
+	canonical, err := schedulewebhook.CanonicalInvestigationJSON(b.Bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(canonical)
+	ref := *claim.Investigation
+	fresh := "sha256:" + hex.EncodeToString(sum[:])
+	cloud.bundle = bytes.Replace(raw, []byte(ref.ContentHash), []byte(fresh), 1)
+	ref.ContentHash = fresh
+	claim.Investigation = &ref
+	cloud.claim = &claim
+	if runtime.Identity.MachineID == "svc_api" {
+		t.Fatal("the executor must not be the evidence source")
+	}
+	if _, err := runtime.PollOnce(context.Background(), 0); err != nil {
+		t.Fatalf("service-sourced investigation refused: %v", err)
+	}
+	if f.term.opened() != 1 {
+		t.Fatalf("opened %d tasks, want 1", f.term.opened())
 	}
 }
