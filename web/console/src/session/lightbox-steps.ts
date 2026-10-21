@@ -243,9 +243,11 @@ export function attachLightboxSteps(
         if (revision !== imageRevision || !blob.size) return
         file = new File([blob], name, { type: blob.type || (name.endsWith(".jpg") ? "image/jpeg" : "image/png") })
         download.disabled = false
-        const canShare = typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })
+        const touchInterface = doc.defaultView?.matchMedia("(hover: none) and (pointer: coarse)").matches ?? false
+        const canShare = touchInterface && typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })
         share.hidden = !canShare
-        // Offer one action: the native sheet when available, otherwise a browser save.
+        // Desktop browsers can share too, but their action is a direct save.
+        // Touch interfaces keep the native sheet when file sharing is supported.
         download.hidden = !!canShare
       }).catch(() => {
         if (revision === imageRevision) download.hidden = true

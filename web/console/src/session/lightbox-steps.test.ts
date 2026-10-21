@@ -114,9 +114,11 @@ class PreviewElement extends EventTarget {
   click() { this.dispatchEvent(new Event("click")) }
 }
 
-test("the preview offers only sharing when supported, otherwise only download", async (t) => {
+test("desktop previews download even with sharing support; touch previews keep native sharing", async (t) => {
   const shared: ShareData[] = []
   let supportsSharing = true
+  let touchInterface = false
+  const downloads: PreviewElement[] = []
   t.mock.method(globalThis, "fetch", async () => ({
     ok: true, blob: async () => new Blob(["original image"], { type: "image/png" }),
   }) as Response)
@@ -126,8 +128,12 @@ test("the preview offers only sharing when supported, otherwise only download", 
   }) as Navigator)
   const dialog = new PreviewElement()
   const doc = Object.assign(new PreviewElement(), {
-    createElement: () => new PreviewElement(),
-    defaultView: null,
+    createElement: (tag: string) => {
+      const element = new PreviewElement()
+      if (tag === "a") element.addEventListener("click", () => downloads.push(element))
+      return element
+    },
+    defaultView: { matchMedia: () => ({ matches: touchInterface }) },
   })
   const preview = attachLightboxSteps(dialog as unknown as HTMLElement, new PreviewElement() as unknown as HTMLElement, {
     previous: "Previous", next: "Next", download: "Download", share: "Share", position: () => "",
@@ -135,8 +141,10 @@ test("the preview offers only sharing when supported, otherwise only download", 
   const share = dialog.children.find(child => child.className === "image-lightbox-share")!
   const download = dialog.children.find(child => child.className === "image-lightbox-download")!
   const trigger = new PreviewElement() as unknown as Element
-  for (const canShare of [true, false, true]) {
-    supportsSharing = canShare
+  for (const [touch, supported] of [[false, true], [true, true], [true, false], [false, false], [true, true]]) {
+    touchInterface = touch
+    supportsSharing = supported
+    const canShare = touch && supported
     preview.opened(trigger, "picture.png")
     assert.equal(share.hidden, true)
     assert.equal(download.hidden, true)
@@ -144,6 +152,12 @@ test("the preview offers only sharing when supported, otherwise only download", 
     assert.equal(share.hidden, !canShare)
     assert.equal(download.hidden, canShare)
     if (canShare) share.click()
+    else download.click()
+  }
+  assert.equal(downloads.length, 3)
+  for (const link of downloads) {
+    assert.equal((link as unknown as HTMLAnchorElement).download, "picture.png")
+    assert.equal((link as unknown as HTMLAnchorElement).href, "data:image/png;base64,aW1hZ2U=")
   }
   assert.equal(shared.length, 2)
   for (const data of shared) {
