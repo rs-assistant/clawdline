@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8753,
-  "riskKeys": 3882,
-  "nonRiskCount": 4871,
+  "englishContentKeys": 8757,
+  "riskKeys": 3885,
+  "nonRiskCount": 4872,
   "groups": [
     {
       "name": "admin / other",
@@ -275,7 +275,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 251,
+      "count": 252,
       "sources": [
         null
       ],
@@ -349,6 +349,7 @@
         "capacityRow.cloud.peer_frame_bytes.what",
         "capacityRow.cloud.peer_inbox.what",
         "capacityRow.cloud.peer_inbox_page.what",
+        "capacityRow.cloud.rekey_body.what",
         "capacityRow.cloud.relay_queue.full",
         "capacityRow.cloud.session_row_asks.full",
         "capacityRow.cloud.session_row_volatile_seconds.what",

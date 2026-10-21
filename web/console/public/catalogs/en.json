@@ -8753,5 +8753,9 @@
   "next.signedInPermissionUnread": "{name} was changed, but the list could not be read again to show it: {why}",
   "next.signedInRevokeLimits": "Revoking refuses a device's next request. What it has already seen or downloaded cannot be taken back.",
   "next.doorAskScope": "A paired browser can read this machine's Sessions, terminal screens, and the documents and images Clawdline shows. If the machine lets it operate, it can also send messages and type in terminals, and the assistants it drives can run programs on the machine.",
-  "next.doorAskControl": "The machine chooses read only or read and operate for each device. Revoke it on the machine under Devices → Signed in to this machine, or with clawdline devices revoke."
+  "next.doorAskControl": "The machine chooses read only or read and operate for each device. Revoke it on the machine under Devices → Signed in to this machine, or with clawdline devices revoke.",
+  "capacityRow.cloud.rekey_lifetime.what": "A pending content-key exchange expires within two minutes so an old signed request cannot remain usable indefinitely.",
+  "capacityRow.cloud.rekey_lifetime.full": "An expired exchange is refused; the viewer must create a fresh operation.",
+  "capacityRow.cloud.rekey_body.what": "One signed content-key control message is limited to 4096 bytes before parsing.",
+  "capacityRow.cloud.rekey_body.full": "Oversized exchanges are refused without decrypting or adopting a key."
 }

@@ -1992,6 +1992,46 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.rekey_body",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/cloud.MaxRekeyBodyBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.rekey_lifetime",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 120,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/cloud.RekeyLifetimeMSLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.relay_queue",
     "Class": "buffer",
     "Unit": "rows",

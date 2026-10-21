@@ -8753,5 +8753,9 @@
   "next.signedInPermissionUnread": "{name} 已變更，但無法重新讀取清單來確認：{why}",
   "next.signedInRevokeLimits": "撤銷後，裝置的下一個請求就會被拒絕；它已經看過或下載的內容無法收回。",
   "next.doorAskScope": "配對後的瀏覽器可以讀取這台機器的 Session、終端畫面，以及 Clawdline 顯示的文件和圖片。如果機器允許它操作，它還能傳送訊息、在終端打字，它驅動的 assistant 也能在機器上執行程式。",
-  "next.doorAskControl": "每台裝置是只讀還是可讀可操作，由機器決定。要撤銷，請在機器上到「裝置」→「登入這台機器的裝置」，或執行 clawdline devices revoke。"
+  "next.doorAskControl": "每台裝置是只讀還是可讀可操作，由機器決定。要撤銷，請在機器上到「裝置」→「登入這台機器的裝置」，或執行 clawdline devices revoke。",
+  "capacityRow.cloud.rekey_lifetime.what": "待處理的內容金鑰交換最多保留兩分鐘，避免舊的簽署請求長期有效。",
+  "capacityRow.cloud.rekey_lifetime.full": "過期的交換會被拒絕；瀏覽器必須建立新的交換作業。",
+  "capacityRow.cloud.rekey_body.what": "每份簽署的內容金鑰控制訊息在解析前限制為 4096 位元組。",
+  "capacityRow.cloud.rekey_body.full": "超過大小限制的交換會被拒絕，不會解密或採用金鑰。"
 }
