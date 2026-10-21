@@ -1,4 +1,9 @@
 {
+  "next.transcriptFillingEarlier": "正在讀取較早的紀錄… {count}/{limit}",
+  "next.transcriptFillPaused": "已讀取 {count} 頁並暫停，可繼續載入更早的訊息。",
+  "next.transcriptEarlierStalled": "紀錄位置未往前推進，請重新開啟這個 Session 後再試。",
+  "capacityRow.console.transcript_fill_pages.what": "對話尚未填滿畫面時，自動往前讀取的紀錄頁數，避免大型原始紀錄造成無限讀取。",
+  "capacityRow.console.transcript_fill_pages.full": "讀取八頁後會暫停並顯示說明；按「載入更早的訊息」即可繼續。",
   "capacityRow.session.codex_past_page.what": "每一頁向 Codex 要求的歷史紀錄筆數，讓開啟清單時不必等待整個專案的歷史。",
   "capacityRow.session.codex_past_page.full": "點選「載入較早的 session」即可接續下一頁。背景紀錄可能被排除；讀取失敗時可重試，已載入的 session 會保留。",
   "next.startPastFiltered": "這一頁沒有可接續的 session，請載入較早的紀錄。",

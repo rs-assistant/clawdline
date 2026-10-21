@@ -475,6 +475,7 @@ const (
 	// change to any of them is a change to this register.
 	ConsoleTranscriptSafetySeconds    = "console.transcript_safety_seconds"
 	ConsoleTranscriptFollowSeconds    = "console.transcript_follow_seconds"
+	ConsoleTranscriptFillPages        = "console.transcript_fill_pages"
 	ConsoleTranscriptMergedRows       = "console.transcript_merged_rows"
 	ConsoleTranscriptBackoffSeconds   = "console.transcript_backoff_seconds"
 	ConsoleRelayTranscriptExpectReask = "console.relay_transcript_expect_reask_seconds"

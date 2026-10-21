@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8276,
-  "riskKeys": 3688,
-  "nonRiskCount": 4588,
+  "englishContentKeys": 8281,
+  "riskKeys": 3690,
+  "nonRiskCount": 4591,
   "groups": [
     {
       "name": "admin / other",
@@ -275,7 +275,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 246,
+      "count": 247,
       "sources": [
         null
       ],
@@ -398,6 +398,7 @@
         "capacityRow.console.status_marker_recovery_wait_seconds.what",
         "capacityRow.console.transcript_backoff_seconds.full",
         "capacityRow.console.transcript_backoff_seconds.what",
+        "capacityRow.console.transcript_fill_pages.full",
         "capacityRow.console.transcript_follow_later_seconds.what",
         "capacityRow.console.viewer_health_attempts.what",
         "capacityRow.console.viewer_health_backoff_seconds.full",
@@ -3078,7 +3079,7 @@
     },
     {
       "name": "next / other",
-      "count": 350,
+      "count": 352,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3339,6 +3340,8 @@
         "next.swipeCloseAction",
         "next.swipeEndLabel",
         "next.todosRetrying",
+        "next.transcriptFillPaused",
+        "next.transcriptFillingEarlier",
         "next.transcriptJumpLatest",
         "next.transcriptJumpNew",
         "next.transcriptLoadEarlier",
