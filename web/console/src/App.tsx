@@ -22,7 +22,7 @@ import { drawerEntries, pageNeedsUpdate, pageReady } from "./pages/registry.js"
 import { publishMachineVersion, useMachineVersion } from "./machine/NeedsUpdate.js"
 import { machineVersionFromHealth } from "./machine/needs-update-model.js"
 import { currentUpdateRead, subscribeUpdate } from "./machine/update.js"
-import { pageFromHash } from "./page-route.js"
+import { pageAdmitted, pageFromHash } from "./page-route.js"
 import { workWord } from "./pages/work/words.js"
 import { verifyWord } from "./pages/verify/words.js"
 import { nextWord } from "./next-strings.js"
@@ -267,9 +267,8 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
   // and says why, rather than missing (pages/registry.ts `pageNeedsUpdate`).
   const tooOld = (id: string) => pageNeedsUpdate(id, PAGE_MODULES, machineVersion.apiLevel)
   const offered = (id: string) => (id === "peer-access" ? !!cloudPeerAccess : ready(id) && !tooOld(id))
-  // The reach page belongs to the administrator section: a typed `#page=transparency` is no way in.
-  const knowsHere = (name: string): name is Page => name === "peer-access" ? !!cloudPeerAccess
-    : name === "transparency" ? cloudOperationsAccess && knows(name) : knows(name)
+  const knowsHere = (name: string): name is Page =>
+    pageAdmitted(name, { knows, peerAccess: !!cloudPeerAccess, operationsAccess: cloudOperationsAccess })
   const tooOldTitle = (id: string) => tooOld(id) ? nextWord("machineNeedsUpdate") : undefined
   const tooOldMark = (id: string) => tooOld(id) ? <small className="sidebar-needs-update"> · {nextWord("machineNeedsUpdateShort")}</small> : null
   const [page, setPage] = useState<Page>(() => location.pathname === "/billing/done"
