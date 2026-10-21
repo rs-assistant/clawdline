@@ -1,8 +1,8 @@
 # Browser content-key refresh (hosted receiver enabled in source)
 
 The browser implementation composes the existing [v1 control contract](content-key-rekey.md)
-with the paired machine's durable state. It is preparation for the relay and daemon runtime;
-the hosted receiver is enabled in source, while the daemon producer remains disabled.
+with the paired machine's durable state. The hosted receiver and daemon producer are enabled in source; the daemon
+additionally waits for its update to be accepted before opening Cloud.
 This does not establish deployed rotation or future-content revocation.
 
 ## Authority and storage
@@ -81,9 +81,10 @@ subscription alone forces a disconnected machine to publish new data.
 
 `CloudViewerSession` and `CloudClient` accept `enableViewerRekey: true`; both default to false.
 The hosted `newCloudSession` factory explicitly sets it to true. The daemon
-production caller still leaves `ContentKeyRuntime` disabled. Receiver deployment
-and acceptance are pending root verification; source enablement is not an online
-acceptance claim. The client additionally requires the trusted public device key
+production caller enables `ContentKeyRuntime` behind update acceptance. Relay and
+hosted receivers have been deployed and checked; running dev, browser/phone and
+signed-release acceptance remain pending. Source enablement is not an online
+revocation acceptance claim. The client additionally requires the trusted public device key
 and `persistMachineRekey` callback. Tests opt in explicitly with a synthetic relay and database.
 
 1. Integrate the native/crypto/epoch source branch and the root's Go envelope key ID compatibility
@@ -93,10 +94,11 @@ and `persistMachineRekey` callback. Tests opt in explicitly with a synthetic rel
    The browser's named `MAX_CONTENT_KEY_ID_BYTES` and Go `MaxKeyIDBytes` must both be 128.
 3. Deploy and accept the hosted viewer with its receiver switch on. The source now
    includes active-pin authorization, rotation/publication barriers, answer handling
-   and fresh snapshot recovery; the daemon producer stays off.
+   and fresh snapshot recovery. Keep the daemon producer off until these receivers
+   are deployed; that receiver-first step was completed on 2026-10-21.
 4. Accept both ends with read-only B, revoked A, cross-tab races, persisted floors, restart,
-   dropped/duplicated frames and recovery. Only after receiver deployment and acceptance
-   enable the daemon producer. Rollbacks must retain durable floors.
+   dropped/duplicated frames and recovery. The daemon source now opts in after receiver deployment; complete running dev
+   and browser acceptance before releasing it. Rollbacks must retain durable floors.
 
 ## Verification
 

@@ -330,13 +330,16 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 	admit := cloudAdmission(cfg.Dir)
 	httptransport.SetCloudUnavailable(cfg.Dir)
 	opts := cloudtransport.LinkOptions{
-		Dir:            cfg.Dir,
-		ForeignDirs:    foreignDirs(),
-		Receipts:       srv.CloudSessionReceipts(),
-		AdmitExecution: srv.CloudAdmitExecution,
-		Sessions:       srv.CloudSessions,
-		SessionsFresh:  srv.CloudSessionsFresh,
-		SessionLook:    srv.CloudSessionLook,
+		// Receivers ship first; update admission keeps this off until this
+		// executable is accepted and cannot automatically return to v2.0.0.
+		ContentKeyRuntime: true,
+		Dir:               cfg.Dir,
+		ForeignDirs:       foreignDirs(),
+		Receipts:          srv.CloudSessionReceipts(),
+		AdmitExecution:    srv.CloudAdmitExecution,
+		Sessions:          srv.CloudSessions,
+		SessionsFresh:     srv.CloudSessionsFresh,
+		SessionLook:       srv.CloudSessionLook,
 		// The daemon's own routes, gate and all. A Cloud request is answered by
 		// exactly the handler a paired browser on this machine's own network
 		// reaches — one set of permission checks, not two.

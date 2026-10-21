@@ -1,11 +1,11 @@
-# Content-key runtime cutover (disabled by default)
+# Content-key runtime cutover
 
-**Status: hosted receiver enabled in source; producer remains disabled.**
-`LinkOptions.ContentKeyRuntime` defaults to false; no production caller enables
-it. The foundation record below describes the original inactive implementation.
-Its remaining-obligations list is historical; the integration section at the end
-records the new wiring and the acceptance still outstanding. Neither section
-establishes deployed future-content revocation.
+**Status: daemon and hosted receiver enabled in source; dev acceptance pending.**
+`LinkOptions.ContentKeyRuntime` still defaults to false for library callers. The
+production daemon explicitly enables it behind update acceptance. This source
+change is not evidence of a running dev installation or a published release.
+The foundation record below describes the original inactive implementation;
+its remaining-obligations list is historical.
 
 ## Update acceptance before Cloud activation
 
@@ -16,8 +16,8 @@ remain available to the update supervisor. Initial activation and settings
 reload share the same admission check; the existing updater settle poll resumes
 Cloud in the same boot after acceptance. Cancellation prevents a deferred open.
 
-This is necessary even though the content-key producer remains disabled: the
-first supervisor upgrading from v2.0.0 runs **the old version's** `Finish`.
+This guard must precede producer activation: the first supervisor upgrading
+from v2.0.0 runs **the old version's** `Finish`.
 Changing only the new supervisor cannot close that first rollback window.
 `Finish` removes pending before writing its healthy receipt, so disappearance
 alone is insufficient. Admission requires the accepted receipt for a witnessed
@@ -30,8 +30,8 @@ closed through its failed receipt.
 Before admission, the device-management routes have no pairing object and
 return a typed refusal without touching pins, revocation journals or keys;
 there is no legacy-revocation fallback. This is an update compatibility guard,
-not an assertion of deployed future-content revocation, and it does not enable
-`LinkOptions.ContentKeyRuntime`.
+not an assertion of deployed future-content revocation. The production caller
+opts into `LinkOptions.ContentKeyRuntime` only behind this guard.
 
 ## The problem it closes
 
@@ -244,11 +244,10 @@ Synthetic tests cover real answer seal/open and future ciphertext, readonly B,
 revoked A, restart and operation idempotence, journal persistence boundaries,
 failed pin writes, stale pairing generations, concurrent answer/revoke, wrong
 or missing pins, bounded slow raw callbacks and late direct frame rejection.
-Task artifacts hold actual run results. Deployment, real hosted-browser
-acceptance, cross-system end-to-end recovery, independent review and operational
-latency measurements remain pending.
-Keep the producer off until the required acceptance is complete; never roll
-back durable floors as a compatibility workaround.
+Task artifacts hold actual run results. The deployed receivers and synthetic cross-system recovery do not establish
+production browser/phone acceptance or operational cutover latency. Complete
+dev and release acceptance before claiming released future-content revocation;
+never roll back durable floors as a compatibility workaround.
 
 
 ## Identity handover participates in runtime authority
@@ -297,15 +296,21 @@ The AES-GCM key imported by identity handover is cryptographically usable with t
 same full hash ID at later epochs, but the diagnostic page does not silently
 adopt it into an ordinary relay binding or claim that Session access was granted.
 
-Production `ContentKeyRuntime` remains off by default. Synthetic tests exercise
-real signatures and AEAD; production relay, real browser and phone acceptance
-remain separate integration requirements.
+The production daemon opts in behind update admission; library callers still
+default to disabled. Synthetic tests exercise real signatures and AEAD. Running
+dev, production browser/phone and signed-release acceptance remain separate
+requirements.
 
 ## Receiver-first rollout status
 
-The hosted `newCloudSession` factory now explicitly enables `ViewerRekey` in source.
-The `CloudViewerSession` and `CloudClient` library defaults remain false, and
-`cmd/clawdline/main.go` still does not enable `ContentKeyRuntime`. This source
-change does not establish deployment or production acceptance. Root must deploy
-and accept the receiver before enabling the producer; browser/phone and relay
-acceptance remain pending.
+On 2026-10-21 the relay receiver was deployed and its public health version and
+schema fingerprint checked. The hosted receiver serves `a01fab0861110c84b74b8b0f4d02fe6474f01527`;
+its served main bundle passed CloudGate and the English/Traditional Chinese catalogs
+were complete. These deployment checks establish receiver availability, not a
+production revocation experiment.
+
+The hosted `newCloudSession` factory enables `ViewerRekey`. The production daemon
+now enables `ContentKeyRuntime` behind the update-acceptance gate described above.
+Library defaults remain false. The next acceptance is the running dev build and
+controlled browser recovery, followed by the exact signed release. No public
+release or phone acceptance is claimed by this source change.
