@@ -8284,7 +8284,7 @@
   "workflowSettings.intro": "These settings apply to this machine. Both are enabled by default. Select ⓘ to see what each switch changes.",
   "workflowSettings.dispatch_full_permissionTitle": "Use full permission by default for dispatch",
   "workflowSettings.dispatch_full_permissionOn": "New dispatched tasks without an explicit permission mode use full permission, allowing the assistant to act without routine permission prompts.",
-  "workflowSettings.dispatch_full_permissionOff": "New dispatched tasks without an explicit permission mode use Ask, so the assistant requests permission when needed.",
+  "workflowSettings.dispatch_full_permissionOff": "New dispatched tasks without an explicit permission mode inherit the assistant’s own permission settings. Clawdline does not add full-permission arguments; the assistant decides when to ask.",
   "workflowSettings.dispatch_full_permissionScope": "Applies to future dispatches, including schedules using the machine default. Explicit task permissions take precedence. Running tasks and the assistant you opened yourself are unchanged.",
   "workflowSettings.session_auto_discoveryTitle": "Automatically discover other Sessions",
   "workflowSettings.session_auto_discoveryOn": "Include Claude Code and Codex conversations opened outside Clawdline in supported tmux and iTerm2 terminals.",

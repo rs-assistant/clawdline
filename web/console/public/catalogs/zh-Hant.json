@@ -8284,7 +8284,7 @@
   "workflowSettings.intro": "這些設定適用於這台機器，預設皆為開啟。點選 ⓘ 可查看開啟與關閉的影響。",
   "workflowSettings.dispatch_full_permissionTitle": "派工預設使用完整權限",
   "workflowSettings.dispatch_full_permissionOn": "新派出的任務未指定權限模式時，會使用完整權限，讓助理執行操作時不逐次詢問權限。",
-  "workflowSettings.dispatch_full_permissionOff": "新派出的任務未指定權限模式時，改用「詢問」，讓助理在需要時請求操作權限。",
+  "workflowSettings.dispatch_full_permissionOff": "之後未指定權限模式的新增派工，沿用助理本身的權限設定。Clawdline 不再加入完整權限參數，何時需要詢問由助理設定決定。",
   "workflowSettings.dispatch_full_permissionScope": "適用於之後的派工，包含使用機器預設權限的排程。單一任務明確指定的權限優先；不改變執行中的任務，也不改變你自行開啟的助理權限。",
   "workflowSettings.session_auto_discoveryTitle": "自動探索其他 Session",
   "workflowSettings.session_auto_discoveryOn": "自動將你在支援的 tmux 與 iTerm2 終端中，自行開啟的 Claude Code、Codex 對話加入 Session 清單。",
