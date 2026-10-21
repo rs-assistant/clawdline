@@ -1758,7 +1758,7 @@
       "sources": [
         {
           "path": "internal/domain/schedulewebhook/investigation.go",
-          "line": 161
+          "line": 234
         },
         {
           "path": "internal/app/orchestrator/scheduled.go",
@@ -2140,7 +2140,7 @@
     "internal/app/work_v2_todos.go": "fb992a3c595450d28507e6b8de14fe0c4be72e0cb84e398445f8c2622e0e171a",
     "internal/config/config.go": "25f547d482792bb8bc1cfef1ad6b9d8355d289104bf1f0842efe5002c7f6ab6c",
     "internal/domain/persona/argv.go": "2b318ab0462bdafb5be21c410d8dc0d5f5c2f7d1040cf206c510b38c89211871",
-    "internal/domain/schedulewebhook/investigation.go": "6bf4690e130736875e3ef80ed9d181f6f736e98ef9371a937c5b6b06dc284c54",
+    "internal/domain/schedulewebhook/investigation.go": "3d861f7d9b01654f933775c48e018217b1e35b669c122b6f15148f80bfc5b33d",
     "internal/domain/snippet/default_workflow.go": "3a4d21963243a0b6dd2af553b4cd67b0d1bfaeabedfc2d43d629ba8b02e0bf08",
     "internal/transport/http/agent_session_close.go": "4cfb1d376e50119026dc079346a7253e826472305263e66ade6982b8e8b958f3",
     "internal/transport/http/coordinator.go": "b5f72bc919f52fb5caea1b6f94edb4bd47f9169b71e3df7259d39fc1393397c0",
