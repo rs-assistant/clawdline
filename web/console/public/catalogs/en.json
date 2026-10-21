@@ -8457,7 +8457,7 @@
   "health.iv_dest_offline": "Offline",
   "health.iv_dest_unknown": "State unknown",
   "health.iv_destNext_ready": "Its investigation schedule will receive this incident.",
-  "health.iv_destNext_setup_required": "On this machine, create a schedule with kind health_investigation and trigger only, then bind its Cloud webhook.",
+  "health.iv_destNext_setup_required": "Complete the event-investigation schedule setup on this machine, then refresh this list.",
   "health.iv_destNext_ambiguous": "Keep one investigation schedule bound on this machine and unbind the others, so Cloud knows which one runs it.",
   "health.iv_destNext_offline": "Bring this machine back online; Cloud lists it as ready when it reports again.",
   "health.iv_destNext_unknown": "Cloud sent a state this page does not know ({raw}). Update this page or check the machine before choosing it.",

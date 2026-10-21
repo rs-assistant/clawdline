@@ -3,6 +3,9 @@ package cloud
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -118,5 +121,55 @@ func TestScheduleWebhookClientOutlivesTheProtocolLongPoll(t *testing.T) {
 	client := NewScheduleWebhookClient("https://api.example.test", "credential")
 	if client.Client.HTTP.Timeout <= 25*time.Second {
 		t.Fatalf("webhook timeout %s cannot outlive a 25s server wait", client.Client.HTTP.Timeout)
+	}
+}
+
+// TestOnlyAnInvestigationActivationCarriesThePurpose: an ordinary activation
+// sends the body it always sent; the investigation one adds the purpose, the
+// same on a retry; and an old Cloud's `unknown_field` is a typed upgrade
+// refusal with no second request without the purpose.
+func TestOnlyAnInvestigationActivationCarriesThePurpose(t *testing.T) {
+	var bodies []string
+	old := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, r.Header.Get("Idempotency-Key")+" "+string(raw))
+		w.Header().Set("Content-Type", "application/json")
+		if old && strings.Contains(string(raw), "binding_purpose") {
+			w.WriteHeader(400)
+			_, _ = w.Write([]byte(`{"error":{"code":"unknown_field","message":"Unknown field binding_purpose"}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"schema":"clawdline.schedule_webhook.management.v1","hook":{"hook_id":"swh_test","state":"active","revision":1}}`))
+	}))
+	defer server.Close()
+	client := ScheduleWebhookClient{Client: NewAccountClient(server.URL), Credential: "machine-secret"}
+	ctx := context.Background()
+	if _, err := client.Activate(ctx, "swh_test", "plain-1", 0); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, err := client.ActivateInvestigation(ctx, "swh_test", "inv-1", 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := []string{`plain-1 {"expected_revision":0}`,
+		`inv-1 {"binding_purpose":"health_investigation","expected_revision":0}`,
+		`inv-1 {"binding_purpose":"health_investigation","expected_revision":0}`}
+	if fmt.Sprint(bodies) != fmt.Sprint(want) {
+		t.Fatalf("bodies %q, want %q", bodies, want)
+	}
+
+	old, bodies = true, nil
+	_, err := client.ActivateInvestigation(ctx, "swh_test", "inv-2", 0)
+	if !errors.Is(err, ErrCloudUpgradeRequired) {
+		t.Fatalf("an old Cloud answered %v, want ErrCloudUpgradeRequired", err)
+	}
+	if len(bodies) != 1 {
+		t.Fatalf("an old Cloud was asked %d times: %q", len(bodies), bodies)
+	}
+	// An ordinary activation's 400 is not read as an upgrade: it carries no purpose.
+	if _, err := client.Activate(ctx, "swh_test", "plain-2", 0); err != nil {
+		t.Fatalf("an ordinary activation on an old Cloud: %v", err)
 	}
 }
