@@ -3579,7 +3579,7 @@
     "Name": "console.transcript_fill_pages",
     "Class": "buffer",
     "Unit": "rows",
-    "Limit": 8,
+    "Limit": 32,
     "WarnAt": 0,
     "AtLimit": "refuse",
     "Deviation": "",

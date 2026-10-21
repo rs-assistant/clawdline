@@ -8,7 +8,7 @@ func consoleBounds() []Entry {
 			// older reads while the transcript does not fill its viewport.
 			// Polling and resize do not reset it; a manual request does.
 			Name: ConsoleTranscriptFillPages, Class: Buffer, Unit: Rows,
-			Limit: 8, AtLimit: Refuse,
+			Limit: 32, AtLimit: Refuse,
 			Told: []Channel{Sender, Diagnostics}, EvictedBy: Person,
 		},
 		{
