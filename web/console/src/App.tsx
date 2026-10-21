@@ -1081,7 +1081,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
             {cloudPeerAccess && <button className="sidebar-item" id="nav-peer-access" type="button"
               data-page-to="peer-access" aria-current={page === "peer-access" ? "page" : undefined}
               onClick={() => go("peer-access")}>
-              <SidebarIcon name="devices" />{nextWord("cloudPeerAccessNav")}
+              <SidebarIcon name="access" />{nextWord("cloudPeerAccessNav")}
             </button>}
             {sidebarPages.filter((p) => p.id === "notifications").map(sidebarPage)}
             {sidebarPages.filter((p) => p.id === "plan").map(sidebarPage)}
