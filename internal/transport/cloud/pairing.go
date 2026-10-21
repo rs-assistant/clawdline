@@ -22,7 +22,8 @@ package cloud
 //     comparing two screens cannot see.
 //   - **Operate pins are written last.** Readonly pairings instead reserve the
 //     durable ceiling before key delivery; a failed final write must not turn
-//     an explicitly readonly browser into a legacy roster-only operator.
+//     an explicitly readonly browser into a legacy roster-only operator. That
+//     reservation keeps a revoked browser revoked until the handover completes.
 //
 // The secret never reaches a log, a status route or the control plane. What
 // leaves this file is an invitation id, a fragment a person carries, and
@@ -392,8 +393,10 @@ func (p *Pairing) deliver(ctx context.Context, offer domaincloud.PairingOffer, s
 	}
 	// Reserve the readonly ceiling before releasing the content key. Otherwise a
 	// failed pin write after delivery would fall back to legacy roster authority.
+	// The reservation keeps a refusal: a revoked browser is restored only by the
+	// pin below, after the handover has actually completed.
 	if reserve == adaptercloud.ScopeReadOnly {
-		if err := p.Pinned.Pin(p.AccountID, adaptercloud.PinnedDevice{DeviceID: offer.ViewerDeviceID,
+		if err := p.Pinned.ReserveReadOnly(p.AccountID, adaptercloud.PinnedDevice{DeviceID: offer.ViewerDeviceID,
 			PublicKey: offer.ViewerSigningKey, Fingerprint: offer.ViewerFingerprint, Scope: reserve,
 			PairedAt: p.now().Unix()}); err != nil {
 			return PairingState{}, err

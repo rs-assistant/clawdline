@@ -14,6 +14,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -47,6 +48,7 @@ type fakeControlPlane struct {
 	delivered          []byte
 	deliveredFrom      string
 	echoWrongPrint     bool
+	failComplete       bool
 	invitationTTLHours int
 }
 
@@ -96,6 +98,11 @@ func (f *fakeControlPlane) start(t *testing.T) *httptest.Server {
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		f.mu.Lock()
 		defer f.mu.Unlock()
+		if f.failComplete {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			writeTestJSON(w, map[string]any{"error": map[string]any{"code": "unavailable"}})
+			return
+		}
 		if body.PairingID != f.pairingID {
 			w.WriteHeader(http.StatusNotFound)
 			writeTestJSON(w, map[string]any{"error": map[string]any{"code": "unknown_pairing"}})
@@ -689,5 +696,79 @@ func TestFailedFinalPinOnARepairKeepsTheReadonlyCeiling(t *testing.T) {
 	}
 	if got, err := adaptercloud.NewPinnedStore(dir).ViewerScope(h.viewer.deviceID); err != nil || got != adaptercloud.ScopeReadOnly {
 		t.Fatalf("failed repair pin elevated viewer: %q %v", got, err)
+	}
+}
+
+// A readonly re-pairing reserves its ceiling before the handover leaves. For a
+// browser this machine threw out, that reservation must not be what lets it
+// back in: only a handover that actually completed may restore it.
+func TestAFailedReadonlyRepairingDoesNotReviveARevokedBrowser(t *testing.T) {
+	failures := map[string]func(h *pairingHarness){
+		"scope change": func(h *pairingHarness) {
+			h.pairing.OnScopeChange = func(string) error { return errors.New("synthetic lease sweep failure") }
+		},
+		"handover": func(h *pairingHarness) {
+			h.plane.mu.Lock()
+			h.plane.failComplete = true
+			h.plane.mu.Unlock()
+		},
+	}
+	for _, scope := range []string{"", adaptercloud.ScopeReadOnly} {
+		for name, inject := range failures {
+			t.Run(fmt.Sprintf("%s/scope=%q", name, scope), func(t *testing.T) {
+				h := newPairingHarness(t)
+				h.prePin(t, adaptercloud.ScopeReadOnly)
+				if changed, err := h.pinned.Revoke(h.viewer.deviceID, time.Now()); err != nil || !changed {
+					t.Fatalf("revoke: %v %v", changed, err)
+				}
+				inject(h)
+				if _, err := h.pairing.Complete(context.Background(), h.viewer.offer.Fragment(), scope); err == nil {
+					t.Fatal("the injected failure did not fail the pairing")
+				}
+				for _, store := range []*adaptercloud.PinnedStore{h.pinned, adaptercloud.NewPinnedStore(filepath.Dir(h.pinned.Path()))} {
+					if refused, err := store.Refused(h.viewer.deviceID); err != nil || !refused {
+						t.Fatalf("a failed re-pairing revived a revoked browser: refused=%v %v", refused, err)
+					}
+					if _, pinned, err := store.PublicKeyFor(h.viewer.deviceID); err != nil || pinned {
+						t.Fatalf("a revoked browser has a live pin: %v %v", pinned, err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestASuccessfulRepairingRestoresARevokedBrowserAcrossRestart(t *testing.T) {
+	for _, scope := range []string{"", adaptercloud.ScopeReadOnly} {
+		t.Run(fmt.Sprintf("scope=%q", scope), func(t *testing.T) {
+			h := newPairingHarness(t)
+			h.prePin(t, adaptercloud.ScopeReadOnly)
+			if _, err := h.pinned.Revoke(h.viewer.deviceID, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			sawRefusal := false
+			h.pairing.OnScopeChange = func(device string) error {
+				refused, err := adaptercloud.NewPinnedStore(filepath.Dir(h.pinned.Path())).Refused(device)
+				sawRefusal = err == nil && refused
+				return err
+			}
+			state, err := h.pairing.Complete(context.Background(), h.viewer.offer.Fragment(), scope)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !sawRefusal {
+				t.Fatal("the reservation lifted the refusal before the handover completed")
+			}
+			if state.Scope != adaptercloud.ScopeReadOnly {
+				t.Fatalf("state scope: %q", state.Scope)
+			}
+			restarted := adaptercloud.NewPinnedStore(filepath.Dir(h.pinned.Path()))
+			if refused, err := restarted.Refused(h.viewer.deviceID); err != nil || refused {
+				t.Fatalf("still refused after a completed re-pairing: %v %v", refused, err)
+			}
+			if got, err := restarted.ViewerScope(h.viewer.deviceID); err != nil || got != adaptercloud.ScopeReadOnly {
+				t.Fatalf("restored scope: %q %v", got, err)
+			}
+		})
 	}
 }

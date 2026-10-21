@@ -19,7 +19,9 @@ package cloud
 //   - **Operate pins follow delivery.** A readonly pairing first reserves its
 //     ceiling before key delivery, so a failed final write cannot admit the
 //     viewer through the legacy roster fallback as an operator. A failed
-//     readonly handover can leave a readonly reservation behind.
+//     readonly handover can leave a readonly reservation behind, but a
+//     reservation never lifts a refusal: only the pin written after a
+//     completed handover does.
 //   - **Revoking is local and it is final here.** The control plane's
 //     `DELETE /v1/devices/:id` needs a browser session, which a daemon does not
 //     have; and even when the account revokes a device, "the roster no longer
@@ -346,6 +348,60 @@ func (s *PinnedStore) pin(accountID string, device PinnedDevice, keepScope bool)
 		return "", err
 	}
 	return device.EffectiveScope(), nil
+}
+
+// ReserveReadOnly lowers a device's ceiling to readonly before a handover
+// leaves, without otherwise changing what this machine knows about it.
+//
+// It exists for the pairing's pre-delivery step, which is not yet a pairing:
+// the handover may still fail or be cancelled. So, unlike Pin, it keeps a
+// refusal — the revoked row stays revoked, read and written under the same
+// lock so no concurrent writer slips between them — and it keeps an existing
+// row's key and pairing time. Only a device this machine holds no row for gets
+// a new active readonly row, which is what stops a failed final write from
+// leaving it to the roster's legacy operate fallback. The pin written after a
+// completed handover is what restores a revoked device.
+func (s *PinnedStore) ReserveReadOnly(accountID string, device PinnedDevice) error {
+	if device.DeviceID == "" {
+		return errors.New("refusing to reserve a device with no id")
+	}
+	if _, ok := device.Key(); !ok {
+		return errors.New("refusing to reserve a device with no usable public key")
+	}
+	if device.PairedAt == 0 {
+		device.PairedAt = time.Now().Unix()
+	}
+	device.Scope, device.RevokedAt = ScopeReadOnly, 0
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.loadLocked(); err != nil {
+		return err
+	}
+	if s.record.AccountID != "" && accountID != "" && s.record.AccountID != accountID {
+		return fmt.Errorf("the paired-device file belongs to account %s, not %s",
+			s.record.AccountID, accountID)
+	}
+	before := s.record
+	before.Devices = append([]PinnedDevice(nil), s.record.Devices...)
+	s.record.Version = 1
+	if accountID != "" {
+		s.record.AccountID = accountID
+	}
+	found := false
+	for i := range s.record.Devices {
+		if s.record.Devices[i].DeviceID == device.DeviceID {
+			s.record.Devices[i].Scope, found = ScopeReadOnly, true
+			break
+		}
+	}
+	if !found {
+		s.record.Devices = append(s.record.Devices, device)
+	}
+	if err := s.saveLocked(); err != nil {
+		s.record = before
+		return err
+	}
+	return nil
 }
 
 // Revoke marks a device refused. It answers whether a row changed, so that a
