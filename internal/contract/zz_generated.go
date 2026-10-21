@@ -1747,6 +1747,8 @@ type BrowserDevice struct {
 // POST /v1/auth/devices/browser: `clawdline open` asking for a device of its
 // own. Local token only.
 type BrowserRequest struct {
+	// Optional local selection; omission preserves read-and-operate.
+	Permission string `json:"permission,omitempty"`
 }
 
 // One build: the commit it was built from and, when its BUILD.json said so,
@@ -2612,6 +2614,15 @@ type DeviceList struct {
 	Configured bool           `json:"configured"`
 	Devices    []PairedDevice `json:"devices"`
 	Password   bool           `json:"password"`
+}
+
+// Local token only. POST /v1/auth/devices/{id}/permission persists a grant;
+// POST /v1/auth/pairings/{id}/permission selects the pending pairing before
+// confirmation. Missing/invalid permission is 400 bad_request; unknown/expired
+// id is 404 not_found. Public pair/confirm fields never select a grant.
+// Repeated writes are idempotent.
+type DevicePermission struct {
+	Permission string `json:"permission"`
 }
 
 // GET /v1/diagnostics, this machine's own token only (a paired device is 403):
@@ -3555,7 +3566,8 @@ type PairStarted struct {
 }
 
 type PairedDevice struct {
-	// Paired devices have read and send access.
+	// Read-only grants have read; read-and-operate grants have read and send. Legacy
+	// rows and unselected new pairings default to read and send.
 	Caps []string `json:"caps"`
 
 	// Unix seconds.

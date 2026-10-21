@@ -14,6 +14,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/contract"
+	"github.com/sainteye/clawdline/internal/domain/auth"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	"github.com/sainteye/clawdline/internal/domain/session"
 	"github.com/sainteye/clawdline/internal/domain/task"
@@ -82,7 +83,23 @@ func (s *Server) sessionAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	requestContext := r.Context()
+	// Network requests always carry the gate. In-process callers may supply a
+	// trusted verdict directly and keep their existing application contract.
+	if accessOf(r).gate != nil {
+		requestContext = app.WithOperationCheck(r.Context(), func() error {
+			a := accessOf(r)
+			if a.gate == nil || a.gate.auth == nil {
+				return app.Refusal{Code: "forbidden", Detail: "This device may read, and not send."}
+			}
+			d, ok := a.gate.auth.Holds(a.verdict.Device)
+			if !ok || !d.Caps.Has(auth.Send) {
+				return app.Refusal{Code: "forbidden", Detail: "This device may read, and not send."}
+			}
+			return nil
+		})
+	}
+	ctx, cancel := context.WithTimeout(requestContext, 15*time.Second)
 	defer cancel()
 
 	switch verb {
@@ -106,7 +123,7 @@ func (s *Server) sessionAction(w http.ResponseWriter, r *http.Request) {
 			// picture; the read of the machine before it keeps the ordinary bound.
 			if len(body.Images) > 0 {
 				var more context.CancelFunc
-				ctx, more = context.WithTimeout(r.Context(), 45*time.Second)
+				ctx, more = context.WithTimeout(requestContext, 45*time.Second)
 				defer more()
 			}
 			sent, err := s.actions().SendWithPictures(ctx, id, body.Text, body.Images)
@@ -608,6 +625,8 @@ func writeActionRefusal(w http.ResponseWriter, err error) {
 
 func actionStatus(code string) int {
 	switch code {
+	case "forbidden":
+		return http.StatusForbidden
 	case "session_not_found":
 		return http.StatusNotFound
 	case "session_unknown", "closeability_unknown", "close_inventory_unavailable":

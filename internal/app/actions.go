@@ -99,6 +99,20 @@ func (a Actions) lanes() *lane.Lanes {
 	return terminalLanes
 }
 
+type operationCheckKey struct{}
+
+// WithOperationCheck attaches caller authorization to this request, never to shared Actions.
+func WithOperationCheck(ctx context.Context, check func() error) context.Context {
+	return context.WithValue(ctx, operationCheckKey{}, check)
+}
+
+func checkOperation(ctx context.Context) error {
+	if check, ok := ctx.Value(operationCheckKey{}).(func() error); ok {
+		return check()
+	}
+	return nil
+}
+
 // turn takes the terminal's lane for one whole write. A full machine, or a
 // caller that gave up waiting, is `busy` — the Swift app's code for a full
 // terminal queue, answered 429 — and nothing was typed.
@@ -112,6 +126,10 @@ func (a Actions) turn(ctx context.Context, s session.Session) (func(), error) {
 	release, err := a.lanes().Acquire(wait, lane.TerminalKey(string(s.Backend), s.ID))
 	if err != nil {
 		return nil, Refusal{RawDetail: true, Code: "busy", Detail: err.Error(), Cause: err}
+	}
+	if err := checkOperation(ctx); err != nil {
+		release()
+		return nil, err
 	}
 	return release, nil
 }
@@ -323,6 +341,9 @@ func (a Actions) send(ctx context.Context, s session.Session, text string) (sess
 	// Whatever the message did to the screen is read live for a moment
 	// (HeldScreens.Pressed), as after a key.
 	defer a.Inventory.Held.Pressed(s.ID)
+	if err := checkOperation(ctx); err != nil {
+		return s, err
+	}
 	if err := h.Send(ctx, s, text); err != nil {
 		return s, sendRefusal(s, err)
 	}
@@ -402,10 +423,18 @@ func (a Actions) SendPrepared(ctx context.Context, id, text string, prepare orch
 		return s, err
 	}
 	defer release()
-	press := func(b []byte) error { return keys.Keystroke(ctx, s, b) }
+	press := func(b []byte) error {
+		if err := checkOperation(ctx); err != nil {
+			return err
+		}
+		return keys.Keystroke(ctx, s, b)
+	}
 	look := func() (string, bool) { return a.Inventory.Screen.Capture(ctx, s) }
 	if err := prepare(ctx, press, look); err != nil {
 		return s, Refusal{RawDetail: true, Code: "send_withheld", Detail: err.Error(), Cause: err}
+	}
+	if err := checkOperation(ctx); err != nil {
+		return s, err
 	}
 	if err := h.Send(ctx, s, text); err != nil {
 		return s, sendRefusal(s, err)
@@ -515,6 +544,10 @@ func (a Actions) SendWithPictures(ctx context.Context, id, text string, images [
 			log.Printf("send: a picture was left out: %v", err)
 			continue
 		}
+		if err := checkOperation(ctx); err != nil {
+			a.Pictures.Drops.Discard(paths)
+			return s, err
+		}
 		path, err := a.Pictures.Drops.Store(pic.Data, time.Now())
 		if err != nil {
 			log.Printf("send: a picture could not be kept: %v", err)
@@ -547,6 +580,9 @@ func (a Actions) deliverPictures(ctx context.Context, s session.Session, h ports
 		return strings.Join(parts, " ")
 	}
 	sendPaths := func() error {
+		if err := checkOperation(ctx); err != nil {
+			return err
+		}
 		if err := h.Send(ctx, s, asPaths(paths)); err != nil {
 			return sendRefusal(s, err)
 		}
@@ -606,6 +642,9 @@ func (a Actions) deliverPictures(ctx context.Context, s session.Session, h ports
 
 	typed := false
 	if text != "" {
+		if err := checkOperation(work); err != nil {
+			return err
+		}
 		if err := typer.Type(work, s, text); err != nil {
 			return Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
 		}
@@ -613,6 +652,9 @@ func (a Actions) deliverPictures(ctx context.Context, s session.Session, h ports
 	}
 	asPath := 0
 	for _, p := range paths {
+		if err := checkOperation(work); err != nil {
+			return err
+		}
 		if err := lender.Offer(work, borrowed, p); err != nil {
 			// Its bytes would not load. The path still works and is only plainer.
 			asPath++
@@ -620,17 +662,26 @@ func (a Actions) deliverPictures(ctx context.Context, s session.Session, h ports
 			if typed {
 				words = " " + words
 			}
+			if err := checkOperation(work); err != nil {
+				return err
+			}
 			if err := typer.Type(work, s, words); err != nil {
 				return Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
 			}
 			typed = true
 			continue
 		}
+		if err := checkOperation(work); err != nil {
+			return err
+		}
 		if err := keys.Keystroke(work, s, keyPaste); err != nil {
 			return Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
 		}
 		typed = true
 		time.Sleep(pictureSettle)
+	}
+	if err := checkOperation(work); err != nil {
+		return err
 	}
 	if err := keys.Keystroke(work, s, keyReturn); err != nil {
 		return Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}

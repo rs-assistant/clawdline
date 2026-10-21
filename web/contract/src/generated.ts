@@ -2034,6 +2034,10 @@ export interface BrowserDevice {
  * Local token only.
  */
 export interface BrowserRequest {
+  /**
+   * Optional local selection; omission preserves read-and-operate.
+   */
+  permission?: string
 }
 
 /**
@@ -3048,6 +3052,17 @@ export interface DeviceList {
   configured: boolean
   devices: PairedDevice[]
   password: boolean
+}
+
+/**
+ * Local token only. POST /v1/auth/devices/{id}/permission persists a grant; POST
+ * /v1/auth/pairings/{id}/permission selects the pending pairing before
+ * confirmation. Missing/invalid permission is 400 bad_request; unknown/expired id
+ * is 404 not_found. Public pair/confirm fields never select a grant. Repeated
+ * writes are idempotent.
+ */
+export interface DevicePermission {
+  permission: string
 }
 
 /**
@@ -4159,7 +4174,8 @@ export interface PairStarted {
 
 export interface PairedDevice {
   /**
-   * Paired devices have read and send access.
+   * Read-only grants have read; read-and-operate grants have read and send. Legacy
+   * rows and unselected new pairings default to read and send.
    */
   caps: string[]
 
