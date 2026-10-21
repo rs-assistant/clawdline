@@ -8763,5 +8763,9 @@
   "settings.settingsITermIntegrationUpgrade": "這台機器的 daemon 尚未支援 iTerm2 授權總開關。請更新這台機器的 Clawdline，才能關閉所有 iTerm2 存取；此頁目前無法判定其存取狀態。",
   "settings.settingsSessionTerminalConsentHint": "iTerm2 整合關閉時，「自動」使用 tmux。開啟整合後，「自動」會在 iTerm2 開著時使用它；有 tmux 時，Session 在 tmux 裡執行，並以 iTerm2 分頁顯示。明確選擇 iTerm2 時，必須先啟用整合並開啟 iTerm2。「iTerm2（原生分頁）」直接在分頁內執行；「tmux」一律使用 tmux。下一個 Session 開始套用。",
   "capacityRow.cloud.envelope_key_id.what": "加密信封的金鑰識別碼最多 128 位元組，包含版本與完整內容金鑰雜湊。",
-  "capacityRow.cloud.envelope_key_id.full": "識別碼過長時，會在傳送或解密信封前拒絕。"
+  "capacityRow.cloud.envelope_key_id.full": "識別碼過長時，會在傳送或解密信封前拒絕。",
+  "capacityRow.cloud.rekey_pending.what": "這台機器最多同時處理八筆已簽署的原始換鑰請求。",
+  "capacityRow.cloud.rekey_pending.full": "額外請求會立即被拒絕，一般中繼訊息仍可繼續處理。",
+  "capacityRow.cloud.rekey_interval.what": "這台機器每兩秒最多接受一筆原始換鑰請求，所有檢視裝置共用此間隔。",
+  "capacityRow.cloud.rekey_interval.full": "間隔內的請求會被拒絕，檢視裝置可在間隔結束後重試。"
 }

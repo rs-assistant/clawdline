@@ -10,14 +10,27 @@ import (
 // (capacity.AreaOf), one reading per row.
 func (s *Server) cloudCapacityMeasures() map[string]func() capacity.Reading {
 	out := map[string]func() capacity.Reading{
+		"cloud.rekey_pending": func() capacity.Reading {
+			line, ok := cloudLines.Load(s.cfg.Dir)
+			if !ok {
+				return capacity.Reading{Known: true, Note: "Cloud key runtime is inactive"}
+			}
+			if reader, ok := line.(interface{ RekeyPendingReading() capacity.Reading }); ok {
+				return reader.RekeyPendingReading()
+			}
+			return capacity.Unmeasured("Cloud link does not expose raw key exchange usage")
+		},
+		"cloud.rekey_interval": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "global raw-offer admission interval; excess requests are refused"}
+		},
 		"cloud.envelope_key_id": func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-envelope key identifier parse guard; no retained buffer"}
 		},
 		"cloud.rekey_lifetime": func() capacity.Reading {
-			return capacity.Reading{Known: true, Note: "inactive contract; no runtime exchange producer or pending operations"}
+			return capacity.Reading{Known: true, Note: "signed offer expiry; runtime remains disabled by default"}
 		},
 		"cloud.rekey_body": func() capacity.Reading {
-			return capacity.Reading{Known: true, Note: "per-message parse guard in an inactive contract; no retained runtime buffer"}
+			return capacity.Reading{Known: true, Note: "per-message signed raw-control parse guard"}
 		},
 		"cloud.health_investigation_bundle_bytes": func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-leased bundle read byte guard; no retained network buffer"}

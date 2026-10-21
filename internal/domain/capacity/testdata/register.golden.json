@@ -2032,6 +2032,26 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.rekey_interval",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.RawRekeyIntervalSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.rekey_lifetime",
     "Class": "cache",
     "Unit": "seconds",
@@ -2048,6 +2068,27 @@
     "QuietRecovery": false,
     "Sources": [
       "internal/domain/cloud.RekeyLifetimeMSLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.rekey_pending",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.RawRekeyPendingLimit",
+      "internal/adapters/cloud.(*Transport).dispatchRawRekey:chan(RawRekeyPendingLimit)"
     ]
   },
   {

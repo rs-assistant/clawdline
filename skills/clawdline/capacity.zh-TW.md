@@ -107,7 +107,9 @@
 | `cloud.peer_outbox` | 512 | `rows` | `refuse` | `diagnostics, notice, health` | — |
 | `cloud.peer_pairs` | 128 | `rows` | `refuse` | `diagnostics, notice, health` | — |
 | `cloud.rekey_body` | 4096 | `bytes` | `refuse` | `diagnostics, sender` | — |
+| `cloud.rekey_interval` | 2 | `seconds` | `refuse` | `diagnostics, sender` | — |
 | `cloud.rekey_lifetime` | 120 | `seconds` | `expire` | `diagnostics, sender` | — |
+| `cloud.rekey_pending` | 8 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `cloud.relay_queue` | 64 | `rows` | `refuse` | `diagnostics, notice, cloud_status, log, sender` | — |
 | `cloud.reload_stop_seconds` | 15 | `seconds` | `refuse` | `diagnostics, sender, log` | — |
 | `cloud.roster_short_read_attempts` | 2 | `rows` | `refuse` | `diagnostics, sender` | — |

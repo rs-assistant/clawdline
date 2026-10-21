@@ -8763,5 +8763,9 @@
   "settings.settingsITermIntegrationUpgrade": "This daemon does not support the iTerm2 consent switch. Update Clawdline on this machine to control all iTerm2 access. Its current access cannot be inferred from this page.",
   "settings.settingsSessionTerminalConsentHint": "Automatic uses tmux while iTerm2 integration is off. With integration enabled, Automatic uses iTerm2 while it is open; with tmux installed, the Session runs in tmux and is shown in an iTerm2 tab. Explicit iTerm2 choices require enabled integration and a running iTerm2. iTerm2 (native tab) runs directly in its tab. tmux always uses tmux. The next Session follows this choice.",
   "capacityRow.cloud.envelope_key_id.what": "An encrypted envelope key identifier is limited to 128 bytes, including the epoch and full content-key hash.",
-  "capacityRow.cloud.envelope_key_id.full": "An oversized key identifier is refused before an envelope is sent or opened."
+  "capacityRow.cloud.envelope_key_id.full": "An oversized key identifier is refused before an envelope is sent or opened.",
+  "capacityRow.cloud.rekey_pending.what": "At most eight signed raw key exchanges may be running on this machine.",
+  "capacityRow.cloud.rekey_pending.full": "Additional offers are refused immediately; ordinary relay messages keep flowing.",
+  "capacityRow.cloud.rekey_interval.what": "This machine admits one raw key offer every two seconds across all viewers.",
+  "capacityRow.cloud.rekey_interval.full": "Offers inside the interval are refused; viewers can retry after the interval."
 }

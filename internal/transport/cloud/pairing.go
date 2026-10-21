@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
@@ -116,6 +117,10 @@ type Pairing struct {
 	Log        func(format string, args ...any)
 	// OnRevoke clears a legacy grant record and the active Cloud connection
 	// after the pin has been refused. A failure is reported as partial revoke.
+	Authority     *sync.Mutex
+	Generation    *atomic.Uint64
+	ContentState  func() (domaincloud.ContentKeyState, error)
+	RevokeContent func(string) (bool, error)
 	OnRevoke      func(string) error
 	OnScopeChange func(string) error
 
@@ -151,7 +156,17 @@ func (p *Pairing) State() PairingState {
 //
 // The returned state carries the link. It is handed to the local settings page
 // and to the terminal, and to nothing else.
+type pairingGenerationContext struct{}
+
+func (p *Pairing) withGeneration(ctx context.Context) context.Context {
+	if p != nil && p.Generation != nil {
+		return context.WithValue(ctx, pairingGenerationContext{}, p.Generation.Load())
+	}
+	return ctx
+}
+
 func (p *Pairing) Begin(ctx context.Context, scopes ...string) (PairingState, error) {
+	ctx = p.withGeneration(ctx)
 	scope, err := pairingScope(scopes)
 	if err != nil {
 		return PairingState{}, err
@@ -309,6 +324,7 @@ func (p *Pairing) answer(ctx context.Context, invitation domaincloud.PairingInvi
 // identical — the invitation exists only to carry these same bytes when the
 // browser is a phone.
 func (p *Pairing) Complete(ctx context.Context, offerFragment string, scopes ...string) (PairingState, error) {
+	ctx = p.withGeneration(ctx)
 	if _, err := pairingScope(scopes); err != nil {
 		return PairingState{}, err
 	}
@@ -350,6 +366,20 @@ func (p *Pairing) CheckOffer(offerFragment string) (domaincloud.PairingOffer, er
 // deliver seals, delivers, checks the echo and pins. It is the one place any
 // of those four happen.
 func (p *Pairing) deliver(ctx context.Context, offer domaincloud.PairingOffer, scopes ...string) (PairingState, error) {
+	var generation uint64
+	if p.Generation != nil {
+		generation = p.Generation.Load()
+		if started, ok := ctx.Value(pairingGenerationContext{}).(uint64); ok {
+			generation = started
+		}
+	}
+	if p.Authority != nil {
+		p.Authority.Lock()
+		defer p.Authority.Unlock()
+	}
+	if p.Generation != nil && generation != p.Generation.Load() {
+		return PairingState{}, domaincloud.ErrRekey
+	}
 	scope, err := pairingScope(scopes)
 	if err != nil {
 		return PairingState{}, err
@@ -368,6 +398,14 @@ func (p *Pairing) deliver(ctx context.Context, offer domaincloud.PairingOffer, s
 		MachineFingerprint: key.Fingerprint(),
 		KeyID:              adaptercloud.MasterKeyID,
 		MasterSecret:       base64.StdEncoding.EncodeToString(secret.Bytes()),
+	}
+	if p.ContentState != nil {
+		state, err := p.ContentState()
+		if err != nil {
+			return PairingState{}, err
+		}
+		handover.KeyID = state.KeyID
+		handover.MasterSecret = base64.StdEncoding.EncodeToString(state.Key.Bytes())
 	}
 	ephemeral, err := domaincloud.NewX25519PrivateKey(rand.Reader)
 	if err != nil {
@@ -465,6 +503,9 @@ func (p *Pairing) deliver(ctx context.Context, offer domaincloud.PairingOffer, s
 func (p *Pairing) Revoke(deviceID string) (bool, error) {
 	if p == nil || p.Pinned == nil {
 		return false, ErrPairingUnavailable
+	}
+	if p.RevokeContent != nil {
+		return p.RevokeContent(deviceID)
 	}
 	changed, err := p.Pinned.Revoke(deviceID, p.now())
 	if err == nil && changed {
@@ -588,13 +629,14 @@ type IdentityPairingState struct {
 // IdentityPairing drives one identity pairing at a time, for the same reason
 // Pairing does: two live codes and one person is how the wrong one is used.
 type IdentityPairing struct {
-	AccountID string
-	AppOrigin string
-	Client    *adaptercloud.IdentityClient
-	Keys      PairingKeys
-	Epochs    adaptercloud.ContentEpochStore
-	Now       func() time.Time
-	Log       func(format string, args ...any)
+	RuntimeUnavailable bool
+	AccountID          string
+	AppOrigin          string
+	Client             *adaptercloud.IdentityClient
+	Keys               PairingKeys
+	Epochs             adaptercloud.ContentEpochStore
+	Now                func() time.Time
+	Log                func(format string, args ...any)
 	// Run replaces the adapter's run in tests; nil runs MachineIdentityPairing.
 	Run func(ctx context.Context, m *adaptercloud.MachineIdentityPairing, accountID string) (adaptercloud.IdentityPairingResult, error)
 
@@ -627,7 +669,7 @@ func (p *IdentityPairing) State() IdentityPairingState {
 // Begin starts a fresh identity pairing, replacing one in flight, and
 // answers once Cloud has issued the QR (or refused).
 func (p *IdentityPairing) Begin(ctx context.Context) (IdentityPairingState, error) {
-	if p == nil || p.Client == nil || p.Keys == nil || p.AccountID == "" {
+	if p == nil || p.RuntimeUnavailable || p.Client == nil || p.Keys == nil || p.AccountID == "" {
 		return IdentityPairingState{}, ErrPairingUnavailable
 	}
 	key, _, err := p.Keys()
