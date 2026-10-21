@@ -1,6 +1,9 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { adoptMachineRekey, importMasterSecret, importSenderPublicKey, loadMachineCryptoState, storePairingCryptoKeys, storePairingBinding } from "../legacy/js/net/cloud-crypto.js"
+import { CloudClient } from "../legacy/js/net/cloud-client.js"
+// @ts-expect-error Node executes TypeScript directly.
+import {rekeyKeyID,sealRekeyAnswer} from "./rekey-crypto.ts"
 import { CloudViewerSession } from "../legacy/js/net/cloud-boot.js"
 
 /** Same serialized readwrite model as viewer-sequence.test.ts, with transaction-local writes
@@ -98,4 +101,77 @@ test("legacy bindings and invalid floors cannot be adopted", async () => {
  db.table.set(names.bindingName,{v:1,machineID:"machine-test",senderID:"machine-test",legacy:true,keyID:"ms-1"})
  await assert.rejects(adoptMachineRekey({...names,expected:pairing,masterKey:pairing.masterKey,
   epoch:2,keyID:"next",operation:"test",valid:()=>true},db.factory))
+})
+
+
+async function recoveryClient(s: Awaited<ReturnType<typeof storedPairing>>) {
+ const viewer = await crypto.subtle.generateKey("Ed25519", false, ["sign", "verify"]) as CryptoKeyPair
+ const publicKey = new Uint8Array(await crypto.subtle.exportKey("raw", viewer.publicKey))
+ const clock = {now:1700000000000}, sent: string[] = []
+ const client: any = new CloudClient({relayURL:"wss://relay.example.test",deviceToken:"synthetic",
+  account:"account-test",deviceID:"viewer-test",devicePrivateKey:viewer.privateKey,devicePublicKey:publicKey,
+  enableViewerRekey:true,now:()=>clock.now,BroadcastChannel:null,
+  persistMachineRekey:s.session.persistMachineRekey.bind(s.session),resolveMachinePairing:s.session.machinePairing.bind(s.session)})
+ client.ready=true;client.socket={readyState:1,send:(raw:string)=>sent.push(raw),close(){}}
+ async function answer() {
+  const ephemeral=await crypto.subtle.generateKey("X25519",true,["deriveBits"]) as CryptoKeyPair
+  const key=crypto.getRandomValues(new Uint8Array(32))
+  return sealRekeyAnswer(sent.at(-1)!,{account_id:"account-test",machine_id:"machine-test",viewer_device_id:"viewer-test",activeViewerKey:publicKey},
+   {epoch:2,key_id:await rekeyKeyID(2,key),key},s.machine.privateKey,ephemeral.privateKey,crypto.getRandomValues(new Uint8Array(12)),clock.now)
+ }
+ async function repair() {
+  await storePairingCryptoKeys({...s.names,masterKey:s.pairing.masterKey,senderKey:s.pairing.senderKey,keyID:"ms-1",
+   binding:{v:1,machineID:"machine-test",senderID:"machine-test",keyID:"ms-1",legacy:false}},s.db.factory)
+  return s.session.machinePairing("machine-test")
+ }
+ return {client,clock,answer,repair}
+}
+
+test("an existing client reloads a repaired positive pairing and completes the next rekey",async()=>{
+ const s=await storedPairing(), r=await recoveryClient(s), c=r.client
+ try {
+  const old=await c._machinePairing("machine-test")
+  const repaired=await r.repair()
+  assert.notEqual(old.revision,repaired.revision)
+  c.forgetMachinePairingAnswer("machine-test")
+  assert.equal((await c._machinePairing("machine-test")).revision,repaired.revision)
+  assert.equal(await c.viewerRekey.request(await c._machinePairing("machine-test")),true)
+  assert.equal(await c._receive(await r.answer()),true)
+  assert.equal((await s.session.machinePairing("machine-test")).epoch,2)
+ } finally {c.stop()}
+})
+
+test("a paired notification cancels the old machine operation and rejects an in-flight old lookup",async()=>{
+ const s=await storedPairing(),r=await recoveryClient(s),c=r.client
+ try {
+  const old=await c._machinePairing("machine-test")
+  assert.equal(await c.viewerRekey.request(old),true)
+  c._forgetPairingAnswer("machine-test")
+  assert.equal(c.viewerRekey.pendingCount,0)
+  let release!:(v:unknown)=>void
+  c.resolveMachinePairing=()=>new Promise(resolve=>{release=resolve})
+  const pending=c._machinePairing("machine-test")
+  c._forgetPairingAnswer("machine-test")
+  release(old)
+  await assert.rejects(pending,{code:"cloud_reconnecting"})
+  const repaired=await r.repair()
+  c.resolveMachinePairing=s.session.machinePairing.bind(s.session)
+  assert.equal((await c._machinePairing("machine-test")).revision,repaired.revision)
+ } finally {c.stop()}
+})
+
+test("a missed pairing notification is repaired after the durable revision conflict",async()=>{
+ const s=await storedPairing(),r=await recoveryClient(s),c=r.client
+ try {
+  const old=await c._machinePairing("machine-test")
+  const repaired=await r.repair()
+  assert.equal(await c.viewerRekey.request(old),true)
+  await assert.rejects(c._receive(await r.answer()),{code:"cloud_reconnecting"})
+  assert.equal(c.viewerRekey.pendingCount,0)
+  assert.equal((await c._machinePairing("machine-test")).revision,repaired.revision)
+  r.clock.now+=120000
+  assert.equal(await c.viewerRekey.request(await c._machinePairing("machine-test")),true)
+  assert.equal(await c._receive(await r.answer()),true)
+  assert.equal((await s.session.machinePairing("machine-test")).epoch,2)
+ } finally {c.stop()}
 })

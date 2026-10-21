@@ -375,8 +375,11 @@ export async function adoptMachineRekey(value, indexedDBValue) {
             if (!b || b.legacy !== false || b.machineID !== value.expected.machineID ||
                 b.senderID !== value.expected.senderID || b.revision !== value.expected.revision ||
                 !Number.isSafeInteger(floor) || floor < 1 || floor > value.epoch ||
-                (floor === value.epoch && b.keyID !== value.keyID) ||
-                b.lastRekeyOperation === value.operation || !value.valid()) {
+                (floor === value.epoch && b.keyID !== value.keyID)) {
+                refused.code = "machine_pairing_changed";
+                tx.abort(); return;
+            }
+            if (b.lastRekeyOperation === value.operation || !value.valid()) {
                 tx.abort(); return;
             }
             adopted = Object.assign({}, b, { keyID: value.keyID, epoch: value.epoch,
@@ -386,7 +389,7 @@ export async function adoptMachineRekey(value, indexedDBValue) {
             keys.put(adopted, value.bindingName);
         };
         tx.oncomplete = function () { db.close(); resolve(adopted); };
-        tx.onerror = function () { db.close(); reject(tx.error || refused); };
+        tx.onerror = function () { db.close(); reject(refused.code === "machine_pairing_changed" ? refused : tx.error || refused); };
         tx.onabort = tx.onerror;
     });
 }
