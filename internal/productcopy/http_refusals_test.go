@@ -34,7 +34,7 @@ func TestHTTPRefusalTextRequiresExactWireDetailAndKnownKey(t *testing.T) {
 			t.Errorf("%+v rendered %q", test, got)
 		}
 	}
-	if translated, total := HTTPRefusalCoverage("zh-Hant"); translated != 1247 || total != 1247 {
+	if translated, total := HTTPRefusalCoverage("zh-Hant"); translated != 1248 || total != 1248 {
 		t.Fatalf("Traditional Chinese coverage = %d/%d", translated, total)
 	}
 	const updateDetail = "force needs the version it installs"

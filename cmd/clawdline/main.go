@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/release/updater"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/app"
@@ -282,7 +283,9 @@ func serve() {
 	// starts and whether or not Cloud is on (health.go).
 	// A stopping daemon stops it first, so the durable store is flushed and
 	// closed rather than abandoned mid-write.
-	go stopConnectionHealthOnSignal(startConnectionHealth(cfg.Dir, srv))
+	cloudCtx, stopCloud := context.WithCancel(context.Background())
+	defer stopCloud()
+	go stopConnectionHealthOnSignal(startConnectionHealth(cfg.Dir, srv), stopCloud)
 	// A device file that cannot be read stops the daemon here, rather than
 	// letting it listen and refuse everybody.
 	if err := srv.AuthReady(); err != nil {
@@ -307,8 +310,9 @@ func serve() {
 	// Things waiting to be verified: the records this daemon owes are planted
 	// once (docs/verifications.md "The first one").
 	srv.StartVerifications(context.Background())
-	startCloudLine(context.Background(), cfg, srv)
+	startCloudLine(cloudCtx, cfg, srv)
 	if err := srv.Serve(ln); err != nil {
+		stopCloud()
 		refuseToServe(1, err.Error())
 	}
 }
@@ -323,6 +327,8 @@ func serve() {
 // behind. Each of those is recorded where `/v1/cloud/status` can say it, which
 // is the difference between a quiet failure and a legible one.
 func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.Server) {
+	admit := cloudAdmission(cfg.Dir)
+	httptransport.SetCloudUnavailable(cfg.Dir)
 	opts := cloudtransport.LinkOptions{
 		Dir:            cfg.Dir,
 		ForeignDirs:    foreignDirs(),
@@ -396,9 +402,15 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 			stop, done = nil, nil
 			webhooksDone = nil
 		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		link, err := cloudtransport.Open(opts)
 		if err != nil {
 			httptransport.SetCloudLine(cfg.Dir, nil)
+			return err
+		}
+		if err := ctx.Err(); err != nil {
 			return err
 		}
 		httptransport.SetCloudLine(cfg.Dir, link)
@@ -420,11 +432,17 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		}()
 		return nil
 	}
-	srv.SetCloudReload(reload)
-	if err := reload(); err != nil {
+	gate := &cloudUpdateGate{ctx: ctx, ready: admit, open: reload}
+	srv.SetCloudReload(gate.reload)
+	if err := gate.reload(); err != nil {
 		// A malformed setting is loud, but never takes the local daemon down.
 		log.Printf("cloud: the line is off: %v", err)
 	}
+	go func() {
+		ticker := time.NewTicker(updater.AppSwapPollSecondsLimit * time.Second)
+		defer ticker.Stop()
+		gate.resume(ticker.C)
+	}()
 }
 
 func doctor() {

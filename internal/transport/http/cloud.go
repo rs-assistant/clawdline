@@ -90,6 +90,24 @@ func (s *Server) noteTaskListChanged() {
 
 var cloudLines sync.Map // dir -> CloudLine
 
+type cloudUnavailable struct{}
+
+func (cloudUnavailable) Status() cloudtransport.Status {
+	return cloudtransport.Status{Enabled: false, State: cloudtransport.StateOff}
+}
+
+// SetCloudUnavailable keeps management routes closed while the executable's
+// update has not been accepted. It never opens keys, pairing or a legacy link.
+func SetCloudUnavailable(dir string) { cloudLines.Store(dir, cloudUnavailable{}) }
+
+func cloudRuntimeUnavailable(w http.ResponseWriter, line any) bool {
+	if _, blocked := line.(cloudUnavailable); !blocked {
+		return false
+	}
+	writeAuthRefusal(w, http.StatusServiceUnavailable, "cloud_runtime_unavailable", "The Cloud connection is not available in this daemon.")
+	return true
+}
+
 // SetCloudLine registers the link that answers for a state directory. Passing
 // nil unregisters it, which is what a daemon whose switch is off does.
 func SetCloudLine(dir string, line CloudLine) {
@@ -301,6 +319,9 @@ func (s *Server) cloudRotateRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	line, ok := cloudLines.Load(s.cfg.Dir)
+	if cloudRuntimeUnavailable(w, line) {
+		return
+	}
 	if !ok {
 		writeAuthRefusal(w, http.StatusConflict, "cloud_off", "The Cloud line is off in this app's settings.")
 		return
@@ -357,6 +378,9 @@ func rotationConfirmationWire(err error, repair any) map[string]any {
 // there is none.
 func (s *Server) cloudPairing(w http.ResponseWriter) (*cloudtransport.Pairing, bool) {
 	line, ok := cloudLines.Load(s.cfg.Dir)
+	if cloudRuntimeUnavailable(w, line) {
+		return nil, false
+	}
 	if !ok {
 		writeAuthRefusal(w, http.StatusConflict, "cloud_off",
 			"The Cloud line is off in this app's settings.")
