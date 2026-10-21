@@ -97,6 +97,11 @@ struct ShellPairingPermissionTest {
         check(request.httpMethod == "POST", "method")
         check(request.value(forHTTPHeaderField: "Authorization") == "Bearer T", "local token")
         check(request.value(forHTTPHeaderField: "Content-Type") == "application/json", "content type")
+        // The registered bound (console.native_pairing_save_seconds; the
+        // capacity package's native_pairing_test.go compares the value).
+        check(request.timeoutInterval == PairingPermissionClient.saveTimeoutSeconds, "the request uses saveTimeoutSeconds")
+        check(PairingPermissionClient.saveTimeoutSeconds > 0 && PairingPermissionClient.saveTimeoutSeconds < 120,
+              "a save ends well inside the two minutes a code lives")
         let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: String]
         check(body == ["permission": "read-only"], "read-only body")
         let operate = client.request(pairingID: "pr_1", permission: .readAndOperate, token: "T")!

@@ -485,13 +485,16 @@ const (
 	ConsolePersonaRetry               = "console.persona_retry_seconds"
 	ConsoleStatusMarkerRetry          = "console.status_marker_retry_seconds"
 	ConsolePinnedListReadTimeout      = "console.pinned_list_read_timeout_seconds"
-	ConsoleStatusMarkerRecoveryWait   = "console.status_marker_recovery_wait_seconds"
-	ConsoleTranscriptFollowFast       = "console.transcript_follow_fast_seconds"
-	ConsoleTranscriptFollowLater      = "console.transcript_follow_later_seconds"
-	ConsoleHealthLive                 = "console.health_live_seconds"
-	ConsoleSessionNotesSafety         = "console.session_notes_safety_seconds"
-	ConsoleOpenedRowRestate           = "console.opened_row_restate_seconds"
-	ConsoleOpenedRowQuiet             = "console.opened_row_quiet_seconds"
+	// One save of a pairing's permission by the macOS shell
+	// (shell/darwin/Pairing.swift saveTimeoutSeconds).
+	ConsoleNativePairingSaveSeconds = "console.native_pairing_save_seconds"
+	ConsoleStatusMarkerRecoveryWait = "console.status_marker_recovery_wait_seconds"
+	ConsoleTranscriptFollowFast     = "console.transcript_follow_fast_seconds"
+	ConsoleTranscriptFollowLater    = "console.transcript_follow_later_seconds"
+	ConsoleHealthLive               = "console.health_live_seconds"
+	ConsoleSessionNotesSafety       = "console.session_notes_safety_seconds"
+	ConsoleOpenedRowRestate         = "console.opened_row_restate_seconds"
+	ConsoleOpenedRowQuiet           = "console.opened_row_quiet_seconds"
 	// This browser's own record of direct attempts per machine, drawn on the
 	// machine sheet (web/console/src/cloud/direct-history.ts), and how often
 	// the open machine list re-reads (pages/devices/AccountMachines.tsx).

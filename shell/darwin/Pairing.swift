@@ -198,6 +198,12 @@ enum PairingPermissionOutcome: Equatable {
 /// Only a 200 that says `{"ok":true}` counts as saved: anything less and the
 /// code is not shown.
 struct PairingPermissionClient {
+    /// How long one save may take: well inside the two minutes a code lives,
+    /// so the gate is never held by a request that will not end. Registered as
+    /// console.native_pairing_save_seconds (internal/domain/capacity
+    /// register_console.go; native_pairing_test.go holds the two together).
+    static let saveTimeoutSeconds: TimeInterval = 15
+
     let base: URL
     let token: () -> String?
     let session: URLSession
@@ -220,9 +226,7 @@ struct PairingPermissionClient {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["permission": permission.rawValue])
-        // Well inside the two minutes a code lives, so the gate is never held
-        // by a request that will not end.
-        request.timeoutInterval = 15
+        request.timeoutInterval = Self.saveTimeoutSeconds
         return request
     }
 

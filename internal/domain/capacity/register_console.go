@@ -178,6 +178,17 @@ func consoleBounds() []Entry {
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
 		{
+			// The macOS shell's one save of the permission the person chose
+			// for a pairing (shell/darwin/Pairing.swift
+			// PairingPermissionClient.saveTimeoutSeconds). At the limit the
+			// shell abandons the request, shows no code and asks the person
+			// to retry or ignore; native_pairing_test.go holds the two sides
+			// together.
+			Name: ConsoleNativePairingSaveSeconds, Class: Cache, Unit: Seconds,
+			Limit: 15, AtLimit: Expire,
+			Told: []Channel{Sender, Diagnostics}, EvictedBy: Daemon,
+		},
+		{
 			// One retained marker replay yields after five seconds of
 			// silence (STATUS_MARKER_RECOVERY_TIMEOUT_MS, status-client.js).
 			Name: ConsoleStatusMarkerRecoveryWait, Class: Cache, Unit: Seconds,

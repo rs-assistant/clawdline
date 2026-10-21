@@ -3501,6 +3501,24 @@
   },
   {
     "Register": "daemon",
+    "Name": "console.native_pairing_save_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 15,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "sender",
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
     "Name": "console.opened_row_quiet_seconds",
     "Class": "cache",
     "Unit": "seconds",

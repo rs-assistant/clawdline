@@ -6263,6 +6263,8 @@
   "capacityRow.console.status_marker_retry_seconds.full": "在那之前清單可能少幾個對話，等更新送到或下一次詢問時就會補齊。你不用做任何事。",
   "capacityRow.console.pinned_list_read_timeout_seconds.what": "透過 Cloud 使用時，頁面向機器要對話清單，最多等多久沒回應就放棄這一次。沒有這個時限，連線卡住時清單會一直等下去。",
   "capacityRow.console.pinned_list_read_timeout_seconds.full": "這麼久沒回應，頁面就不再等這次請求，改用其他方式取得清單，清單可能晚一點才出現。如果常常這樣，檢查那台機器的網路。",
+  "capacityRow.console.native_pairing_save_seconds.what": "手機或瀏覽器要求配對時，桌面 App 最多等多久讓服務保存你選的權限，保存後才顯示六位數代碼。沒有這個時限，服務卡住時配對會一直等到代碼過期。",
+  "capacityRow.console.native_pairing_save_seconds.full": "等這麼久還沒保存，App 就不再等、不顯示代碼，讓你重試保存或忽略這次要求。如果常常這樣，重新啟動 Clawdline 後再配對一次。",
   "capacityRow.console.status_marker_recovery_wait_seconds.what": "透過 Cloud 使用時，頁面等 Cloud 重播它存著的「機器有哪些對話」總表最多等多久。通常馬上就到；設時限是避免一直沒回應時，頁面卡住不去直接問機器。",
   "capacityRow.console.status_marker_recovery_wait_seconds.full": "時間到就不再等那份存檔，直接向機器要清單；清單可能晚幾秒出現。你不用做任何事。",
   "capacityRow.console.transcript_follow_fast_seconds.what": "你送出訊息後的這段時間，對話每兩秒查一次回覆，因為回覆通常在這段時間內就開始。把它縮短之後，手機不會每送一則訊息就讀幾十次。",
