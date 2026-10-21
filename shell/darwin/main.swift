@@ -619,23 +619,81 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
 
     // MARK: - Pairing
 
-    /// The Swift app's alert, word for word, with its one button.
+    /// The pairing in flight, held until its flow ends.
+    private var pairingFlow: PairingPermissionFlow?
+
+    /// Choose a permission, save it, and only then show the code.
+    ///
+    /// The code never reaches the screen before the daemon has said the
+    /// permission is saved: a refusal, no answer or an expired pairing shows
+    /// why and no code. Saving runs off the main queue; the alerts are modal,
+    /// as the one before them was.
     ///
     /// One at a time: something hammering the pairing route must not stack a
     /// wall of alerts to dismiss one by one. The watcher holds that gate (see
-    /// PairingWatcher for why it cannot be held here); the daemon's rate limit
-    /// is the other half.
+    /// PairingWatcher for why it cannot be held here); the flow opens it again
+    /// on every way out. The daemon's rate limit is the other half.
     private func showPairing(_ pending: PairingNotice) {
-        defer { pairing.alertClosed() }
         // The name, never the code.
-        shellLog("pairing: \(pending.name) is asking; alert shown")
+        shellLog("pairing: \(pending.name) is asking; choosing a permission")
+        let client = PairingPermissionClient(base: home)
+        let flow = PairingPermissionFlow(
+            pending,
+            screens: PairingScreens(
+                choose: { notice in Self.choosePairingPermission(notice) },
+                showCode: { notice, permission in Self.showPairingCode(notice, permission) },
+                showFailure: { notice, outcome in Self.showPairingFailure(notice, outcome) }),
+            save: client.save,
+            finished: { [weak self] in
+                self?.pairingFlow = nil
+                self?.pairing.alertClosed()
+            })
+        pairingFlow = flow
+        flow.start()
+    }
+
+    private static func pairingAlert(_ notice: PairingNotice) -> NSAlert {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = L.t.pairingAsks(pending.name)
-        alert.informativeText = L.t.pairingCode(pending.code)
+        alert.messageText = L.t.pairingAsks(notice.name)
         alert.alertStyle = .informational
+        return alert
+    }
+
+    /// Operate is the first button, as the daemon's default is; Escape ignores.
+    private static func choosePairingPermission(_ notice: PairingNotice) -> PairingChoice {
+        let alert = pairingAlert(notice)
+        alert.informativeText = L.t.pairingChooseBody
+        alert.addButton(withTitle: L.t.pairingReadAndOperate)
+        alert.addButton(withTitle: L.t.pairingReadOnly)
+        alert.addButton(withTitle: L.t.pairingIgnore).keyEquivalent = "\u{1b}"
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return .grant(.readAndOperate)
+        case .alertSecondButtonReturn: return .grant(.readOnly)
+        default: return .ignore
+        }
+    }
+
+    private static func showPairingCode(_ notice: PairingNotice, _ permission: PairingPermission) {
+        let alert = pairingAlert(notice)
+        alert.informativeText = L.t.pairingSaved(permission) + "\n\n" + L.t.pairingCode(notice.code)
         alert.addButton(withTitle: L.t.pairingIgnore)
         alert.runModal()
+    }
+
+    /// True to try again. An expired pairing has nothing to retry.
+    private static func showPairingFailure(_ notice: PairingNotice, _ outcome: PairingPermissionOutcome) -> Bool {
+        let alert = pairingAlert(notice)
+        alert.alertStyle = .warning
+        alert.informativeText = L.t.pairingFailed(outcome)
+        if outcome == .expired {
+            alert.addButton(withTitle: L.t.dialogOK)
+            alert.runModal()
+            return false
+        }
+        alert.addButton(withTitle: L.t.pairingRetry)
+        alert.addButton(withTitle: L.t.pairingIgnore).keyEquivalent = "\u{1b}"
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     // MARK: - Where the hotkey applies

@@ -93,6 +93,23 @@ struct ShellCopy {
     var pairingIgnore: String { word("pairingIgnore") }
     func pairingAsks(_ device: String) -> String { word("pairingAsks", [device]) }
     func pairingCode(_ code: String) -> String { word("pairingCode", [code]) }
+    var pairingChooseBody: String { word("pairingChooseBody") }
+    var pairingReadOnly: String { word("pairingReadOnly") }
+    var pairingReadAndOperate: String { word("pairingReadAndOperate") }
+    var pairingRetry: String { word("pairingRetry") }
+    func pairingSaved(_ permission: PairingPermission) -> String {
+        switch permission {
+        case .readOnly: return word("pairingSavedReadOnly")
+        case .readAndOperate: return word("pairingSavedReadAndOperate")
+        }
+    }
+    func pairingFailed(_ outcome: PairingPermissionOutcome) -> String {
+        switch outcome {
+        case .expired: return word("pairingFailedExpired")
+        case .refused(let status): return word("pairingFailedRefused", [String(status)])
+        case .unreachable, .saved: return word("pairingFailedUnreachable")
+        }
+    }
     var daemonUnavailableTitle: String { word("daemonUnavailableTitle") }
     func daemonUnavailableBody(_ address: String) -> String { word("daemonUnavailableBody", [address]) }
     var daemonUnavailableStart: String { word("daemonUnavailableStart") }
