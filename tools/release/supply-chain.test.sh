@@ -110,25 +110,45 @@ printf '[]\n' >"$good/manifest.sig.json" # provenance needs every asset present;
 cat >"$work/gh" <<'STUB'
 #!/bin/bash
 # What `gh attestation verify --format json` prints for one verified asset,
-# shaped by STUB_MODE. It also insists on the policy flags provenance.sh owes it.
+# shaped by STUB_MODE. It insists on the policy flags provenance.sh owes it,
+# and matches the signer identity as gh does: --cert-identity exactly,
+# --signer-workflow as a prefix of the certificate's SAN (gh's
+# validateSignerWorkflow), so a looser flag passes here as it would there.
 set -euo pipefail
 file=$3
 want_commit=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1])).commit)' "$(dirname "$file")/manifest.json")
 args=" $* "
-for need in "--repo sainteye/clawdline" "--signer-workflow sainteye/clawdline/.github/workflows/release.yml" \
-  "--source-ref refs/heads/main" "--source-digest $want_commit" "--deny-self-hosted-runners" "--format json"; do
-  [[ "$args" == *" $need "* ]] || { echo "stub gh: missing $need" >&2; exit 1; }
+owner=sainteye/clawdline
+san=https://github.com/sainteye/clawdline/.github/workflows/release.yml@refs/heads/main
+case "${STUB_MODE:-}" in
+  # Somebody else's genuinely signed attestation: gh accepts it only when it
+  # is asked for that repository.
+  someone-else) owner=someone-else/clawdline; san=https://github.com/someone-else/clawdline/.github/workflows/release.yml@refs/heads/main ;;
+  # A workflow whose path merely starts with release.yml, signing a statement
+  # that claims to be release.yml.
+  prefix-signer) san=https://github.com/sainteye/clawdline/.github/workflows/release.yml-copy.yml@refs/heads/main ;;
+esac
+for need in "--repo $owner" "--source-ref refs/heads/main" "--source-digest $want_commit" "--deny-self-hosted-runners" "--format json"; do
+  [[ "$args" == *" $need "* ]] || { echo "Error: no attestations found (stub gh: missing $need)" >&2; exit 1; }
 done
+if [[ "$args" =~ \ --cert-identity\ ([^ ]+)\  ]]; then
+  [ "${BASH_REMATCH[1]}" = "$san" ] || { echo "Error: no attestations found (stub gh: SAN $san)" >&2; exit 1; }
+elif [[ "$args" =~ \ --signer-workflow\ ([^ ]+)\  ]]; then
+  [[ "$san" == "https://github.com/${BASH_REMATCH[1]}"* ]] || { echo "Error: no attestations found (stub gh: SAN $san)" >&2; exit 1; }
+else
+  echo "stub gh: no signer identity asked for" >&2; exit 1
+fi
 [ "${STUB_MODE:-}" != gh-refuses ] || { echo "Error: no attestations found" >&2; exit 1; }
 digest=$(shasum -a 256 "$file" | cut -d' ' -f1)
-repo=https://github.com/sainteye/clawdline commit=$want_commit
+repo=https://github.com/$owner commit=$want_commit wf=.github/workflows/release.yml
 case "${STUB_MODE:-}" in
   wrong-repo) repo=https://github.com/someone-else/clawdline ;;
   wrong-commit) commit=0000000000000000000000000000000000000000 ;;
   wrong-digest) digest=$(printf other | shasum -a 256 | cut -d' ' -f1) ;;
+  wrong-workflow) wf=.github/workflows/ci.yml ;;
 esac
-printf '[{"verificationResult":{"statement":{"predicateType":"https://slsa.dev/provenance/v1","subject":[{"name":"%s","digest":{"sha256":"%s"}}],"predicate":{"buildDefinition":{"externalParameters":{"workflow":{"repository":"%s","path":".github/workflows/release.yml","ref":"refs/heads/main"}},"resolvedDependencies":[{"uri":"git+%s@refs/heads/main","digest":{"gitCommit":"%s"}}]}}}}}]\n' \
-  "$(basename "$file")" "$digest" "$repo" "$repo" "$commit"
+printf '[{"verificationResult":{"signature":{"certificate":{"subjectAlternativeName":"%s"}},"statement":{"predicateType":"https://slsa.dev/provenance/v1","subject":[{"name":"%s","digest":{"sha256":"%s"}}],"predicate":{"buildDefinition":{"externalParameters":{"workflow":{"repository":"%s","path":"%s","ref":"refs/heads/main"}},"resolvedDependencies":[{"uri":"git+%s@refs/heads/main","digest":{"gitCommit":"%s"}}]}}}}}]\n' \
+  "$san" "$(basename "$file")" "$digest" "$repo" "$wf" "$repo" "$commit"
 STUB
 chmod +x "$work/gh"
 export CLAWDLINE_GH="$work/gh"
@@ -139,13 +159,30 @@ STUB_MODE=wrong-digest expect_fail "an attestation of another digest fails" 'sub
 STUB_MODE=gh-refuses expect_fail "an asset gh finds no attestation for fails" 'has no attestation' tools/release/provenance.sh "$good"
 d="$work/no-sig"; cp -R "$good" "$d"; rm "$d/manifest.sig.json"
 expect_fail "a release missing an asset fails" 'manifest.sig.json is missing' tools/release/provenance.sh "$d"
-CLAWDLINE_PROVENANCE_WORKFLOW=.github/workflows/ci.yml expect_fail "provenance asks gh for the release workflow only" 'stub gh: missing --signer-workflow' tools/release/provenance.sh "$good"
+STUB_MODE=wrong-workflow expect_fail "an attestation whose statement names another workflow fails" 'workflow .github/workflows/ci.yml' tools/release/provenance.sh "$good"
+STUB_MODE=prefix-signer expect_fail "a signer whose workflow path only starts with release.yml fails" 'has no attestation' tools/release/provenance.sh "$good"
+CLAWDLINE_PROVENANCE_REPO=someone-else/clawdline CLAWDLINE_PROVENANCE_WORKFLOW=.github/workflows/release.yml STUB_MODE=someone-else \
+  expect_fail "the environment cannot point provenance at another repository" 'has no attestation' tools/release/provenance.sh "$good"
 unset CLAWDLINE_GH
 rm "$good/manifest.sig.json"
 
 echo "== rebuild comparison"
 expect_ok "two identical builds compare clean" tools/release/reproduce.sh compare "$good" "$good"
 expect_fail "a different payload file is reported" '^differs .*dist/assets/extra.js|only-in-B .*extra.js' tools/release/reproduce.sh compare "$good" "$work/stale"
+d="$work/extra-archive"; cp -R "$good" "$d"; cp "$good/clawdline_${version}_linux_amd64.tar.gz" "$d/clawdline_${version}_linux_arm64.tar.gz"
+rel_good=$(node -e 'process.stdout.write(require("path").relative(process.cwd(), process.argv[1]))' "$good")
+rel_extra=$(node -e 'process.stdout.write(require("path").relative(process.cwd(), process.argv[1]))' "$d")
+expect_fail "an archive only the second build has is reported, with relative paths too" '^only-in-B +clawdline_.*_linux_arm64' tools/release/reproduce.sh compare "$rel_good" "$rel_extra"
+if [ "$(uname -s)" = Darwin ]; then
+  # A Mach-O file differs; it is signature-only only when the bytes left once
+  # both signatures are removed are the same.
+  mk_mach() { local d=$1 bin=$2 ident=$3 s="$work/mach.$RANDOM"; mkdir -p "$d" "$s"; cp "$bin" "$s/clawdline"; chmod u+w "$s/clawdline"
+    codesign --force --sign - --identifier "$ident" "$s/clawdline" 2>/dev/null; COPYFILE_DISABLE=1 tar -C "$s" -czf "$d/clawdline_${version}_darwin_arm64.tar.gz" .; rm -rf "$s"; }
+  other="$(go env GOROOT)/pkg/tool/$(go env GOOS)_$(go env GOARCH)/addr2line"
+  mk_mach "$work/mach-a" "$gobin" one; mk_mach "$work/mach-b" "$gobin" two; mk_mach "$work/mach-c" "$other" two
+  expect_ok "a Mach-O file re-signed with another identity is signature-only" tools/release/reproduce.sh compare "$work/mach-a" "$work/mach-b"
+  expect_fail "a Mach-O file with another payload is not called signature-only" '^differs .*:clawdline$' tools/release/reproduce.sh compare "$work/mach-a" "$work/mach-c"
+fi
 
 if [ "$(uname -s)" = Darwin ]; then
   echo "== macOS release signature"
@@ -167,6 +204,20 @@ d="$work/gate-extra"; cp -R "$signed" "$d"; printf 'x\n' >"$d/notes.txt"
 expect_fail "the gate refuses an asset the manifest does not account for" 'does not account for: notes.txt' tools/release/gate.sh "$version" --dir "$d"
 d="$work/gate-no-sbom"; cp -R "$signed" "$d"; rm "$d"/*.spdx.json
 expect_fail "the gate refuses a release without SBOMs" 'has no .*\.spdx\.json' tools/release/gate.sh "$version" --dir "$d"
+# A -test version may skip provenance and the macOS check only as a local
+# --dir release; one drafted on GitHub gets the whole gate or none. The stub
+# gh answers as a draft whose assets are this test release.
+mkdir -p "$work/bin"
+cat >"$work/bin/gh" <<STUB
+#!/bin/bash
+case "\$1 \$2" in
+  "release view") echo true ;;
+  "release download") while [ "\$#" -gt 0 ]; do [ "\$1" = --dir ] && { mkdir -p "\$2"; cp "$signed"/* "\$2"/; }; shift; done ;;
+  *) echo "stub gh: \$*" >&2; exit 1 ;;
+esac
+STUB
+chmod +x "$work/bin/gh"
+PATH="$work/bin:$PATH" expect_fail "a -test version drafted on GitHub is not gated without provenance" 'only with --dir' tools/release/gate.sh "$version"
 unset CLAWDLINE_TEST_RELEASE_PUB
 
 echo "supply-chain: $pass passed, $fails failed"
