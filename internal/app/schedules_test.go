@@ -125,7 +125,8 @@ func TestACloudWithoutThePurposeIsNotAskedAgainWithoutIt(t *testing.T) {
 	// A book with no investigation activation refuses instead of activating unmarked.
 	f.book.ActivateInvestigation = nil
 	other := "b2000099-0000-4000-8000-000000000002"
-	if status, body := f.book.BindWebhook(context.Background(), other, "swh_"+strings.Repeat("r", 26), id, nil, nil, "test"); status != 503 ||
+	second := storeBindable(t, f, 8, schedulewebhook.InvestigationKind, map[string]any{"trigger_only": true}, true)
+	if status, body := f.book.BindWebhook(context.Background(), other, "swh_"+strings.Repeat("r", 26), second, nil, nil, "test"); status != 503 ||
 		!strings.Contains(string(body), "cloud_upgrade_required") || len(a.plain) != 0 {
 		t.Fatalf("an unwired investigation activation answered %d %s, plain %v", status, body, a.plain)
 	}
