@@ -8,7 +8,7 @@ import type { Investigation, Investigations } from "./investigations.ts"
 // @ts-expect-error -- a `.ts` path, for node.
 import { INVESTIGATION_REASONS, liveInvestigation, parseInvestigations, reasonWords, startGate } from "./investigations.ts"
 // @ts-expect-error -- a `.ts` path, for node.
-import { fetchHooks, startInvestigation } from "./investigation-actions.ts"
+import { fetchDestinations, parseDestinations, startInvestigation, startRequestFor } from "./investigation-actions.ts"
 // @ts-expect-error -- a `.ts` path, for node.
 import { parseIncidentDetail } from "./stored.ts"
 // @ts-expect-error -- a `.ts` path, for node.
@@ -122,17 +122,88 @@ test("the fixture's incidents carry verified, verification-failed and earlier in
   assert.equal(val(itemsOf(closed)[0].reason), "report_verification_failed")
 })
 
-/* ---- the operator's webhooks ------------------------------------------------- */
+/* ---- where an investigation can run --------------------------------------------- */
 
-test("the picker lists only active webhooks from the real list schema", async () => {
-  const get = (async (u: RequestInfo | URL) => fixtureAnswer("normal", String(u), NOW)) as typeof fetch
-  const r = await fetchHooks(get, API, new AbortController().signal)
-  assert.ok("ok" in r && r.ok)
-  assert.deepEqual(r.hooks.map((h: { availability: string }) => h.availability), ["active", "active"])
-  const wrong = (async () => new Response(JSON.stringify({ hooks: [] }), { status: 200 })) as typeof fetch
-  assert.deepEqual(await fetchHooks(wrong, API, new AbortController().signal), { ok: false, code: "contract_shape" })
-  const out = (async () => new Response("{}", { status: 401 })) as typeof fetch
-  assert.deepEqual(await fetchHooks(out, API, new AbortController().signal), { refused: "signed_out" })
+const SCHEMA = "clawdline.health_investigation.destinations.v1"
+const MAC_HOOK = "swh_mac_investigation"
+const row = (machine_id: string, machine_name: string, status: unknown, hook_id: string | null = null, reason = "r") => ({ machine_id, machine_name, status, hook_id, reason })
+const listOf = (machines: unknown, over: Record<string, unknown> = {}) => ({ schema: SCHEMA, status: "ok", complete: true, machines, ...over })
+const okList = (body: unknown) => {
+  const d = parseDestinations(body)
+  assert.ok(d !== null && d.status === "ok")
+  return d
+}
+
+test("a Mac with three webhooks and a Linux machine with one are two machines, each listed once", () => {
+  // Cloud resolves the Mac's three hooks to its one investigation hook; the Linux machine has none bound.
+  const d = okList(listOf([row("mac_1", "Studio Mac", "ready", MAC_HOOK), row("linux_1", "Build server", "setup_required")]))
+  assert.equal(d.machines.length, 2)
+  assert.deepEqual(d.machines.map((m) => [m.machine_name, m.state]), [["Studio Mac", "ready"], ["Build server", "setup_required"]])
+  // The name is shown on its own; the webhook stays a separate field and never joins it.
+  assert.equal(d.machines[0].machine_name, "Studio Mac")
+  assert.equal(d.machines[1].hook_id, null)
+  // A list repeating one machine per hook, as the webhook list did, cannot be trusted at all.
+  assert.equal(parseDestinations(listOf([row("mac_1", "Studio Mac", "ready", MAC_HOOK), row("mac_1", "Studio Mac", "ready", "swh_other")])), null)
+  // Nor can two machines claiming one hook.
+  assert.equal(parseDestinations(listOf([row("mac_1", "A", "ready", MAC_HOOK), row("mac_2", "B", "ready", MAC_HOOK)])), null)
+})
+
+test("two machines with the same name and different IDs stay two rows", () => {
+  const d = okList(listOf([row("mac_1", "MacBook Pro", "ready", "swh_one"), row("mac_2", "MacBook Pro", "ready", "swh_two")]))
+  assert.deepEqual(d.machines.map((m) => m.machine_id), ["mac_1", "mac_2"])
+  assert.deepEqual(startRequestFor(d, "mac_2", 4), { hook_id: "swh_two", expected_incident_revision: 4 })
+})
+
+test("only a ready machine maps to a start; ambiguous, unconfigured, offline and nothing chosen do not", () => {
+  const d = okList(listOf([
+    row("mac_1", "One", "ambiguous", "swh_first_of_many"), row("mac_2", "Two", "setup_required"), row("mac_3", "Three", "offline", "swh_offline"), row("mac_4", "Four", "ready", "swh_four"),
+  ]))
+  // A non-ready row never carries a hook onward, even when Cloud sent one.
+  assert.deepEqual(d.machines.map((m) => m.hook_id), [null, null, null, "swh_four"])
+  for (const id of ["mac_1", "mac_2", "mac_3", "", "mac_missing"]) assert.equal(startRequestFor(d, id, 2), null)
+  assert.deepEqual(startRequestFor(d, "mac_4", 2), { hook_id: "swh_four", expected_incident_revision: 2 })
+})
+
+test("an unknown state or a ready row without a hook is said as unknown and the list stops claiming to be complete", () => {
+  const d = okList(listOf([row("mac_1", "One", "sleeping", "swh_x"), row("mac_2", "Two", "ready", null), row("mac_3", "Three", "ready", "swh_three")]))
+  assert.deepEqual(d.machines.map((m) => [m.state, m.raw, m.hook_id]), [["unknown", "sleeping", null], ["unknown", "ready", null], ["ready", null, "swh_three"]])
+  assert.equal(d.complete, false)
+  assert.equal(startRequestFor(d, "mac_1", 1), null)
+  // Cloud's own partial or paged answer stays partial.
+  assert.equal(okList(listOf([row("mac_3", "Three", "ready", "swh_three")], { complete: false })).complete, false)
+  // Unreadable shapes fail closed rather than look like an empty or complete list.
+  for (const bad of [listOf(null), listOf([row("mac_1", "", "ready", "swh_a")]), listOf([row("mac 1", "One", "ready", "swh_a")]), listOf([row("mac_1", "One", "ready", "bad hook")]),
+    { ...listOf([]), schema: "clawdline.schedule_webhook.list.v1" }, { ...listOf([]), status: "degraded" }, { ...listOf([]), complete: "yes" }]) {
+    assert.equal(parseDestinations(bad), null, JSON.stringify(bad))
+  }
+  assert.deepEqual(okList(listOf([])).machines, [])
+  assert.deepEqual(parseDestinations({ schema: SCHEMA, status: "unavailable", complete: false, machines: null }), { status: "unavailable" })
+})
+
+test("the destinations read: the real route, an older Cloud's 404 as not supported, and no fallback to the webhook list", async () => {
+  const seen: string[] = []
+  const get = (async (u: RequestInfo | URL) => { seen.push(String(u)); return fixtureAnswer("normal", String(u), NOW) }) as typeof fetch
+  const r = await fetchDestinations(get, API, new AbortController().signal)
+  assert.ok("ok" in r && r.ok && r.destinations.status === "ok")
+  assert.deepEqual(seen, [`${API}/su/v1/health/investigation-destinations`])
+  const answer = (status: number, body: unknown = {}) => (async () => new Response(JSON.stringify(body), { status })) as typeof fetch
+  const signal = new AbortController().signal
+  assert.deepEqual(await fetchDestinations(answer(404, { error: { code: "not_found" } }), API, signal), { ok: false, code: "not_supported" })
+  assert.deepEqual(await fetchDestinations(answer(401), API, signal), { refused: "signed_out" })
+  assert.deepEqual(await fetchDestinations(answer(503), API, signal), { ok: false, code: "unavailable" })
+  assert.deepEqual(await fetchDestinations(answer(200, { hooks: [] }), API, signal), { ok: false, code: "contract_shape" })
+  assert.deepEqual(await fetchDestinations((async () => { throw new TypeError("offline") }) as typeof fetch, API, signal), { ok: false, code: "network" })
+})
+
+test("each machine state has its own Traditional Chinese words and next step", () => {
+  for (const s of ["ready", "setup_required", "ambiguous", "offline", "unknown"]) {
+    const word = zh(`iv_dest_${s}` as never)
+    const next = zh(`iv_destNext_${s}` as never, { raw: "sleeping" })
+    assert.notEqual(word, en(`iv_dest_${s}` as never))
+    assert.match(word + next, /[\u4e00-\u9fff]/)
+    assert.doesNotMatch(next, /\{\w+\}/)
+  }
+  assert.match(zh("iv_destNext_unknown", { raw: "sleeping" }), /sleeping/)
 })
 
 /* ---- starting ---------------------------------------------------------------- */
@@ -198,4 +269,23 @@ test("Cloud's typed refusals are definite; an untyped 5xx keeps the key; a signe
   const { get, calls } = recorder(() => new Response("{}", { status: 503 }))
   await startInvestigation(get, API, INC.loss, "acct_1", req, "k", signal)
   assert.equal(calls[0].url, `${API}/su/v1/health/incidents/${INC.loss}/investigations?account=acct_1`)
+})
+
+test("the chosen machine's hook is what the start sends, and a lost answer is retried with the same key and body", async () => {
+  const r = await fetchDestinations((async (u: RequestInfo | URL) => fixtureAnswer("normal", String(u), NOW)) as typeof fetch, API, new AbortController().signal)
+  assert.ok("ok" in r && r.ok)
+  const rev = (await detail("normal", INC.loss)).incident.revision
+  const req = startRequestFor(r.destinations, "fixture_mac_b", rev)
+  assert.deepEqual(req, { hook_id: "swh_fixture00000000000000000000b2", expected_incident_revision: rev })
+  const real = fixtureCall("normal")
+  const { get, calls } = recorder(async (c, n) => { const a = await real(c); return n === 1 ? "throw" : a })
+  const signal = new AbortController().signal
+  assert.deepEqual(await startInvestigation(get, API, INC.loss, null, req!, "inv-dest-1", signal), { ok: false, definite: false, code: "network" })
+  const again = await startInvestigation(get, API, INC.loss, null, req!, "inv-dest-1", signal)
+  assert.ok("ok" in again && again.ok)
+  assert.equal(calls.length, 2)
+  for (const c of calls) {
+    assert.equal(new Headers(c.init.headers).get("idempotency-key"), "inv-dest-1")
+    assert.deepEqual(JSON.parse(String(c.init.body)), req)
+  }
 })

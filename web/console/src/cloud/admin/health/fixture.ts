@@ -346,8 +346,8 @@ export async function fixtureAnswer(scenario: FixtureScenario, url: string, now:
   if (scenario === "signed_out") return refusal(401, "unauthorized")
   if (scenario === "forbidden") return refusal(404, "not_found")
   const u = new URL(url, "https://fixture.invalid")
-  if (u.pathname.endsWith("/v1/schedule-webhooks")) return hooksAnswer(now)
   const path = u.pathname.replace(/^.*\/su\/v1\/health\//, "")
+  if (path === "investigation-destinations") return destinationsAnswer()
   const q = u.searchParams
   const empty = scenario === "empty"
   if (path === "aggregates") return aggregatesAnswer(scenario, q, now)
@@ -563,14 +563,16 @@ const HOOK_A = "swh_fixture00000000000000000000a1"
 const HOOK_B = "swh_fixture00000000000000000000b2"
 const FIX_COMMIT = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c"
 
-/** The operator's own schedule webhooks: two active, one disabled (which the picker leaves out). */
-function hooksAnswer(now: number): Response {
-  const hook = (id: string, machine: string, state: string) => ({
-    hook_id: id, machine_id: machine, machine_name: machine === MAC_A ? "Investigation machine A" : "Investigation machine B", state, availability: state, generation: 1, revision: 2,
-    created_at: new Date(now - 86_400_000).toISOString(), activated_at: new Date(now - 86_000_000).toISOString(),
-    rotated_at: null, disabled_at: state === "disabled" ? new Date(now - 3_600_000).toISOString() : null, credential_fingerprint: `fp_${id.slice(-4)}`,
-  })
-  return json(200, { schema: "clawdline.schedule_webhook.list.v1", hooks: [hook(HOOK_A, MAC_A, "active"), hook(HOOK_B, "fixture_mac_b", "active"), hook("swh_fixture00000000000000000000c3", MAC_A, "disabled")], next_cursor: null })
+/** Where an investigation can run: one row per machine, two ready, the others each saying what they need. */
+function destinationsAnswer(): Response {
+  const row = (machine_id: string, machine_name: string, status: string, hook_id: string | null, reason: string) => ({ machine_id, machine_name, status, hook_id, reason })
+  return json(200, { schema: "clawdline.health_investigation.destinations.v1", status: "ok", complete: true, machines: [
+    row(MAC_A, "Investigation machine A", "ready", HOOK_A, "single_investigation_hook"),
+    row("fixture_mac_b", "Investigation machine B", "ready", HOOK_B, "single_investigation_hook"),
+    row("fixture_mac_c", "A machine whose name is long enough to wrap on a phone screen", "ambiguous", null, "multiple_investigation_hooks"),
+    row("fixture_linux_d", "Build server", "setup_required", null, "no_investigation_hook"),
+    row("fixture_mac_e", "Laptop", "offline", null, "machine_offline"),
+  ] })
 }
 
 type IvSpec = { state: string; reason: string | null; delivery: string | null; task: string | null; ago: number; closed?: boolean; report?: { conclusion: string; fix_commit: string | null; evidence_refs: string[] }; recovery?: boolean }
