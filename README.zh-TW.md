@@ -46,6 +46,8 @@ Clawdline 的常駐服務與主控台在你的機器上執行，管理你已使�
 
 **[查看安全性說明：加密、配對，以及 Cloud 能看見什麼](https://clawdline.com/security/)。** 頁面包含資料流圖解，以及各步驟對應的原始碼連結。
 
+我們請 Claude Code 與 Codex 評估安裝 Clawdline 與另外三個同類工具是否有資安風險；[完整檢視與解讀方式在這裡](docs/security/agent-reviews/README.zh-TW.md)。
+
 - **在你的機器上：** Clawdline 會讀取既有的 Claude Code、Codex 紀錄、終端畫面，以及功能所需的專案檔案。對話或終端中已有的敏感內容可能顯示在主控台。本機服務預設只監聽 loopback；本機使用不需要 Clawdline 帳號。
 - **未啟用 Cloud：** Cloud 連線預設關閉。更新檢查仍可能連到 GitHub 或官網版本端點；關閉 Cloud 不代表停用所有網路流量。
 - **啟用 Cloud 後：** Session 快照會自動發布；開啟對話、檔案與附件時，會向你的機器請求內容。內容在本機加密後才傳送，不會因此將整份對話歷史封存備份到 Cloud。內容金鑰由機器與配對瀏覽器持有；Cloud 轉送密文，沒有內容解密金鑰。服務仍可見帳號、裝置、路由、時間與流量資訊。
