@@ -1458,7 +1458,7 @@ func (l *Link) terminalOperation(ctx context.Context, svc *terminals.Service, p 
 			return nil, terminal.Refuse(terminal.CodeForbidden, "the viewer grant cannot be verified")
 		}
 		if scope != adaptercloud.ScopeOperate {
-			return nil, terminal.Refuse(terminal.RefusalCode("viewer_read_only"), "This device may read, and not send.")
+			return nil, terminal.Refuse(terminal.CodeViewerReadOnly, "This device may read, and not send.")
 		}
 	}
 	id := terminal.ID(req.TerminalID)

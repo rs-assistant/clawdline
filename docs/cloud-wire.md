@@ -933,11 +933,17 @@ The machine-local APIs accept an optional `scope` in invitation and manual-offer
 requests. Scope is never taken from an untrusted browser offer, Cloud header or
 account roster. `POST /v1/cloud/devices/grant` accepts `{device, scope}` for an
 existing active local pin. The response is `{device, scope}`; status viewer rows
-and pairing states also expose nonsecret scope. Omitted pairing scope preserves
-legacy defaults. There is no generated Cloud status contract in this tree; these
+and pairing states also expose nonsecret scope. An omitted pairing scope keeps
+the scope of the device's existing pin row and takes the legacy `operate`
+default only for a device with no row; an unreadable pin file or unknown stored
+scope refuses before the handover. `POST /v1/cloud/pairing/agent` takes the same
+optional `scope` for this machine and refuses one for a hand-off to another. There is no generated Cloud status contract in this tree; these
 shapes are owned by `transport/cloud` and consumed by the local CLI.
 
-`viewer_read_only` (403) identifies an effect refused by this pin. The machine
+`viewer_read_only` (403) identifies an effect refused by this pin. It is also a
+member of the closed `TerminalRefusalCode` enum in `api/v1/terminals.schema.json`;
+the console's write-off set and relay status table recognise it alongside the
+older `cloud_read_only`. The machine
 switch independently returns `cloud_commands_disabled` (403). Read-level push
 registration and content reads remain available. The dedicated terminal rail
 keeps its current total-switch prerequisite even for readonly screen reads.

@@ -7409,11 +7409,12 @@ const (
 	TerminalRefusalCodeTerminalAccessRevoked     TerminalRefusalCode = "terminal_access_revoked"
 	TerminalRefusalCodeTerminalCloudNotSupported TerminalRefusalCode = "terminal_cloud_not_supported"
 	TerminalRefusalCodeTerminalSocketPathTooLong TerminalRefusalCode = "terminal_socket_path_too_long"
+	TerminalRefusalCodeViewerReadOnly            TerminalRefusalCode = "viewer_read_only"
 	TerminalRefusalCodeTerminalInvalid           TerminalRefusalCode = "terminal_invalid"
 )
 
 // TerminalRefusalCodeValues is every value the contract allows, in contract order.
-var TerminalRefusalCodeValues = []TerminalRefusalCode{TerminalRefusalCodeTerminalForbidden, TerminalRefusalCodeNotController, TerminalRefusalCodeTerminalControlled, TerminalRefusalCodeLeaseSuperseded, TerminalRefusalCodeLeaseExpired, TerminalRefusalCodeInputGap, TerminalRefusalCodeInputStateUnknown, TerminalRefusalCodeInputTooLarge, TerminalRefusalCodeTerminalBusy, TerminalRefusalCodeTerminalClosed, TerminalRefusalCodeTerminalUnreachable, TerminalRefusalCodeTerminalUnsupported, TerminalRefusalCodeTerminalsFull, TerminalRefusalCodeTerminalViewersFull, TerminalRefusalCodeTerminalAccessRevoked, TerminalRefusalCodeTerminalCloudNotSupported, TerminalRefusalCodeTerminalSocketPathTooLong, TerminalRefusalCodeTerminalInvalid}
+var TerminalRefusalCodeValues = []TerminalRefusalCode{TerminalRefusalCodeTerminalForbidden, TerminalRefusalCodeNotController, TerminalRefusalCodeTerminalControlled, TerminalRefusalCodeLeaseSuperseded, TerminalRefusalCodeLeaseExpired, TerminalRefusalCodeInputGap, TerminalRefusalCodeInputStateUnknown, TerminalRefusalCodeInputTooLarge, TerminalRefusalCodeTerminalBusy, TerminalRefusalCodeTerminalClosed, TerminalRefusalCodeTerminalUnreachable, TerminalRefusalCodeTerminalUnsupported, TerminalRefusalCodeTerminalsFull, TerminalRefusalCodeTerminalViewersFull, TerminalRefusalCodeTerminalAccessRevoked, TerminalRefusalCodeTerminalCloudNotSupported, TerminalRefusalCodeTerminalSocketPathTooLong, TerminalRefusalCodeViewerReadOnly, TerminalRefusalCodeTerminalInvalid}
 
 // POST /v1/terminals/{id}/resize. The holder only; the newest size asked for
 // wins.

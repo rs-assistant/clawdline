@@ -102,7 +102,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `invalid_title` | `internal/transport/http/work_v2_session_name.go` |
 | `invalid_track` | `internal/transport/http/tracks.go` |
 | `invalid_transition` | `internal/domain/work/v2.go` |
-| `invalid_viewer_scope` | `internal/transport/http/cloud.go` |
+| `invalid_viewer_scope` | `internal/transport/http/cloud.go`, `internal/transport/http/cloud_agent.go` |
 | `invalid_work_id` | `internal/transport/http/orchestrator.go` |
 | `item_terminal` | `internal/domain/work/v2.go` |
 | `item_unassigned` | `internal/domain/work/v2.go` |

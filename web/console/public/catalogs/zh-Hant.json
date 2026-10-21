@@ -1,5 +1,6 @@
 {
   "next.transcriptEarlierStalled": "紀錄位置未往前推進，請重新開啟這個 Session 後再試。",
+  "next.terminalRefusalViewerReadOnly": "這台機器只讓這個裝置觀看終端，不能輸入。要操作的話，請在那台機器上把它的權限改成 operate。",
   "capacityRow.console.transcript_fill_pages.what": "對話尚未填滿畫面時，自動往前讀取的紀錄頁數，避免大型原始紀錄造成無限讀取。",
   "capacityRow.console.transcript_fill_pages.full": "自動載入達到上限後會暫停；按「載入更早的訊息」即可繼續。",
   "capacityRow.session.codex_past_page.what": "每一頁向 Codex 要求的歷史紀錄筆數，讓開啟清單時不必等待整個專案的歷史。",

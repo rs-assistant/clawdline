@@ -1872,7 +1872,7 @@ func (l *Link) TerminalViewerOperate(device string) error {
 			return terminal.Refuse(terminal.CodeForbidden, "the viewer grant cannot be verified")
 		}
 		if scope != adaptercloud.ScopeOperate {
-			return terminal.Refuse(terminal.RefusalCode("viewer_read_only"), "This device may read, and not send.")
+			return terminal.Refuse(terminal.CodeViewerReadOnly, "This device may read, and not send.")
 		}
 	}
 	return l.TerminalViewerAccess(device)

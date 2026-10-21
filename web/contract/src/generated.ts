@@ -8977,9 +8977,10 @@ export type TerminalRefusalCode =
   | "terminal_access_revoked"
   | "terminal_cloud_not_supported"
   | "terminal_socket_path_too_long"
+  | "viewer_read_only"
   | "terminal_invalid"
 
-export const TerminalRefusalCodeValues: readonly TerminalRefusalCode[] = ["terminal_forbidden", "not_controller", "terminal_controlled", "lease_superseded", "lease_expired", "input_gap", "input_state_unknown", "input_too_large", "terminal_busy", "terminal_closed", "terminal_unreachable", "terminal_unsupported", "terminals_full", "terminal_viewers_full", "terminal_access_revoked", "terminal_cloud_not_supported", "terminal_socket_path_too_long", "terminal_invalid"] as const
+export const TerminalRefusalCodeValues: readonly TerminalRefusalCode[] = ["terminal_forbidden", "not_controller", "terminal_controlled", "lease_superseded", "lease_expired", "input_gap", "input_state_unknown", "input_too_large", "terminal_busy", "terminal_closed", "terminal_unreachable", "terminal_unsupported", "terminals_full", "terminal_viewers_full", "terminal_access_revoked", "terminal_cloud_not_supported", "terminal_socket_path_too_long", "viewer_read_only", "terminal_invalid"] as const
 
 /**
  * POST /v1/terminals/{id}/resize. The holder only; the newest size asked for wins.
