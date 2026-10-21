@@ -6,6 +6,16 @@ package capacity
 func cloudBounds() []Entry {
 	return append(append(append(append(connectionHealthBounds(), healthJournalBounds()...), healthUploadBounds()...), healthSealedBounds()...), append(healthInvestigationBounds(), []Entry{
 		{
+			Name: "cloud.rekey_lifetime", Class: Cache, Unit: Seconds,
+			Limit: 120, AtLimit: Expire, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/cloud.RekeyLifetimeMSLimit"},
+		},
+		{
+			Name: "cloud.rekey_body", Class: Buffer, Unit: Bytes,
+			Limit: 4096, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/cloud.MaxRekeyBodyBytes"},
+		},
+		{
 			// A Cloud Session row (s/), status row (ss/) or status marker
 			// whose only change is its activity time, its sub-agents or its
 			// line's token count is re-sent at most once per this interval;

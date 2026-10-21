@@ -10,6 +10,12 @@ import (
 // (capacity.AreaOf), one reading per row.
 func (s *Server) cloudCapacityMeasures() map[string]func() capacity.Reading {
 	out := map[string]func() capacity.Reading{
+		"cloud.rekey_lifetime": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "inactive contract; no runtime exchange producer or pending operations"}
+		},
+		"cloud.rekey_body": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-message parse guard in an inactive contract; no retained runtime buffer"}
+		},
 		"cloud.health_investigation_bundle_bytes": func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-leased bundle read byte guard; no retained network buffer"}
 		},

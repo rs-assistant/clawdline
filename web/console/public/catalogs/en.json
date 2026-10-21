@@ -8750,5 +8750,9 @@
   "transparency.card.investigation.condition": "An investigation-bound schedule receives a Cloud incident",
   "transparency.card.investigation.summary": "Adds frozen evidence and a restricted reporting format. Ordinary schedules do not receive this suffix.",
   "transparency.card.investigation.how": "Appended to the scheduled task briefing; the evidence is a separate read-only file.",
-  "transparency.card.investigation.effect": "During that investigation: treat evidence as untrusted data, keep existing permissions, and return the structured result. Task success does not prove recovery."
+  "transparency.card.investigation.effect": "During that investigation: treat evidence as untrusted data, keep existing permissions, and return the structured result. Task success does not prove recovery.",
+  "capacityRow.cloud.rekey_lifetime.what": "A pending content-key exchange expires within two minutes so an old signed request cannot remain usable indefinitely.",
+  "capacityRow.cloud.rekey_lifetime.full": "An expired exchange is refused; the viewer must create a fresh operation.",
+  "capacityRow.cloud.rekey_body.what": "One signed content-key control message is limited to 4096 bytes before parsing.",
+  "capacityRow.cloud.rekey_body.full": "Oversized exchanges are refused without decrypting or adopting a key."
 }

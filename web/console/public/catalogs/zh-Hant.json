@@ -8750,5 +8750,9 @@
   "transparency.card.investigation.condition": "綁定事件調查的排程收到 Cloud 事件",
   "transparency.card.investigation.summary": "加入固定版本的證據與限定回報格式；一般排程沒有這段附加指示。",
   "transparency.card.investigation.how": "附在排程任務說明；證據另存為唯讀檔案。",
-  "transparency.card.investigation.effect": "調查期間：證據不可當指令，維持原有權限，回傳結構化結果。任務成功不代表事件已恢復。"
+  "transparency.card.investigation.effect": "調查期間：證據不可當指令，維持原有權限，回傳結構化結果。任務成功不代表事件已恢復。",
+  "capacityRow.cloud.rekey_lifetime.what": "待處理的內容金鑰交換最多保留兩分鐘，避免舊的簽署請求長期有效。",
+  "capacityRow.cloud.rekey_lifetime.full": "過期的交換會被拒絕；瀏覽器必須建立新的交換作業。",
+  "capacityRow.cloud.rekey_body.what": "每份簽署的內容金鑰控制訊息在解析前限制為 4096 位元組。",
+  "capacityRow.cloud.rekey_body.full": "超過大小限制的交換會被拒絕，不會解密或採用金鑰。"
 }
