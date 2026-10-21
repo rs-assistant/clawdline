@@ -30,7 +30,7 @@ import {
   type MachineOnly,
 } from "../cloud.js"
 import { directLocalNetworkShown } from "../direct-local.js"
-import { DEFAULTS, reading, type SettingKey } from "./defaults.js"
+import { DEFAULTS, reading, supportsITermIntegration, type SettingKey } from "./defaults.js"
 import { installVoiceModel, readVoiceLanguage, readVoiceSetup } from "../voice.js"
 import {
   APP_EVENT,
@@ -438,7 +438,7 @@ export function SettingsWindow({ embedded = false, pane, hideNavigation = false 
               onPick={pick("mascot")}
             />
           </Row>
-          <Row label={W.settingsSessionTerminal} hint={W.settingsSessionTerminalHint}>
+          <Row label={W.settingsSessionTerminal} hint={supportsITermIntegration(snapshot) ? W.settingsSessionTerminalConsentHint : W.settingsSessionTerminalHint}>
             <PopUp
               label={W.settingsSessionTerminal}
               value={String(now("terminal"))}
@@ -451,9 +451,11 @@ export function SettingsWindow({ embedded = false, pane, hideNavigation = false 
               onPick={pick("terminal")}
             />
           </Row>
-          <Row label={W.settingsITermScan} hint={W.settingsITermScanHint}>
-            <Switch label={W.settingsITermScan} on={!!now("iterm_scan")} onChange={flip("iterm_scan")} />
-          </Row>
+          {snapshot && (supportsITermIntegration(snapshot) ? (
+            <Row label={W.settingsITermIntegration} hint={W.settingsITermIntegrationHint}>
+              <Switch label={W.settingsITermIntegration} on={!!now("iterm_integration")} onChange={flip("iterm_integration")} />
+            </Row>
+          ) : <Note dot="warn">{W.settingsITermIntegrationUpgrade}</Note>)}
           {INPUT_BAR_ENABLED && <><Row label={W.settingsScopeGlobal}>
             <Switch
               label={W.settingsScopeGlobal}

@@ -8753,5 +8753,9 @@
   "next.signedInPermissionUnread": "{name} was changed, but the list could not be read again to show it: {why}",
   "next.signedInRevokeLimits": "Revoking refuses a device's next request. What it has already seen or downloaded cannot be taken back.",
   "next.doorAskScope": "A paired browser can read this machine's Sessions, terminal screens, and the documents and images Clawdline shows. If the machine lets it operate, it can also send messages and type in terminals, and the assistants it drives can run programs on the machine.",
-  "next.doorAskControl": "The machine chooses read only or read and operate for each device. Revoke it on the machine under Devices → Signed in to this machine, or with clawdline devices revoke."
+  "next.doorAskControl": "The machine chooses read only or read and operate for each device. Revoke it on the machine under Devices → Signed in to this machine, or with clawdline devices revoke.",
+  "settings.settingsITermIntegration": "Enable iTerm2 integration",
+  "settings.settingsITermIntegrationHint": "Off by default. While off, Clawdline does not detect, read or control iTerm2 or request its Automation permission. Enabling permits listing tabs, reading screens, sending input, and opening, showing or closing tabs, and may request macOS Automation permission. Existing installations must also opt in.",
+  "settings.settingsITermIntegrationUpgrade": "This daemon does not support the iTerm2 consent switch. Update Clawdline on this machine to control all iTerm2 access. Its current access cannot be inferred from this page.",
+  "settings.settingsSessionTerminalConsentHint": "Automatic uses tmux while iTerm2 integration is off. With integration enabled, Automatic uses iTerm2 while it is open; with tmux installed, the Session runs in tmux and is shown in an iTerm2 tab. Explicit iTerm2 choices require enabled integration and a running iTerm2. iTerm2 (native tab) runs directly in its tab. tmux always uses tmux. The next Session follows this choice."
 }
