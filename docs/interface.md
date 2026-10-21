@@ -657,3 +657,15 @@ of any routine to a PNG so an agent drawing one can see what it drew.
 <img src="assets/dance.gif" width="420" alt="clawd">
 <img src="assets/mochi-dance.gif" width="420" alt="mochi">
 </div>
+
+### Operations language and trace coverage
+
+The hosted operations sidebar includes the same browser UI language control as Settings.
+The choice is shared across the console and operations pages on that origin, independent of
+the machine's agent/voice language. A selected language reloads the page; automatic selection
+uses the browser's preferred supported language. English and Taiwan Traditional Chinese use
+the same shipped catalogs.
+
+A single-operation trace does not infer missing records from producer sequence jumps: the
+producer assigns sequences across all operations. Source-wide coverage remains the authority
+for stored sequence gaps.
