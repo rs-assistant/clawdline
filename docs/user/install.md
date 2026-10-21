@@ -32,8 +32,15 @@ Line's right edge reads `Plan limits unknown`. [usage.md](usage.md) says what to
 curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
 ```
 
-It downloads the latest release for your system, checks it against the release's checksums and
-signature, and runs `clawdline setup` from it, which:
+It downloads the latest release for your system and compares the archive with `SHA256SUMS`
+from the same release host. It then extracts and executes that release's `clawdline setup`,
+which verifies the signed manifest before activating the installation. **The downloaded
+program has already started when that signature check runs.** First installation therefore
+trusts the installer source and GitHub over HTTPS; a same-source checksum is not independent
+proof of authenticity. Later updates use the release keys built into the installed program.
+[Release trust](../releasing.md#what-a-release-is) explains this distinction.
+
+After verification, `clawdline setup`:
 
 - puts the release in `~/.local/share/clawdline-next/releases/<version>/` and links
   `~/.local/bin/clawdline` to it — if `~/.local/bin` is not on your `PATH`, it prints the one
@@ -80,6 +87,41 @@ clawdline doctor          # version, port, state directory
 ```
 
 answers with the version you installed.
+
+### Review and pin an installation
+
+The default command uses the current `main/install.sh` and the latest published release.
+Reading a repository commit does not establish that this is the program the command installs.
+To select a reviewed release, download its installer first and pass the same release version
+explicitly. Replace `vX.Y.Z` with the published version you reviewed:
+
+```sh
+clawdline_release=vX.Y.Z
+curl --proto '=https' --proto-redir '=https' -fL \
+  "https://raw.githubusercontent.com/sainteye/clawdline/$clawdline_release/install.sh" \
+  -o clawdline-install.sh
+```
+
+Read `clawdline-install.sh` before running it. To pin the script to an immutable source
+revision, replace `$clawdline_release` in the download URL with the full reviewed commit hash;
+keep the selected release version in the command below:
+
+```sh
+sh ./clawdline-install.sh --version "$clawdline_release"
+```
+
+This selects a version and separates downloading from execution; it does not independently
+verify a binary before it starts. If your policy requires that, use your own trusted build
+or verification process before executing a downloaded program. The release tooling can
+verify downloaded manifests and archives with `go run ./tools/release verify <release-dir>`
+from a reviewed source checkout with a trusted Go toolchain. It requires every artifact
+listed in the manifest and does not run the downloaded release program.
+
+Installation normally starts a background service and enables autostart. `--no-autostart`
+starts it now without enabling login or boot startup. Cloud stays off until you enable it;
+local use still has the filesystem and terminal permissions of the account running the service.
+See the [security overview](https://clawdline.com/security/) and
+[remote permissions](remote-access.md) before pairing a browser.
 
 ## 2. Open the console
 

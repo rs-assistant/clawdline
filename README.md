@@ -64,6 +64,8 @@ curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh 
 
 The installer checks the archive checksum, then runs the downloaded program to verify the release signature and start a per-user service. The first install therefore trusts GitHub, HTTPS, and the installation script; subsequent updates verify signed manifests against release keys built into the installed program. It then opens the console. Start a Session there or run `claude` or `codex` in tmux; the release includes tmux if needed. [Install and first run](docs/user/install.md) · [First Session](docs/user/first-session.md)
 
+To install the release you reviewed, pin **both** the installer source revision and `--version`; the default command follows `main` and the latest release. [Review and pin an installation](docs/user/install.md#review-and-pin-an-installation) explains the steps and the first-install trust boundary.
+
 ## Availability
 
 - Local use is free and needs no Clawdline account. Cloud offers Free and Pro plans.
