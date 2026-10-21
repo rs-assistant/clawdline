@@ -489,9 +489,12 @@ an entire window without yielding any visible conversation. A nonzero
 
 After layout, the transcript automatically loads older pages while the content
 fits within the viewport, without requiring a scroll gesture. One opening or
-explicit load permits at most eight older reads (`console.transcript_fill_pages`).
-The loading control reports the current read and budget. At the limit it pauses
-with an explanation and the existing manual button. Polling and resize do not
-reset that budget. Errors and non-decreasing cursors stop automatic reads; leaving
+explicit load permits at most 32 older reads (`console.transcript_fill_pages`).
+A single loading surface stays mounted over the transcript across the entire
+fill. Intermediate pages remain laid out but hidden, so they can be measured
+without flashing incomplete content. Page counts and internal budgets are not
+shown in the conversation. The fill measures the hidden conversation body, not
+the loading placeholder or its overflow. At the limit the existing manual
+button remains. Polling and resize do not reset that budget. Errors and non-decreasing cursors stop automatic reads; leaving
 the Session prevents an outstanding response from starting another read. Loaded
 pages retain the existing chronological merge and scroll anchor behavior.

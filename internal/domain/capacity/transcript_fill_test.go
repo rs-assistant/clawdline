@@ -24,7 +24,7 @@ func TestTranscriptFillIsBounded(t *testing.T) {
 	for _, e := range Register() {
 		if e.Name == "console.transcript_fill_pages" {
 			if e.Limit != limit || e.AtLimit != Refuse {
-				t.Fatalf("automatic history fill must stop after eight reads: %+v", e)
+				t.Fatalf("automatic history fill must match its registered read budget: %+v", e)
 			}
 			return
 		}
