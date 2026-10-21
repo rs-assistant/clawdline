@@ -139,7 +139,10 @@ compilation if the selected identity is not Developer ID Application.
   (`codesign_notarize` in `tools/release/codesign.sh`); the app is stapled. It needs an App
   Store Connect API key in the `release` environment's `CLAWDLINE_NOTARY_KEY_P8_BASE64`,
   `CLAWDLINE_NOTARY_KEY_ID` and `CLAWDLINE_NOTARY_ISSUER` secrets; without them the build fails
-  before compiling. Dev builds are neither hardened nor notarized.
+  before compiling. Dev builds are neither hardened nor notarized. The gate accepts only the
+  release team `83D62P566Q`, fixed in `tools/release/codesign.sh`, and asks Apple online for
+  each binary's notarization ticket; changing that team is a reviewed commit
+  ([release-evidence.md](security/release-evidence.md#the-release-team-and-changing-it)).
 - **Without it**, a build signs ad hoc as before: a clone builds and runs with no one's certificate.
 - **Replacing it** changes the identity once: macOS can ask for the keychain
   password and Automation permission once after the transition. Validate two

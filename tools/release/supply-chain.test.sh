@@ -104,6 +104,30 @@ s.packages = s.packages.filter((p) => p.name !== "libevent");
 fs.writeFileSync(f, JSON.stringify(s, null, 1) + "\n");' "$d/clawdline_${version}_linux_amd64.tar.gz.spdx.json"
 expect_fail "an SBOM with a package removed fails" 'does not describe.*Native-libevent' tools/release/sbom.sh verify "$d"
 
+# The tmux pins an SBOM is checked against are the manifest commit's. A
+# scratch clone shares this repository's objects; its working tree holds only
+# the sbom.sh under test and a sources.sh whose pins have since moved, and a
+# second commit moves the pins in history.
+pinclone="$work/pin-clone"
+git clone -q --shared --no-checkout "$root" "$pinclone"
+mkdir -p "$pinclone/tools/release/tmux"
+cp tools/release/sbom.sh "$pinclone/tools/release/sbom.sh"
+sed -e "s/^TMUX_VERSION=.*/TMUX_VERSION=9.9z/" -e "s/^TMUX_SHA256=.*/TMUX_SHA256=$(printf moved | shasum -a 256 | cut -d' ' -f1)/" \
+  tools/release/tmux/sources.sh >"$pinclone/tools/release/tmux/sources.sh"
+expect_ok "pins that moved in the checkout do not fail an older release's SBOM" "$pinclone/tools/release/sbom.sh" verify "$good"
+moved=$(cd "$pinclone" && export GIT_INDEX_FILE="$work/pin-index" && git read-tree "$commit" &&
+  git update-index --add --cacheinfo "100644,$(git hash-object -w tools/release/tmux/sources.sh),tools/release/tmux/sources.sh" &&
+  GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.invalid GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.invalid \
+    git commit-tree -p "$commit" -m "move the tmux pin" "$(git write-tree)")
+d="$work/moved-pin"; cp -R "$good" "$d"
+rm -f "$d/manifest.json" "$d/SHA256SUMS" "$d"/*.spdx.json
+(cd "$d" && shasum -a 256 ./*.tar.gz | sed 's# \./# #' >SHA256SUMS)
+go run ./tools/release manifest -version "$version" -commit "$moved" -committed-at "$committed_at" \
+  -channel beta -base-url "http://127.0.0.1:1/$version" "$d" >/dev/null
+"$pinclone/tools/release/sbom.sh" generate "$d" >/dev/null
+expect_fail "an archive whose tmux is not its commit's pinned tmux fails" 'does not name the pinned tmux 9\.9z' "$pinclone/tools/release/sbom.sh" verify "$d"
+rm -rf "$pinclone"
+
 echo "== provenance (stub gh)"
 cp "$good/manifest.json" "$work/manifest.copy"
 printf '[]\n' >"$good/manifest.sig.json" # provenance needs every asset present; its content is not read here
@@ -189,6 +213,20 @@ if [ "$(uname -s)" = Darwin ]; then
   cp "$gobin" "$work/adhoc"
   expect_fail "an ad hoc signature is not a release signature" 'not signed by a Developer ID' \
     bash -c '. tools/release/codesign.sh; codesign_verify_release "$1"' _ "$work/adhoc"
+  # Node's official macOS binary is a Developer ID signature from another
+  # team, with the hardened runtime, a timestamp and a notarization ticket:
+  # everything a release has except its signer.
+  nodebin=$(node -p 'require("fs").realpathSync(process.execPath)')
+  nodesig=$(codesign -dvvv "$nodebin" 2>&1 || true)
+  if grep -q '^Authority=Developer ID Application: ' <<<"$nodesig"; then
+    expect_fail "another team's notarized Developer ID binary is not a release signature" 'not signed by the Clawdline release team' \
+      bash -c '. tools/release/codesign.sh; codesign_verify_release "$1"' _ "$nodebin"
+    team=$(sed -n 's/^TeamIdentifier=//p' <<<"$nodesig")
+    CLAWDLINE_RELEASE_TEAM_ID=$team expect_fail "the environment cannot name another release team" 'not signed by the Clawdline release team' \
+      bash -c '. tools/release/codesign.sh; codesign_verify_release "$1"' _ "$nodebin"
+  else
+    echo "SKIP  another team's Developer ID binary: $nodebin is not Developer ID signed"
+  fi
 fi
 
 echo "== gate (test release, signed with a throwaway key)"

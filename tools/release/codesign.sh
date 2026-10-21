@@ -91,20 +91,44 @@ codesign_notarize() {
   done
 }
 
+# The Apple Developer Team every official Clawdline release is signed by. It
+# is fixed here, not read from the environment, a manifest or the artifact
+# under test: the check exists to refuse a validly signed binary from anybody
+# else. It was read from the public signatures of the published v2.0.0
+# darwin archives, whose digests match their signed manifest, and agrees with
+# this project's dev builds (docs/security/release-evidence.md). Changing it
+# is a maintainer's decision recorded in that page, never a build input.
+CLAWDLINE_RELEASE_TEAM_ID=83D62P566Q
+
+# codesign_release_requirement is the code requirement a release signature
+# satisfies: a Developer ID Application leaf issued under Apple's Developer
+# ID intermediate, for the release team. codesign checks it against the
+# certificate chain itself, not against text a signature prints.
+codesign_release_requirement() {
+  printf 'anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "%s"' \
+    "$CLAWDLINE_RELEASE_TEAM_ID"
+}
+
 # codesign_verify_release <path>... is the publication check of a shipped
-# macOS binary or app: a strict, deep signature by a Developer ID Application
-# identity with the hardened runtime and a secure timestamp. An .app must also
-# carry a stapled notarization ticket and pass Gatekeeper. A bare binary
-# cannot be stapled; its notarization is the build's notarytool verdict, which
-# Gatekeeper looks up online when the binary is first run.
+# macOS binary or app: a strict, deep signature by the release team's
+# Developer ID Application identity with the hardened runtime and a secure
+# timestamp, and a notarization ticket Apple holds for exactly this code.
+# A bare binary cannot be stapled, so its ticket is looked up online by its
+# code directory hash (codesign --check-notarization); a machine that cannot
+# reach Apple fails the check rather than skipping it. An .app must also carry
+# a stapled ticket and pass Gatekeeper.
 codesign_verify_release() {
   local p info
   for p in "$@"; do
     codesign --verify --deep --strict "$p" || { echo "$p: signature does not verify" >&2; return 1; }
     info=$(codesign -dvvv "$p" 2>&1)
     grep -q '^Authority=Developer ID Application: ' <<<"$info" || { echo "$p: not signed by a Developer ID Application identity" >&2; return 1; }
+    codesign --verify --deep --strict -R="$(codesign_release_requirement)" "$p" 2>/dev/null ||
+      { echo "$p: not signed by the Clawdline release team $CLAWDLINE_RELEASE_TEAM_ID ($(grep '^TeamIdentifier=' <<<"$info"))" >&2; return 1; }
     grep -Eq '^CodeDirectory .*flags=0x[0-9a-f]+\([^)]*runtime' <<<"$info" || { echo "$p: no hardened runtime" >&2; return 1; }
     grep -q '^Timestamp=' <<<"$info" || { echo "$p: no secure timestamp" >&2; return 1; }
+    codesign --verify --strict --check-notarization -R=notarized "$p" 2>/dev/null ||
+      { echo "$p: Apple holds no notarization ticket for this code (or could not be reached)" >&2; return 1; }
     case "$p" in
       *.app)
         xcrun stapler validate "$p" >/dev/null || { echo "$p: no stapled notarization ticket" >&2; return 1; }
@@ -112,7 +136,7 @@ codesign_verify_release() {
         echo "$p: notarization ticket stapled; Gatekeeper accepts it"
         ;;
     esac
-    echo "$p: Developer ID, hardened runtime, timestamped"
+    echo "$p: Developer ID of team $CLAWDLINE_RELEASE_TEAM_ID, hardened runtime, timestamped, notarized"
   done
 }
 

@@ -10,7 +10,8 @@
 # there and still describes its archive: the archive digest is the manifest's,
 # the file list and every file's sha256 are what the archive holds, the Go
 # modules linked into each Go binary are what `go version -m` reads from it,
-# and the carried tmux is what its tmux.json names and sources.sh pins.
+# and the carried tmux is what its tmux.json names and the manifest commit's
+# sources.sh pins.
 #
 # Two kinds of entry are kept apart, and each package says which it is:
 #   artifact content  read from the unpacked archive itself (files, Go
@@ -19,7 +20,8 @@
 #                     source pins): what the build was given, not proof that
 #                     every listed package ended up in the minified bundle
 #
-# Both commands read web/package-lock.json at the manifest's commit, so they
+# Both commands read web/package-lock.json and tools/release/tmux/sources.sh
+# at the manifest's commit, never this checkout's copies, so they
 # run in a checkout that has that commit. Node and Go are the only tools used.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -37,7 +39,18 @@ commit=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(pro
 [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "sbom: manifest.json names no commit" >&2; exit 1; }
 git cat-file -e "$commit^{commit}" 2>/dev/null || { echo "sbom: commit $commit is not in this checkout; fetch it first" >&2; exit 1; }
 git show "$commit:web/package-lock.json" >"$work/package-lock.json"
-. tools/release/tmux/sources.sh
+# The tmux pins are the commit's too, not this checkout's: a release built
+# before a pin moved still names the pins it was built with. They are read as
+# NAME=value lines, not sourced, so the commit's file runs no code here.
+git show "$commit:tools/release/tmux/sources.sh" >"$work/sources.sh" 2>/dev/null ||
+  { echo "sbom: commit $commit has no tools/release/tmux/sources.sh" >&2; exit 1; }
+for name in TMUX LIBEVENT UTF8PROC NCURSES; do
+  for field in VERSION URL SHA256; do
+    v=$(sed -n "s#^${name}_${field}=\([A-Za-z0-9._:/+-]*\)\$#\1#p" "$work/sources.sh" | tail -n 1)
+    [ -n "$v" ] || { echo "sbom: commit $commit's sources.sh pins no ${name}_${field}" >&2; exit 1; }
+    printf -v "${name}_${field}" '%s' "$v"
+  done
+done
 
 TMUX_VERSION=$TMUX_VERSION TMUX_URL=$TMUX_URL TMUX_SHA256=$TMUX_SHA256 \
 LIBEVENT_VERSION=$LIBEVENT_VERSION LIBEVENT_URL=$LIBEVENT_URL LIBEVENT_SHA256=$LIBEVENT_SHA256 \
@@ -245,7 +258,7 @@ if (!(manifest.artifacts || []).length) fail("manifest.json lists no artifacts")
 if (mode === "verify" && failures) process.exit(1);
 JS
 if [ "$mode" = verify ]; then
-  # Every carried tmux.json names the pins in sources.sh; build.sh enforced
+  # Every carried tmux.json names the commit's pins; build.sh enforced
   # this at build time and the gate enforces it again on what was downloaded.
   for a in "$dir"/*.tar.gz; do
     d="$work/pins/$(basename "$a")"

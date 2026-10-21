@@ -10,7 +10,7 @@ and what it does not prove. Cutting and publishing a release is [releasing.md](.
 | Signed manifest | `manifest.json`, `manifest.sig.json` | These archives, with these sizes and sha256 digests, are the ones the release key signed. The installer and the updater check it before unpacking anything. |
 | SBOM | `<archive>.spdx.json`, one per archive (SPDX 2.3) | What the archive holds and what it was built from. |
 | Build provenance | a GitHub artifact attestation for every asset (SLSA provenance v1, signed through Sigstore) | The asset with this digest was produced by `.github/workflows/release.yml` of `sainteye/clawdline`, run on `refs/heads/main` on a GitHub-hosted runner, from the commit the manifest names. |
-| macOS notarization | the app's stapled ticket; Apple's notary record for the daemon archives | Apple scanned these Developer ID-signed, hardened-runtime binaries and accepted them. |
+| macOS notarization | the app's stapled ticket; Apple's notary record for the daemon archives, looked up online by each binary's code directory hash | Apple scanned these Developer ID-signed, hardened-runtime binaries of the release team `83D62P566Q` and accepted them. |
 
 Releases drafted before this evidence existed, including v2.0.0, have none of the last three. They
 are not re-described as having it, and the publication gate cannot pass them.
@@ -23,7 +23,8 @@ Each package in an SBOM has `summary` set to one of two kinds, and they mean dif
   modules linked into each Go binary (from the build information `go version -m` reads out of the
   binary itself), and the carried tmux with the libevent, utf8proc, ncurses and musl it statically
   links (from the archive's `tmux.json`, whose versions must equal the pins in
-  `tools/release/tmux/sources.sh`).
+  `tools/release/tmux/sources.sh` **at the manifest's commit**; a pin that moved later does not
+  fail an older release, and the file is parsed as `NAME=value` lines, never sourced).
 - **`source-inventory`** is read from the commit: the console's npm packages from
   `web/package-lock.json`, runtime entries as `DEPENDS_ON` and build-only entries as
   `BUILD_DEPENDENCY_OF`. The console is a minified bundle; nobody traced each listed package into it,
@@ -79,13 +80,34 @@ tools/release/provenance.sh "rel-$v" --bundle-dir . --trusted-root trusted_root.
 tar -xzf "rel-$v/Clawdline-${v}-macos-arm64.tar.gz" -C app
 codesign --verify --deep --strict "app/Clawdline Next.app"
 codesign -dvvv "app/Clawdline Next.app" 2>&1 | grep -E 'Authority=Developer ID Application|flags=.*runtime|Timestamp='
+codesign --verify --strict -R='anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "83D62P566Q"' "app/Clawdline Next.app"
 spctl --assess --type execute -vv "app/Clawdline Next.app"   # source=Notarized Developer ID
 xcrun stapler validate "app/Clawdline Next.app"
+tar -xzf "rel-$v/clawdline_${v}_darwin_arm64.tar.gz" -C daemon
+codesign --verify --strict --check-notarization -R=notarized daemon/clawdline daemon/libexec/tmux
 ```
 
-A bare command-line binary cannot have a ticket stapled to it; Gatekeeper looks its notarization
-up online the first time it runs. `tools/release/gate.sh` runs all of the above
-(`codesign_verify_release` in `tools/release/codesign.sh`).
+The `-R` requirement is checked by `codesign` against the certificate chain: a Developer ID
+Application leaf, under Apple's Developer ID intermediate, issued to team `83D62P566Q`. Any other
+team's Developer ID signature fails it, however valid.
+
+A bare command-line binary cannot have a ticket stapled to it. `--check-notarization` asks Apple
+online whether it holds a ticket for exactly that code directory hash, so the answer is Apple's,
+not a status the build wrote down; without a network connection it fails. `tools/release/gate.sh`
+runs all of the above (`codesign_verify_release` in `tools/release/codesign.sh`) and refuses on
+any failure.
+
+### The release team, and changing it
+
+`CLAWDLINE_RELEASE_TEAM_ID` in `tools/release/codesign.sh` is fixed in the script. It is not read
+from the environment, a manifest or the artifact under test, so neither a crafted release nor the
+machine running the gate can name another team. It was established on 2026-10-21, read-only, from
+the public signatures of the published v2.0.0 `clawdline_v2.0.0_darwin_arm64.tar.gz` (its sha256
+matched the signed manifest; `clawdline` and `libexec/tmux` both `TeamIdentifier=83D62P566Q`,
+strict verification passing), and it agrees with this project's dev builds. No private key,
+keychain or secret was read. If the maintainer's signing team ever changes, the change is a commit
+to that line and to this paragraph, with the new team's evidence, reviewed like any other code; it
+is never a build or gate input.
 
 ## Rebuilding a release
 
@@ -127,6 +149,17 @@ The release environment needs these secrets, beside the existing code-signing an
 secrets: `CLAWDLINE_NOTARY_KEY_P8_BASE64` (an App Store Connect API key with access to the notary
 service), `CLAWDLINE_NOTARY_KEY_ID` and `CLAWDLINE_NOTARY_ISSUER`. The Apple Developer Program
 membership behind them belongs to the maintainer.
+
+## What is still pending
+
+- No build with the hardened runtime has been notarized, so the gate has not yet seen a release
+  pass the notarization check. Its refusal was observed on the published v2.0.0 daemon
+  (`source=Unnotarized Developer ID`), and the online check was observed passing on an unrelated
+  notarized Developer ID command-line binary; both 2026-10-21. The first official release is the
+  acceptance.
+- The notary submission record (`CLAWDLINE_NOTARY_LOG`: submission id and status per archive) is
+  not yet published as a release asset or included in the attestation. It would be an audit trail
+  only: the gate's notarization answer comes from Apple's own record, not from it.
 
 ## What this does not prove
 
