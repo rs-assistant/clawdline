@@ -35,6 +35,11 @@ from the newest published non-prerelease. `min_version` is the oldest version a 
 upgraded from and rolled back to; a release whose store change an older binary cannot read sets
 `non_additive_migration` and raises it.
 
+The README and install guide deliberately pin both the installer source commit and a published
+release version. When promoting a later release, update those examples together after verifying
+the chosen public installer revision and the signed release manifest. The installer revision
+may be newer than the program release; do not present them as the same source tree.
+
 ## Cutting a release
 
 1. Make sure `main` is green in CI and the commit is the one you mean.

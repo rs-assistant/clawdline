@@ -41,7 +41,15 @@ Line's right edge reads `Plan limits unknown`. [usage.md](usage.md) says what to
 ## 1. Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
+curl --proto '=https' --proto-redir '=https' -fL \
+  https://raw.githubusercontent.com/sainteye/clawdline/74fc07e5bc8c8d092f216478f26d99b7ed1b77ee/install.sh \
+  -o clawdline-install.sh
+```
+
+Read the downloaded script, then run it:
+
+```sh
+sh ./clawdline-install.sh --version v2.0.0
 ```
 
 The installer checks local verification tools, downloads the release manifest and signatures,
@@ -81,10 +89,10 @@ autostart off or remove Clawdline, each with `--port` when you chose another por
 "Next" in `Clawdline Next.app`, `clawdline-next.service` and `~/.config/clawdline-next` is this
 generation's internal name; the product is Clawdline.
 
-Options go after `sh -s --`:
+Pass options to the downloaded script:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh -s -- --headless
+sh ./clawdline-install.sh --version v2.0.0 --headless
 ```
 
 | Option | Does |
@@ -108,8 +116,14 @@ answers with the version you installed.
 
 ### Review and pin an installation
 
-The default command uses the current `main/install.sh` and the latest published release.
-Reading a repository commit does not establish that this is the program the command installs.
+The steps above pin installer commit `74fc07e5bc8c8d092f216478f26d99b7ed1b77ee`
+and release `v2.0.0`. The release's signed manifest identifies program source commit
+`d2ed0c0633dec8dc7c4f0d2b8d78cf229a2795d4`. These are separate identities: the newer script verifies the
+existing signed release before it starts. Reading the installer does not amount to auditing
+the release's program source or proving the binary reproducible.
+
+Calling the script without `--version` still selects the latest release; using a `main` URL
+still follows a moving script. Neither is the default installation example on this page.
 To select a reviewed release, use a reviewed installer with pre-execution verification and pass
 the release version explicitly. Replace `REVIEWED_INSTALLER_COMMIT` with that installer's full
 commit hash and `vX.Y.Z` with the published release you reviewed. The installer can verify
@@ -224,7 +238,7 @@ whole of it.
 ## Stop or remove it
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh -s -- --uninstall
+sh ./clawdline-install.sh --uninstall
 # or, with it installed:
 clawdline setup --uninstall           # service, link, app and releases
 clawdline setup --uninstall --purge   # and the state: devices, sessions, settings
