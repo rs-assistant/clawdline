@@ -697,7 +697,7 @@ function drawPast(list: HTMLElement, box: HTMLInputElement): void {
     const li = document.createElement("li")
     const button = document.createElement("button")
     button.type = "button"
-    button.className = "place"
+    button.className = "start-past-more"
     button.disabled = reading || !!pressing || !!wait
     button.textContent = reading ? T().webLoading : pastFailed ? nextWord("usageRetry") : nextWord("startPastMore")
     button.onclick = () => readPast(pastCursor)
@@ -991,6 +991,7 @@ function openMode(machine: boolean, requested: StartMode = "session", on: { id: 
   machineOnly = machine
   mode = machine ? "session" : requested
   editingProjects = false
+  resume = false
   el("start-title").textContent = machine ? "Clawdfather" : T().webStart
   el("start").hidden = false
   said("")
