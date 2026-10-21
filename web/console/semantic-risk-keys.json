@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8529,
+  "englishKeys": 8533,
   "counts": {
-    "negation": 2491,
-    "state": 1395,
+    "negation": 2492,
+    "state": 1399,
     "permission": 467,
     "deletion": 197,
-    "uncertainty": 264
+    "uncertainty": 265
   },
-  "unionCount": 3801,
+  "unionCount": 3805,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -260,6 +260,7 @@
       "capacityRow.console.health_ui_incident_pages.full",
       "capacityRow.console.health_ui_incident_rows.full",
       "capacityRow.console.health_ui_incident_window_seconds.full",
+      "capacityRow.console.health_ui_investigations.full",
       "capacityRow.console.health_ui_page_rows.full",
       "capacityRow.console.health_ui_probe_claims.full",
       "capacityRow.console.health_ui_probe_hosts.full",
@@ -2664,6 +2665,10 @@
       "capacityRow.console.health_live_seconds.what",
       "capacityRow.console.health_ui_body_bytes.full",
       "capacityRow.console.health_ui_budget_seconds.full",
+      "capacityRow.console.health_ui_investigation_refs.full",
+      "capacityRow.console.health_ui_investigation_refs.what",
+      "capacityRow.console.health_ui_investigations.full",
+      "capacityRow.console.health_ui_investigations.what",
       "capacityRow.console.health_ui_page_rows.full",
       "capacityRow.console.health_ui_parallel_reads.full",
       "capacityRow.console.health_ui_probe_claims.full",
@@ -4585,6 +4590,7 @@
       "capacityRow.cloud.spool_bytes.what",
       "capacityRow.cloud.terminal_roster_deadline_seconds.full",
       "capacityRow.console.health_ui_id_characters.full",
+      "capacityRow.console.health_ui_investigations.full",
       "capacityRow.console.opened_row_restate_seconds.full",
       "capacityRow.console.opened_row_restate_seconds.what",
       "capacityRow.console.owner_retention_request_seconds.full",
@@ -5181,6 +5187,10 @@
     "capacityRow.console.health_ui_incident_pages.full",
     "capacityRow.console.health_ui_incident_rows.full",
     "capacityRow.console.health_ui_incident_window_seconds.full",
+    "capacityRow.console.health_ui_investigation_refs.full",
+    "capacityRow.console.health_ui_investigation_refs.what",
+    "capacityRow.console.health_ui_investigations.full",
+    "capacityRow.console.health_ui_investigations.what",
     "capacityRow.console.health_ui_page_rows.full",
     "capacityRow.console.health_ui_parallel_reads.full",
     "capacityRow.console.health_ui_probe_claims.full",

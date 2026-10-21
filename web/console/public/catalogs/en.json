@@ -8529,5 +8529,9 @@
   "next.sessionStateEmptyAttention": "No Sessions need your attention right now.",
   "next.sessionStateEmptyWorking": "No Sessions are working right now.",
   "next.sessionStateEmptyIdle": "No Sessions are idle right now.",
-  "next.sessionStateShowAll": "Show all Sessions"
+  "next.sessionStateShowAll": "Show all Sessions",
+  "capacityRow.console.health_ui_investigations.what": "The investigations accepted for one incident in this page.",
+  "capacityRow.console.health_ui_investigations.full": "An oversized list is refused; an unreadable response is not shown as no investigations.",
+  "capacityRow.console.health_ui_investigation_refs.what": "The stored evidence references accepted in one investigation report.",
+  "capacityRow.console.health_ui_investigation_refs.full": "An oversized reference list is refused rather than silently omitting evidence."
 }

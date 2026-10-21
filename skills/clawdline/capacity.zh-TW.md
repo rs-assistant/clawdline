@@ -166,6 +166,8 @@
 | `console.health_ui_incident_pages` | 5 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_incident_rows` | 50 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_incident_window_seconds` | 604800 | `seconds` | `expire` | `diagnostics` | — |
+| `console.health_ui_investigation_refs` | 8 | `rows` | `refuse` | `diagnostics` | — |
+| `console.health_ui_investigations` | 5 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_page_rows` | 200 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_parallel_reads` | 2 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_probe_claims` | 8 | `rows` | `refuse` | `diagnostics` | — |
