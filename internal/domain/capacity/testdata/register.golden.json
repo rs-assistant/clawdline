@@ -802,6 +802,82 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.health_investigation_bundle_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/schedulewebhook.MaxInvestigationBundleBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_investigation_read_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "disconnect",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/schedulewebhook.MaxInvestigationReadSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_investigation_report_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 2048,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/schedulewebhook.MaxInvestigationReportBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_investigation_report_refs",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/schedulewebhook.MaxInvestigationReportRefs"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.health_journal_bytes",
     "Class": "journal",
     "Unit": "bytes",

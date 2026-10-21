@@ -20,6 +20,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/app/lane"
 	"github.com/sainteye/clawdline/internal/app/tmuxview"
+	"github.com/sainteye/clawdline/internal/domain/schedulewebhook"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
@@ -64,8 +65,9 @@ type DispatchRequest struct {
 
 // ScheduleOrigin is the schedule a scheduled dispatch belongs to.
 type ScheduleOrigin struct {
-	ID    string
-	Title string
+	Investigation *schedulewebhook.InvestigationRef
+	ID            string
+	Title         string
 	// CloseTab is the schedule's close_tab — on_success, always or never —
 	// which decides what the run's end does to its tab (tabPolicy).
 	CloseTab string
@@ -141,6 +143,7 @@ func (b *Broker) Dispatch(ctx context.Context, req DispatchRequest) (Dispatched,
 	}
 	if req.Schedule != nil {
 		record.ScheduleID = req.Schedule.ID
+		record.Investigation = req.Schedule.Investigation
 		record.ScheduleTitle = truncate(req.Schedule.Title, rootLabelLimit)
 		record.ScheduleCloseTab = req.Schedule.CloseTab
 	}

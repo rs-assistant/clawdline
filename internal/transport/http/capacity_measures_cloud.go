@@ -10,6 +10,19 @@ import (
 // (capacity.AreaOf), one reading per row.
 func (s *Server) cloudCapacityMeasures() map[string]func() capacity.Reading {
 	out := map[string]func() capacity.Reading{
+		"cloud.health_investigation_bundle_bytes": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-leased bundle read byte guard; no retained network buffer"}
+		},
+		"cloud.health_investigation_report_bytes": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-task typed report byte guard; oversized reports are refused"}
+		},
+		"cloud.health_investigation_report_refs": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-task evidence reference guard; no shared queue"}
+		},
+		"cloud.health_investigation_read_seconds": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "one read per claim with a fixed deadline and no automatic retry"}
+		},
+
 		capacity.CloudTaskListReread: func() capacity.Reading {
 			line, ok := cloudLines.Load(s.cfg.Dir)
 			if !ok {

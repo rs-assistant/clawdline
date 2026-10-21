@@ -450,3 +450,11 @@ changed (`TestTheSchedulePermissionFieldRoundTrips`, `TestAnAgentMayNotSetOrChan
 Codex 的舊 run 不回補，只有新的 run 從讀數記下對話。
 
 `TestAFinishedRunIsResumedByItsChildsConversation`、`TestAChildConversationIsFoundByItsFirstLine`。
+
+## Incident investigation schedules
+
+A trigger-only schedule with `task.kind: "health_investigation"` can receive a
+frozen incident through its bound Cloud webhook. Permission remains the person's
+choice; ordinary hooks never become investigation workers automatically. See
+[Health investigations](health-investigations.md) for the binding, read-only
+evidence, bounded result format and restart behavior.

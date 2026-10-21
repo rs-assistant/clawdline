@@ -8533,5 +8533,17 @@
   "capacityRow.console.health_ui_investigations.what": "The investigations accepted for one incident in this page.",
   "capacityRow.console.health_ui_investigations.full": "An oversized list is refused; an unreadable response is not shown as no investigations.",
   "capacityRow.console.health_ui_investigation_refs.what": "The stored evidence references accepted in one investigation report.",
-  "capacityRow.console.health_ui_investigation_refs.full": "An oversized reference list is refused rather than silently omitting evidence."
+  "capacityRow.console.health_ui_investigation_refs.full": "An oversized reference list is refused rather than silently omitting evidence.",
+  "capacityRow.cloud.health_investigation_bundle_bytes.what": "The maximum size of one frozen incident evidence bundle read by this machine.",
+  "capacityRow.cloud.health_investigation_bundle_bytes.full": "Larger evidence is refused before acceptance; no investigation task starts.",
+  "capacityRow.cloud.health_investigation_report_bytes.what": "The maximum size of one typed investigation report from a task.",
+  "capacityRow.cloud.health_investigation_report_bytes.full": "An oversized report is refused; the task must submit a smaller valid report.",
+  "capacityRow.cloud.health_investigation_report_refs.what": "How many distinct stored health event references one investigation report may name.",
+  "capacityRow.cloud.health_investigation_report_refs.full": "A report with more references is refused as a whole.",
+  "capacityRow.cloud.health_investigation_read_seconds.what": "How long one leased incident evidence download may take.",
+  "capacityRow.cloud.health_investigation_read_seconds.full": "The read is canceled without accepting evidence or launching a task.",
+  "http.bfa52fe77bfb1bda": "The schedule is not investigation-bound.",
+  "http.87cdc6f672c5e3a4": "The task belongs to another schedule.",
+  "http.cf3b8368c6c23d5d": "The investigation evidence could not be saved.",
+  "http.7662b55a28331c3d": "The broker could not confirm the scheduled dispatch."
 }

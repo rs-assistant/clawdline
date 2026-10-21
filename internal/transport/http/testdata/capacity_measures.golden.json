@@ -194,6 +194,26 @@
     "Note": true
   },
   {
+    "Name": "cloud.health_investigation_bundle_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_investigation_read_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_investigation_report_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_investigation_report_refs",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.health_journal_bytes",
     "Known": true,
     "Note": true
@@ -796,6 +816,16 @@
   },
   {
     "Name": "console.health_ui_incident_window_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_investigation_refs",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_investigations",
     "Known": true,
     "Note": true
   },
