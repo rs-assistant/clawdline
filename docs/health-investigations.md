@@ -35,6 +35,25 @@ incident or from the `health_investigation` kind. An investigation delivered to 
 schedule missing either marker is refused without launching an agent. An
 ordinary webhook delivered to an investigation schedule is also refused.
 
+### The binding purpose sent at activation
+
+When the bind activates the hook, the daemon reads the schedule as stored and,
+only when it is enabled, trigger-only and of kind `health_investigation`, sends
+`{"expected_revision": n, "binding_purpose": "health_investigation"}` instead of
+`{"expected_revision": n}`. Cloud then lists the hook as an investigation
+destination before its first successful run. No title, instruction or secret
+crosses; the request never chooses the purpose. Every other schedule sends the
+body it always sent.
+
+The declaration covers that activation only. A retry of the same request sends
+the same body. A schedule changed afterwards is still refused before each run by
+`InvestigationBound`, and a move or rotation needs a new activation to declare
+it again. A Cloud that refuses the field (`400 unknown_field`) is answered as
+`503 cloud_upgrade_required`: the daemon does not repeat the request without the
+purpose, and leaves the bind unrecorded, so the same request succeeds once
+Cloud is upgraded. `ScheduleWebhookClient.ActivateInvestigation` is attached to
+the shared schedule book by `StartScheduleWebhooks`.
+
 ## Acceptance and evidence
 
 The claim request uses `clawdline.schedule_webhook.v2`. The delivery digest
