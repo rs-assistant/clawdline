@@ -96,6 +96,14 @@ gate requires successful complete verification of its exact tree, whole-tree
 privacy and release acceptance. `--full` remains available for diagnosis and
 manual integration verification; `--web` requests the complete web gate locally.
 
+The release evidence test, `tools/release/supply-chain.test.sh`
+(`docs/security/release-evidence.md`), runs in every `--full` check, in an
+ordinary check when `tools/release/`, `tools/check.sh` or the release
+workflows change, and by name in CI's static (Linux) and darwin jobs, because
+CI does not run `tools/check.sh`. It drives the SBOM, provenance, rebuild,
+macOS signature and gate checks through their passing case and each failure
+on synthetic releases; it proves no real attestation or notarization.
+
 Dev installation builds the selected commit without repeating full verification.
 After switching, verify the running version and served stamp, `GET /` returning
 200 and existing Sessions remaining available. Startup failure rolls back through

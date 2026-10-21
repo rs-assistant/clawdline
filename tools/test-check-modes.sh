@@ -12,6 +12,8 @@ for name in check-legacy-css.sh check-machine-words.sh check-shell-expansions.sh
   printf '#!/bin/sh\nexit 0\n' > "$scratch/repo/tools/$name"
   chmod +x "$scratch/repo/tools/$name"
 done
+mkdir -p "$scratch/repo/tools/release"
+printf '#!/bin/sh\nprintf "supply-chain\\n" >> "$CALLS"\n' > "$scratch/repo/tools/release/supply-chain.test.sh"
 cat > "$scratch/bin/go" <<'MOCK'
 #!/bin/bash
 printf 'go %s\n' "$*" >> "$CALLS"
@@ -76,6 +78,7 @@ bash tools/check.sh --full > "$scratch/full.log"
 grep -Fxq 'go vet ./...' "$CALLS"
 grep -Fxq 'go build -o /dev/null ./cmd/clawdline' "$CALLS"
 grep -Fxq 'npm run build' "$CALLS"
+grep -Fxq 'supply-chain' "$CALLS"
 : > "$CALLS"
 bash tools/check.sh --quick ./internal/example > "$scratch/quick.log"
 [ "$(cat "$CALLS")" = 'go test ./internal/example' ]
