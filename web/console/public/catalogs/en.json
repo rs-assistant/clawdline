@@ -8790,5 +8790,9 @@
   "workflowSettings.iterm_integrationOn": "Allow Clawdline to list iTerm2 tabs, read their screens, send input, and open, show or close tabs. The first operation may request macOS Automation permission.",
   "workflowSettings.iterm_integrationOff": "Do not detect, read or control iTerm2, including for dispatch, messages, viewer tabs and cleanup. Do not request its Automation permission.",
   "workflowSettings.iterm_integrationScope": "Off by default for new and existing installations. Applies to this machine and iTerm2 on macOS. Turning it off leaves tabs open and existing macOS grants intact; an Apple Event already sent may still complete.",
-  "workflowSettings.itermUpdateRequired": "Update Clawdline on this machine to manage iTerm2 integration. Its current access cannot be determined here."
+  "workflowSettings.itermUpdateRequired": "Update Clawdline on this machine to manage iTerm2 integration. Its current access cannot be determined here.",
+  "capacityRow.cloud.rekey_pending.what": "At most eight signed raw key exchanges may be running on this machine.",
+  "capacityRow.cloud.rekey_pending.full": "Additional offers are refused immediately; ordinary relay messages keep flowing.",
+  "capacityRow.cloud.rekey_interval.what": "This machine admits one raw key offer every two seconds across all viewers.",
+  "capacityRow.cloud.rekey_interval.full": "Offers inside the interval are refused; viewers can retry after the interval."
 }

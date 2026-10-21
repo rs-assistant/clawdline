@@ -766,6 +766,10 @@ func (l *Link) terminalService() (*terminals.Service, error) {
 // handleTerminal handles only the dedicated termi rail. It is deliberately
 // separate from cloudops.Bridge and Router, which cannot grant terminal access.
 func (l *Link) handleTerminal(ctx context.Context, in Inbound) {
+	if l.contentAuthority != nil {
+		l.contentAuthority.mu.Lock()
+		defer l.contentAuthority.mu.Unlock()
+	}
 	if in.Channel != "termi/"+l.identity.MachineID+"/"+in.Sender || in.Class != string(domaincloud.ClassCtl) {
 		return
 	}

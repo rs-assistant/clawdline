@@ -16,6 +16,16 @@ func cloudBounds() []Entry {
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
 		{
+			Name: "cloud.rekey_pending", Class: Buffer, Unit: Rows,
+			Limit: 8, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/cloud.RawRekeyPendingLimit", "internal/adapters/cloud.(*Transport).dispatchRawRekey:chan(RawRekeyPendingLimit)"},
+		},
+		{
+			Name: "cloud.rekey_interval", Class: Buffer, Unit: Seconds,
+			Limit: 2, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.RawRekeyIntervalSecondsLimit"},
+		},
+		{
 			Name: "cloud.envelope_key_id", Class: Buffer, Unit: Bytes,
 			Limit: 128, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/domain/cloud.MaxKeyIDBytes"},

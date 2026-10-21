@@ -408,6 +408,7 @@ export class CloudClient {
         }
         if (options.masterKey) this.masterKeys.set(this.keyID, options.masterKey);
         this.machinePairings = new Map();
+        this.pairingGeneration = {};
         if (options.machinePairings) {
             Object.keys(options.machinePairings).forEach((machine) =>
                 this.machinePairings.set(machine, options.machinePairings[machine]));
@@ -647,6 +648,7 @@ export class CloudClient {
                     this.socket.send(raw);
                 },
                 persist: options.persistMachineRekey,
+                changed: (machine) => this._forgetPairingAnswer(machine),
                 adopted: (pairing) => this._resumeMachineAfterRekey(pairing)
             }) : null;
     }
@@ -1116,8 +1118,12 @@ export class CloudClient {
             source = "store";
             if (probe) probe.pairingSource = source;
             var asked = Date.now();
+            var generation = this.pairingGeneration;
             try { value = await this.resolveMachinePairing(machine); }
             catch (error) {
+                if (generation !== this.pairingGeneration) {
+                    throw cloudError("cloud_reconnecting", "the machine pairing changed during lookup");
+                }
                 // Only the typed half-pairing is remembered. A store that failed to answer at all —
                 // an iOS app resumed before IndexedDB is back — is asked again at the next envelope.
                 if (error && error.code === "machine_key_incomplete") {
@@ -1127,6 +1133,9 @@ export class CloudClient {
                 throw error;
             }
             finally { if (probe) probe.pairingLookupMs = Math.max(0, Date.now() - asked); }
+            if (generation !== this.pairingGeneration) {
+                throw cloudError("cloud_reconnecting", "the machine pairing changed during lookup");
+            }
             if (value) {
                 this.machinePairings.set(machine, value);
                 this.pairingSeen.add(machine);
@@ -1170,7 +1179,7 @@ export class CloudClient {
     }
 
     /**
-     * A pairing for `machine` was just stored in this page: its earlier "none" no longer holds.
+     * A pairing for `machine` was just stored: all earlier answers may be superseded.
      * The composition root calls this when a Pair a Browser flow completes.
      */
     forgetMachinePairingAnswer(machine) {
@@ -1194,6 +1203,12 @@ export class CloudClient {
     }
 
     _forgetPairingAnswer(machine) {
+        if (typeof machine !== "string" || !machine) return;
+        // A new pin invalidates successful answers too. A lookup already awaiting storage
+        // cannot repopulate either a positive or negative answer from the old generation.
+        this.pairingGeneration = {};
+        this.machinePairings.delete(machine);
+        if (this.viewerRekey && this.viewerRekey.isPending(machine)) this.viewerRekey.cancel();
         this.pairingAbsent.delete(machine);
         this.pairingIncomplete.delete(machine);
         this.unpairedMachines.delete(machine);

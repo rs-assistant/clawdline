@@ -168,6 +168,9 @@ const StateOff = "off"
 
 // LinkOptions is everything the wiring needs from the daemon.
 type LinkOptions struct {
+	// ContentKeyRuntime enables the integrated protocol only after relay/viewer acceptance.
+	// Production callers intentionally leave this false.
+	ContentKeyRuntime bool
 	// Dir is this daemon's own state directory. Keys, the identity record and
 	// the sequence fence live under it.
 	Dir string
@@ -241,9 +244,11 @@ type LinkOptions struct {
 
 // Link is one machine's Cloud line.
 type Link struct {
-	opts     LinkOptions
-	file     *nextconfig.File
-	settings adaptercloud.Settings
+	contentEpoch     *domaincloud.KeyEpoch
+	contentAuthority *runtimeAuthority
+	opts             LinkOptions
+	file             *nextconfig.File
+	settings         adaptercloud.Settings
 
 	identity        adaptercloud.Identity
 	keys            *cloudkeys.Files
@@ -707,9 +712,39 @@ func (l *Link) wire() error {
 	if err != nil {
 		return err
 	}
-	secret, err := domaincloud.LoadOrCreateMasterSecret(keys, rand.Reader)
-	if err != nil {
-		return err
+	var secret domaincloud.ContentKey
+	var epoch *domaincloud.KeyEpoch
+	keyID := adaptercloud.MasterKeyID
+	if opts.ContentKeyRuntime {
+		state, loadErr := keys.LoadOrCreateContentKey(rand.Reader)
+		if errors.Is(loadErr, domaincloud.ErrContentKeyPending) {
+			state, loadErr = keys.RecoverContentKey()
+		}
+		if loadErr != nil {
+			return loadErr
+		}
+		epoch, err = domaincloud.NewKeyEpoch(state)
+		if err != nil {
+			return err
+		}
+		secret, keyID = state.Key, state.KeyID
+		l.contentEpoch = epoch
+		if l.contentAuthority == nil {
+			l.contentAuthority = &runtimeAuthority{}
+		}
+		l.pairing.Authority = &l.contentAuthority.mu
+		l.pairing.Generation = &l.contentAuthority.generation
+		l.pairing.ContentState = epoch.Current
+		l.pairing.RevokeContent = l.revokeContentViewer
+		l.identityPairing.Authority = &l.contentAuthority.mu
+		l.identityPairing.Generation = &l.contentAuthority.generation
+		l.identityPairing.ContentState = epoch.Current
+		l.identityPairing.Pinned = l.pinned
+	} else {
+		secret, err = domaincloud.LoadOrCreateMasterSecret(keys, rand.Reader)
+		if err != nil {
+			return err
+		}
 	}
 	l.mu.Lock()
 	l.fingerprint = key.Fingerprint()
@@ -747,7 +782,8 @@ func (l *Link) wire() error {
 		MachineID: identity.MachineID,
 		Signer:    key,
 		Secret:    secret,
-		KeyID:     adaptercloud.MasterKeyID,
+		KeyID:     keyID,
+		Keys:      epoch,
 		Now:       opts.Now,
 		Log:       opts.Log,
 		Depth:     opts.QueueDepth,
@@ -783,6 +819,8 @@ func (l *Link) wire() error {
 		OnAck:                l.publicationAcked,
 		PublicKeyFor:         l.publicKeyFor,
 		ContentKey:           secret,
+		KeyEpoch:             epoch,
+		RawRekeyOffer:        l.rawRekeyCallback(),
 		Log:                  func(line string) { l.logf("%s", line) },
 		Now:                  opts.Now,
 		Health:               opts.Health,
@@ -792,6 +830,15 @@ func (l *Link) wire() error {
 	}
 	l.transport = transport
 	l.relay.Transport = transport
+	if epoch != nil {
+		if r, pending, err := keys.PendingRevocation(); err != nil {
+			return err
+		} else if pending {
+			if err := l.resumeRevocation(r); err != nil {
+				return err
+			}
+		}
+	}
 	l.service = Service{
 		MachineID: identity.MachineID,
 		Bridge: cloudops.Bridge{
@@ -1253,6 +1300,10 @@ func (l *Link) answerTraced(ctx context.Context, service Service, request Inboun
 // answer handles one request, counting what it answered, and reports
 // whether the answer was OK.
 func (l *Link) answer(ctx context.Context, service Service, request Inbound) bool {
+	if l.contentAuthority != nil {
+		l.contentAuthority.mu.Lock()
+		defer l.contentAuthority.mu.Unlock()
+	}
 	answer := service.Answer(ctx, request)
 	l.mu.Lock()
 	l.answered++
@@ -1340,6 +1391,10 @@ func (l *Link) pairingKeys() (domaincloud.DeviceKey, domaincloud.ContentKey, err
 	key, err := domaincloud.LoadOrCreateDeviceKey(l.keys, rand.Reader)
 	if err != nil {
 		return domaincloud.DeviceKey{}, domaincloud.ContentKey{}, err
+	}
+	if l.contentEpoch != nil {
+		state, err := l.contentEpoch.Current()
+		return key, state.Key, err
 	}
 	secret, err := domaincloud.LoadOrCreateMasterSecret(l.keys, rand.Reader)
 	if err != nil {

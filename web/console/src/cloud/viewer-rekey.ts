@@ -18,6 +18,7 @@ interface Options {
  now(): number; send(raw: string): void;
  persist(pairing: RekeyPairing, state: {epoch: number; key_id: string; key: Uint8Array}, operation: string, valid: () => boolean): Promise<RekeyPairing>;
  adopted(pairing: RekeyPairing): void;
+ changed?(machine: string): void;
  setTimeout?: typeof setTimeout; clearTimeout?: typeof clearTimeout;
 }
 const rejected = () => Object.assign(new Error("content key exchange rejected"), { code: "unknown_key" })
@@ -74,7 +75,17 @@ export class ViewerRekey {
    this.cancel()
    o.adopted(adopted)
    return true
-  } catch (error) { if (this.pending === p) p.adopting = false; throw error }
+  } catch (error) {
+   if (this.pending === p) {
+    p.adopting = false
+    if (error && typeof error === "object" && "code" in error && error.code === "machine_pairing_changed") {
+     this.cancel()
+     o.changed?.(p.machine)
+     throw Object.assign(new Error("content key exchange rejected"), {code:"cloud_reconnecting"})
+    }
+   }
+   throw error
+  }
  }
  cancel() {
   const p = this.pending

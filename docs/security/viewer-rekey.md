@@ -30,6 +30,13 @@ durable state nor memory. Competing tabs cannot replace a higher epoch or a diff
 at the same epoch. Explicit pairing and legacy migration also preserve existing floors.
 The original account-level compatibility key is never replaced by refresh.
 
+Explicit pairing completion and same-origin pairing notifications invalidate successful
+machine-pairing caches as well as missing answers, and cancel that machine's pending
+exchange. An in-flight older lookup cannot repopulate a superseded cache. A durable
+revision or floor conflict also invalidates the cached tuple, so a lost notification
+cannot keep later bounded exchanges tied to an old pin generation. The existing
+cooldown remains in force; this adds no automatic retries.
+
 The pending operation is local and reserved while adoption is in progress. Duplicates cannot
 start a second adoption, the consumed operation is recorded in the binding, and restart or
 disconnect loses the ephemeral and pending offer. An unsolicited answer after restart is

@@ -505,7 +505,17 @@
     "Note": true
   },
   {
+    "Name": "cloud.rekey_interval",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.rekey_lifetime",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.rekey_pending",
     "Known": true,
     "Note": true
   },

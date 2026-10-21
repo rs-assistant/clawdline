@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8790,
+  "englishKeys": 8794,
   "counts": {
     "negation": 2559,
-    "state": 1442,
+    "state": 1445,
     "permission": 487,
     "deletion": 197,
     "uncertainty": 269
   },
-  "unionCount": 3904,
+  "unionCount": 3907,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -2682,8 +2682,11 @@
       "capacityRow.cloud.peer_pairs.full",
       "capacityRow.cloud.peer_pairs.what",
       "capacityRow.cloud.rekey_body.full",
+      "capacityRow.cloud.rekey_interval.full",
       "capacityRow.cloud.rekey_lifetime.full",
       "capacityRow.cloud.rekey_lifetime.what",
+      "capacityRow.cloud.rekey_pending.full",
+      "capacityRow.cloud.rekey_pending.what",
       "capacityRow.cloud.reload_stop_seconds.full",
       "capacityRow.cloud.roster_short_read_attempts.full",
       "capacityRow.cloud.session_row_asks.what",
@@ -5229,8 +5232,11 @@
     "capacityRow.cloud.peer_pairs.full",
     "capacityRow.cloud.peer_pairs.what",
     "capacityRow.cloud.rekey_body.full",
+    "capacityRow.cloud.rekey_interval.full",
     "capacityRow.cloud.rekey_lifetime.full",
     "capacityRow.cloud.rekey_lifetime.what",
+    "capacityRow.cloud.rekey_pending.full",
+    "capacityRow.cloud.rekey_pending.what",
     "capacityRow.cloud.relay_queue.what",
     "capacityRow.cloud.reload_stop_seconds.full",
     "capacityRow.cloud.reload_stop_seconds.what",

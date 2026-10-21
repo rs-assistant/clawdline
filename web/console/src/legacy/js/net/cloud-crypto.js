@@ -375,8 +375,11 @@ export async function adoptMachineRekey(value, indexedDBValue) {
             if (!b || b.legacy !== false || b.machineID !== value.expected.machineID ||
                 b.senderID !== value.expected.senderID || b.revision !== value.expected.revision ||
                 !Number.isSafeInteger(floor) || floor < 1 || floor > value.epoch ||
-                (floor === value.epoch && b.keyID !== value.keyID) ||
-                b.lastRekeyOperation === value.operation || !value.valid()) {
+                (floor === value.epoch && b.keyID !== value.keyID)) {
+                refused.code = "machine_pairing_changed";
+                tx.abort(); return;
+            }
+            if (b.lastRekeyOperation === value.operation || !value.valid()) {
                 tx.abort(); return;
             }
             adopted = Object.assign({}, b, { keyID: value.keyID, epoch: value.epoch,
@@ -386,7 +389,7 @@ export async function adoptMachineRekey(value, indexedDBValue) {
             keys.put(adopted, value.bindingName);
         };
         tx.oncomplete = function () { db.close(); resolve(adopted); };
-        tx.onerror = function () { db.close(); reject(tx.error || refused); };
+        tx.onerror = function () { db.close(); reject(refused.code === "machine_pairing_changed" ? refused : tx.error || refused); };
         tx.onabort = tx.onerror;
     });
 }
@@ -432,7 +435,22 @@ export async function storeHealthHandover(name, record, indexedDBValue) {
     var db = await keyDatabase(indexedDBValue);
     return new Promise(function (resolve, reject) {
         var tx = db.transaction("keys", "readwrite");
-        tx.objectStore("keys").put(record, name);
+        var keys = tx.objectStore("keys");
+        var previous = keys.get(name);
+        previous.onsuccess = function () {
+            var old = previous.result;
+            if (old && (!Number.isSafeInteger(old.contentKeyEpoch) || old.contentKeyEpoch < 1 ||
+                !Number.isSafeInteger(old.identityEpoch) || old.identityEpoch < 0 ||
+                old.accountID !== record.accountID || old.machineID !== record.machineID ||
+                record.contentKeyEpoch < old.contentKeyEpoch || record.identityEpoch < old.identityEpoch ||
+                (record.contentKeyEpoch === old.contentKeyEpoch && old.contentKeyID && old.contentKeyID !== record.contentKeyID) ||
+                (old.machineSigningKey && old.machineSigningKey !== record.machineSigningKey))) {
+                tx.abort();
+                return;
+            }
+            keys.put(record, name);
+        };
+        previous.onerror = function () { tx.abort(); };
         tx.oncomplete = function () { db.close(); resolve(record); };
         tx.onerror = function () { db.close(); reject(tx.error); };
         tx.onabort = tx.onerror;
