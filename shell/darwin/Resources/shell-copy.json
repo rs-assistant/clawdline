@@ -55,6 +55,9 @@
     "browserShowCloud": "Open Clawdline Cloud in this window",
     "dialogOK": "OK",
     "dialogCancel": "Cancel",
+    "pairLocalAsks": "Pair this browser with “{arg0}”?",
+    "pairLocalBody": "The app hands the one-time code directly to this machine. Existing access is preserved. A new browser can read Sessions, documents and terminal output, and operate assistants. Compare the fingerprints when pairing finishes.",
+    "pairLocalStart": "Pair with this machine",
     "pairAgentAsks": "Let this Mac's AI connect to “{arg0}” and pair it?",
     "pairAgentCommand": "It will use this Mac’s existing connection (such as ssh) and run only this command:\n\nclawdline cloud pair -offer '{arg0}'",
     "pairAgentStart": "Start",
@@ -156,6 +159,9 @@
     "browserShowCloud": "在這個視窗打開 Clawdline Cloud",
     "dialogOK": "好",
     "dialogCancel": "取消",
+    "pairLocalAsks": "將這個瀏覽器與「{arg0}」配對？",
+    "pairLocalBody": "App 會直接把一次性配對碼交給這台機器，保留既有權限。首次配對的瀏覽器將可讀取 Session、文件與終端畫面，並操作助理。完成後請核對兩邊的指紋。",
+    "pairLocalStart": "與這台機器配對",
     "pairAgentAsks": "讓這台 Mac 的 AI 連到「{arg0}」執行配對？",
     "pairAgentCommand": "它會用這台 Mac 已經有的連線方式（例如 ssh）連過去，只執行這一行：\n\nclawdline cloud pair -offer '{arg0}'",
     "pairAgentStart": "開始",
@@ -300,7 +306,10 @@
     "daemonUnavailableBody": "{arg0} で待ち受けているサービスがありません。",
     "daemonUnavailableStart": "次のコマンドでデーモンを起動してください：",
     "daemonUnavailableRetrying": "このウィンドウは自動的に再試行します。今すぐ試すには ⌘R を押してください。",
-    "daemonUnavailableStopped": "自動再試行は停止しました。再試行するには ⌘R を押してください。"
+    "daemonUnavailableStopped": "自動再試行は停止しました。再試行するには ⌘R を押してください。",
+    "pairLocalAsks": "Pair this browser with “{arg0}”?",
+    "pairLocalBody": "The app hands the one-time code directly to this machine. Existing access is preserved. A new browser can read Sessions, documents and terminal output, and operate assistants. Compare the fingerprints when pairing finishes.",
+    "pairLocalStart": "Pair with this machine"
   },
   "zh-Hans": {
     "statusWaitingOne": "{arg0} 在等你回答",
@@ -401,7 +410,10 @@
     "daemonUnavailableBody": "{arg0} 当前没有服务在监听。",
     "daemonUnavailableStart": "请用以下命令启动守护进程：",
     "daemonUnavailableRetrying": "此窗口会自动重试；按 ⌘R 可立即重试。",
-    "daemonUnavailableStopped": "已停止自动重试；按 ⌘R 可再次尝试。"
+    "daemonUnavailableStopped": "已停止自动重试；按 ⌘R 可再次尝试。",
+    "pairLocalAsks": "Pair this browser with “{arg0}”?",
+    "pairLocalBody": "The app hands the one-time code directly to this machine. Existing access is preserved. A new browser can read Sessions, documents and terminal output, and operate assistants. Compare the fingerprints when pairing finishes.",
+    "pairLocalStart": "Pair with this machine"
   },
   "ko": {
     "statusWaitingOne": "{arg0}이(가) 답변을 기다리고 있습니다",
@@ -502,7 +514,10 @@
     "daemonUnavailableBody": "{arg0}에서 수신 대기 중인 서비스가 없습니다.",
     "daemonUnavailableStart": "다음 명령으로 데몬을 시작하세요:",
     "daemonUnavailableRetrying": "이 창은 자동으로 다시 시도합니다. 지금 다시 시도하려면 ⌘R을 누르세요.",
-    "daemonUnavailableStopped": "자동 재시도가 중지되었습니다. 다시 시도하려면 ⌘R을 누르세요."
+    "daemonUnavailableStopped": "자동 재시도가 중지되었습니다. 다시 시도하려면 ⌘R을 누르세요.",
+    "pairLocalAsks": "Pair this browser with “{arg0}”?",
+    "pairLocalBody": "The app hands the one-time code directly to this machine. Existing access is preserved. A new browser can read Sessions, documents and terminal output, and operate assistants. Compare the fingerprints when pairing finishes.",
+    "pairLocalStart": "Pair with this machine"
   },
   "es": {
     "statusWaitingOne": "{arg0} espera tu respuesta",
@@ -603,7 +618,10 @@
     "daemonUnavailableBody": "No hay ningún servicio escuchando en {arg0}.",
     "daemonUnavailableStart": "Inicia el daemon con",
     "daemonUnavailableRetrying": "Esta ventana volverá a intentarlo automáticamente; pulsa ⌘R para reintentar ahora.",
-    "daemonUnavailableStopped": "Se detuvieron los intentos automáticos; pulsa ⌘R para volver a intentarlo."
+    "daemonUnavailableStopped": "Se detuvieron los intentos automáticos; pulsa ⌘R para volver a intentarlo.",
+    "pairLocalAsks": "Pair this browser with “{arg0}”?",
+    "pairLocalBody": "The app hands the one-time code directly to this machine. Existing access is preserved. A new browser can read Sessions, documents and terminal output, and operate assistants. Compare the fingerprints when pairing finishes.",
+    "pairLocalStart": "Pair with this machine"
   },
   "pt-BR": {
     "statusWaitingOne": "{arg0} aguarda sua resposta",
@@ -704,7 +722,10 @@
     "daemonUnavailableBody": "Nenhum serviço está escutando em {arg0}.",
     "daemonUnavailableStart": "Inicie o daemon com",
     "daemonUnavailableRetrying": "Esta janela tentará novamente automaticamente; pressione ⌘R para tentar agora.",
-    "daemonUnavailableStopped": "As tentativas automáticas pararam; pressione ⌘R para tentar novamente."
+    "daemonUnavailableStopped": "As tentativas automáticas pararam; pressione ⌘R para tentar novamente.",
+    "pairLocalAsks": "Pair this browser with “{arg0}”?",
+    "pairLocalBody": "The app hands the one-time code directly to this machine. Existing access is preserved. A new browser can read Sessions, documents and terminal output, and operate assistants. Compare the fingerprints when pairing finishes.",
+    "pairLocalStart": "Pair with this machine"
   },
   "fr": {
     "statusWaitingOne": "{arg0} attend votre réponse",
@@ -805,7 +826,10 @@
     "daemonUnavailableBody": "Aucun service n’écoute sur {arg0}.",
     "daemonUnavailableStart": "Démarrez le daemon avec",
     "daemonUnavailableRetrying": "Cette fenêtre réessaiera automatiquement ; appuyez sur ⌘R pour réessayer maintenant.",
-    "daemonUnavailableStopped": "Les essais automatiques ont cessé ; appuyez sur ⌘R pour réessayer."
+    "daemonUnavailableStopped": "Les essais automatiques ont cessé ; appuyez sur ⌘R pour réessayer.",
+    "pairLocalAsks": "Pair this browser with “{arg0}”?",
+    "pairLocalBody": "The app hands the one-time code directly to this machine. Existing access is preserved. A new browser can read Sessions, documents and terminal output, and operate assistants. Compare the fingerprints when pairing finishes.",
+    "pairLocalStart": "Pair with this machine"
   },
   "de": {
     "statusWaitingOne": "{arg0} wartet auf Ihre Antwort",
@@ -906,6 +930,9 @@
     "daemonUnavailableBody": "Unter {arg0} lauscht kein Dienst.",
     "daemonUnavailableStart": "Starte den Daemon mit",
     "daemonUnavailableRetrying": "Dieses Fenster versucht es automatisch erneut; mit ⌘R kannst du es sofort erneut versuchen.",
-    "daemonUnavailableStopped": "Die automatischen Versuche wurden beendet; mit ⌘R kannst du es erneut versuchen."
+    "daemonUnavailableStopped": "Die automatischen Versuche wurden beendet; mit ⌘R kannst du es erneut versuchen.",
+    "pairLocalAsks": "Pair this browser with “{arg0}”?",
+    "pairLocalBody": "The app hands the one-time code directly to this machine. Existing access is preserved. A new browser can read Sessions, documents and terminal output, and operate assistants. Compare the fingerprints when pairing finishes.",
+    "pairLocalStart": "Pair with this machine"
   }
 }

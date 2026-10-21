@@ -87,6 +87,9 @@ struct ShellCopy {
     var browserShowCloud: String { word("browserShowCloud") }
     var dialogOK: String { word("dialogOK") }
     var dialogCancel: String { word("dialogCancel") }
+    func pairLocalAsks(_ machine: String) -> String { word("pairLocalAsks", [machine]) }
+    var pairLocalBody: String { word("pairLocalBody") }
+    var pairLocalStart: String { word("pairLocalStart") }
     func pairAgentAsks(_ machine: String) -> String { word("pairAgentAsks", [machine]) }
     func pairAgentCommand(_ offer: String) -> String { word("pairAgentCommand", [offer]) }
     var pairAgentStart: String { word("pairAgentStart") }

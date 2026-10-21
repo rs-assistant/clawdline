@@ -336,3 +336,18 @@ final class PairingPermissionFlow {
         finished()
     }
 }
+
+
+/// Admission for the Cloud-only local pairing bridge. Both the initiating
+/// frame and the currently displayed top-level page must be the trusted origin.
+enum CloudPairingAccess {
+    static func allows(mainFrame: Bool, scheme: String, host: String, port: Int,
+                       page: URL?, trusted: URL) -> Bool {
+        guard mainFrame, let page else { return false }
+        let originPort: Int? = port == 0 ? nil : port
+        return scheme.lowercased() == trusted.scheme?.lowercased() &&
+            host.lowercased() == trusted.host?.lowercased() && originPort == trusted.port &&
+            page.scheme?.lowercased() == trusted.scheme?.lowercased() &&
+            page.host?.lowercased() == trusted.host?.lowercased() && page.port == trusted.port
+    }
+}

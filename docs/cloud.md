@@ -296,3 +296,27 @@ No follow-up replays an answer key. Switching Session or execution cancels the o
 follow-up; ordinary unread questions stop following when the Session resumes.
 
 The [static HTML report reader](html-artifacts.md) describes the document format, isolation, compatibility and measurement boundary for self-contained artifacts.
+
+
+### Recovering a browser that can sign in but cannot read
+
+An account session and a machine's cryptographic pairing are separate. A cached
+machine list can survive a missing local pin. A read timeout alone does not prove
+that pairing is broken: the read alert therefore offers both retry and pairing,
+without silently deleting a device, changing its permissions, or trusting the
+account roster as a replacement for the machine's pin.
+
+The pairing card offers a complete CLI command containing the short-lived offer.
+Run it on the named machine, keep the requesting browser open, and compare the
+fingerprints. The code is sensitive until it expires; do not publish it. On phones,
+Safari and the Home Screen app have distinct keys: complete the flow in the same
+browser container that failed to read.
+
+A macOS shell exposing `clawdlinePairLocal` also offers a direct handover when the
+requested machine matches the authenticated local daemon. A native confirmation
+names that machine and explains access before the ordinary pairing offer route
+runs. The bridge accepts only the Cloud main frame, never exports the local token,
+never launches an assistant, and retains existing access by omitting a new scope.
+The existing fingerprint comparison still completes in the browser. Older shells
+continue to use the copied command; hosted deployment alone cannot add a native
+message handler to an installed App.
