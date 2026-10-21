@@ -38,7 +38,8 @@ import { Start } from "./session/Start.js"
 import { startedRow } from "./session/started-row.js"
 import { askedSession } from "./session/asked-session.js"
 import type { StartAnswer, StartPlaceRow } from "./legacy/start-bridge.js"
-import { OperationsDashboardLink } from "./cloud/admin/OperationsDashboardLink.js"
+import { AdministratorSection } from "./cloud/admin/OperationsDashboardLink.js"
+import type { Attention } from "./cloud/admin/health/attention.js"
 import { SidebarIcon, type SidebarIconName } from "./SidebarIcon.js"
 import { scanRecovering, sessionCountState, sessionReadingChinese, totalSessionWords } from "./session-reading.js"
 import type { MachineOffline } from "./session/machine-offline.js"
@@ -212,7 +213,7 @@ function rowNode(id: string): HTMLElement | null {
  * light and draws both in one control (`cloud/CloudGate.tsx`) — on a phone two
  * pills beside each other left the counts no room to be read.
  */
-export default function App({ aside, cloudSessions, cloudOperationsAccess = false, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
+export default function App({ aside, cloudSessions, cloudOperationsAccess = false, cloudOperationsAttention = null, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
   fleetTargetIdentity = null, fleetReaderMachine = null, executionReadRevision = 0,
   cloudStartedRow = null, onCloudStartedObserved, cloudMachineOffline = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
@@ -221,6 +222,8 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
   cloudSessions?: ReactNode
   cloudOperationsAccess?: boolean
+  /** The Cloud's operator attention list, read by the gate only for an administrator. */
+  cloudOperationsAttention?: Attention | null
   cloudPeerAccess?: ReactNode | ((active: boolean) => ReactNode)
   fleetList?: (filter: string, onFilter: (value: string) => void) => ReactNode
   executionReadRevision?: number
@@ -264,7 +267,9 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
   // and says why, rather than missing (pages/registry.ts `pageNeedsUpdate`).
   const tooOld = (id: string) => pageNeedsUpdate(id, PAGE_MODULES, machineVersion.apiLevel)
   const offered = (id: string) => (id === "peer-access" ? !!cloudPeerAccess : ready(id) && !tooOld(id))
-  const knowsHere = (name: string): name is Page => name === "peer-access" ? !!cloudPeerAccess : knows(name)
+  // The reach page belongs to the administrator section: a typed `#page=transparency` is no way in.
+  const knowsHere = (name: string): name is Page => name === "peer-access" ? !!cloudPeerAccess
+    : name === "transparency" ? cloudOperationsAccess && knows(name) : knows(name)
   const tooOldTitle = (id: string) => tooOld(id) ? nextWord("machineNeedsUpdate") : undefined
   const tooOldMark = (id: string) => tooOld(id) ? <small className="sidebar-needs-update"> · {nextWord("machineNeedsUpdateShort")}</small> : null
   const [page, setPage] = useState<Page>(() => location.pathname === "/billing/done"
@@ -1117,10 +1122,11 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
             </button>}
             {sidebarPages.filter((p) => p.id === "notifications").map(sidebarPage)}
             {sidebarPages.filter((p) => p.id === "plan").map(sidebarPage)}
-            {sidebarPages.filter((p) => p.id === "transparency").map(sidebarPage)}
             {sidebarPages.filter((p) => p.id === "settings").map(sidebarPage)}
-            <OperationsDashboardLink allowed={cloudOperationsAccess} />
           </section>
+          <AdministratorSection allowed={cloudOperationsAccess} attention={cloudOperationsAttention}>
+            {sidebarPages.filter((p) => p.id === "transparency").map(sidebarPage)}
+          </AdministratorSection>
           <div className="sidebar-version" role="status">
             {focusCloudSessions
               ? nextWord("sidebarChooseMachineVersion")
@@ -1173,7 +1179,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
       {Object.values(PAGE_MODULES).map(({ id, Component }) => (
         // Mounted once opened and kept, as the original keeps its sections in
         // the document and only hides them.
-        <Component key={id} shown={page === id} />
+        <Component key={id} shown={page === id && knowsHere(id)} />
       ))}
       {!surveyAccount ? <SurveyCoordinator /> : null}
       <Overlays />

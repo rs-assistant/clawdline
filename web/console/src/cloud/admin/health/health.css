@@ -406,3 +406,10 @@
 .adh-iv-hook > span { min-width: 0; }
 .adh-iv-hook input { margin-top: 3px; flex: none; }
 .adh-iv-hook input:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
+
+/* Waiting for you: the Cloud's actionable items, each with its one action. */
+.adh-attention { margin: 12px 0 16px; }
+.adh-attention h2 { margin: 0 0 6px; font-size: 15px; }
+.adh-attention-list { margin: 0; padding: 0; list-style: none; }
+.adh-attention-list li { padding: 8px 0; border-top: 1px solid var(--line); }
+.adh-attention-list li p { margin: 0 0 4px; }
