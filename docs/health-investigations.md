@@ -35,6 +35,55 @@ incident or from the `health_investigation` kind. An investigation delivered to 
 schedule missing either marker is refused without launching an agent. An
 ordinary webhook delivered to an investigation schedule is also refused.
 
+## Choosing the machine that runs it
+
+An administrator chooses a machine, not a webhook. The webhook list
+(`GET /v1/schedule-webhooks`) has one row per hook and nothing saying which
+hook is bound to an investigation schedule, so a Mac with three hooks and a
+Linux machine with one used to read as four machines. The console now reads
+Cloud's `GET /su/v1/health/investigation-destinations` (browser superuser):
+
+```json
+{
+  "schema": "clawdline.health_investigation.destinations.v1",
+  "status": "ok",
+  "complete": true,
+  "machines": [
+    {"machine_id": "mac_1", "machine_name": "Studio Mac", "status": "ready",
+     "hook_id": "swh_…", "reason": "…"}
+  ]
+}
+```
+
+`status` is `ok` or `unavailable`; `machines` is an array, or null when
+unavailable. A row's `status` is `ready`, `setup_required`, `ambiguous`,
+`offline` or `unknown`. Only a `ready` row with a non-null `hook_id` can be
+chosen; the start is the existing POST with that hook, the incident revision
+and an Idempotency-Key, retried with the same key and body when no answer
+arrived. Every other row shows the machine's name, its state and the next
+step, and cannot be chosen. Nothing is preselected.
+
+The console refuses the whole answer for a wrong schema or status, a row
+without a machine ID or name, the same `machine_id` twice, or one hook on two
+machines. A row state it does not know, or a `ready` row without a hook, is
+shown as unknown and the list is marked as possibly incomplete, as is
+`complete: false`. Two machines with the same name stay two rows. A 404 from a
+Cloud without the route says investigations cannot be started there yet; the
+console does not fall back to the webhook list. The machine ID, webhook and
+Cloud's reason sit under each row's technical details, not beside the name.
+
+### What the daemon does not declare yet
+
+The daemon could tell Cloud, when it activates a hook bound to a
+`health_investigation`, `trigger_only` schedule, that the hook serves
+investigations (an optional `binding_purpose`). It does not: Cloud's activate
+route accepts exactly `expected_revision` and refuses any other key, and a
+refusal is retained under its Idempotency-Key, so sending the field to the
+current Cloud would break investigation bindings and could not be retried
+without it under the same key. Until Cloud accepts the optional field, Cloud
+identifies the investigation hook from evidence it already holds, such as a
+successful investigation delivery reported at the same generation.
+
 ## Acceptance and evidence
 
 The claim request uses `clawdline.schedule_webhook.v2`. The delivery digest
