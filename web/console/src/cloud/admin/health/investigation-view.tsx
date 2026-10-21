@@ -2,14 +2,14 @@
  *
  * The newest investigation leads, in words: its state, the concrete reason and what to do next,
  * then the agent's enumerated report. Earlier ones fold away. Task success is never recovery, and
- * human review stays its own panel. A start names one of the operator's own active schedule
- * webhooks; Cloud cannot say which one is bound to an investigation schedule, so the page says
- * that and asks the operator to confirm it, and a machine without the binding refuses it. */
+ * human review stays its own panel. A start names a machine: Cloud lists each real machine once
+ * with whether it has exactly one investigation schedule, and only such a machine can be chosen.
+ * The page sends that machine's own hook; it never guesses one from the webhook list. */
 import { useEffect, useRef, useState } from "react"
 import type { Refusal } from "./cloud"
 import type { Investigation, Investigations, StartGate } from "./investigations"
 import { reasonWords, startGate } from "./investigations"
-import { fetchHooks, newIdempotencyKey, startInvestigation, START_REFUSALS, type HookChoice, type StartRequest } from "./investigation-actions"
+import { fetchDestinations, newIdempotencyKey, startInvestigation, startRequestFor, START_REFUSALS, type Destination, type Destinations, type StartRequest } from "./investigation-actions"
 import type { HealthSay, HealthWord } from "./words"
 import { At, Id } from "./stored-screens"
 import { Panel } from "./parts"
@@ -99,15 +99,52 @@ function Earlier({ items, say }: { items: Investigation[]; say: HealthSay }) {
   )
 }
 
-type HooksState = { kind: "loading" } | { kind: "failed"; code: string } | { kind: "ready"; hooks: HookChoice[]; more: boolean }
-/** `pending` holds the key and body of a request whose outcome is not known yet. */
+type DestState = { kind: "loading" } | { kind: "failed"; code: string } | { kind: "unsupported" } | { kind: "ready"; destinations: Destinations }
+/** `pending` holds the key and body of a request whose outcome is not known yet, and the machine it was for. */
+type Pending = { key: string; req: StartRequest; machine: string }
 type StartState =
   | { kind: "closed" }
   | { kind: "picking" }
-  | { kind: "busy"; pending: { key: string; req: StartRequest } }
-  | { kind: "ambiguous"; pending: { key: string; req: StartRequest }; code: string }
+  | { kind: "busy"; pending: Pending }
+  | { kind: "ambiguous"; pending: Pending; code: string }
   | { kind: "refused"; code: string }
   | { kind: "done"; replayed: boolean }
+
+/** One row per machine. Only a `ready` row has a radio that can be checked; every other row says why and what to do. */
+function MachineList({ d, name, chosen, locked, onPick, say }: { d: Extract<Destinations, { status: "ok" }>; name: string; chosen: string; locked: boolean; onPick: (id: string) => void; say: HealthSay }) {
+  if (d.machines.length === 0) return <p className="adm-stale" role="status">{say("iv_destNone")}</p>
+  return (
+    <fieldset className="adh-iv-hooks" disabled={locked}>
+      <legend className="adm-fine">{say("iv_destLegend")}</legend>
+      {d.machines.map((m) => <MachineRow key={m.machine_id} m={m} name={name} checked={chosen === m.machine_id} onPick={onPick} say={say} />)}
+      {!d.machines.some((m) => m.state === "ready") ? <p className="adm-stale">{say("iv_destNoneReady")}</p> : null}
+      {!d.complete ? <p className="adm-stale" role="note">{say("iv_destIncomplete")}</p> : null}
+    </fieldset>
+  )
+}
+
+function MachineRow({ m, name, checked, onPick, say }: { m: Destination; name: string; checked: boolean; onPick: (id: string) => void; say: HealthSay }) {
+  const ready = m.state === "ready"
+  const next = m.state === "unknown" ? say("iv_destNext_unknown", { raw: m.raw ?? "—" }) : say(`iv_destNext_${m.state}` as HealthWord)
+  return (
+    <div className={`adh-iv-hook${ready ? "" : " adh-iv-hook-off"}`}>
+      <label className="adh-iv-hook-pick">
+        <input type="radio" name={name} value={m.machine_id} checked={checked} disabled={!ready} aria-describedby={`${name}-${m.machine_id}`} onChange={() => onPick(m.machine_id)} />
+        <span className="adh-iv-hook-name">{m.machine_name}</span>
+        <span className={ready ? "adm-fine" : "adm-stale"}>{say(`iv_dest_${m.state}` as HealthWord)}</span>
+      </label>
+      <p className="adm-fine" id={`${name}-${m.machine_id}`}>{next}</p>
+      <details className="adh-disclose">
+        <summary>{say("iv_destTech")}</summary>
+        <dl className="adh-facts">
+          <dt>{say("iv_destMachineId")}</dt><dd><Id v={m.machine_id} /></dd>
+          <dt>{say("iv_destHookId")}</dt><dd><Id v={m.hook_id} /></dd>
+          <dt>{say("iv_destReason")}</dt><dd><Id v={m.reason || null} /></dd>
+        </dl>
+      </details>
+    </div>
+  )
+}
 
 function refusalWord(say: HealthSay, code: string): string {
   return (START_REFUSALS as readonly string[]).includes(code) ? say(`iv_ref_${code}` as HealthWord) : say(`st_fail_${code}` as HealthWord)
@@ -115,27 +152,28 @@ function refusalWord(say: HealthSay, code: string): string {
 
 function Start({ incidentId, revision, account, gate, say, actions }: { incidentId: string; revision: number; account: string | null; gate: StartGate; say: HealthSay; actions: InvestigationActions }) {
   const [st, setSt] = useState<StartState>({ kind: "closed" })
-  const [hooks, setHooks] = useState<HooksState>({ kind: "loading" })
-  // The chosen hook is kept for this page only; nothing is stored or created.
-  const [hookId, setHookId] = useState("")
+  const [dest, setDest] = useState<DestState>({ kind: "loading" })
+  // The chosen machine is kept for this page only; nothing is stored or created.
+  const [machineId, setMachineId] = useState("")
   const ctl = useRef<AbortController | null>(null)
   useEffect(() => () => { ctl.current?.abort() }, [])
 
-  const loadHooks = () => {
+  // Nothing is chosen for the operator, not even a sole ready machine: the choice is theirs to make.
+  const loadDestinations = () => {
     ctl.current?.abort()
     const mine = new AbortController()
     ctl.current = mine
-    setHooks({ kind: "loading" })
-    void fetchHooks(actions.get, actions.apiOrigin, mine.signal).then((r) => {
+    setDest({ kind: "loading" })
+    setMachineId("")
+    void fetchDestinations(actions.get, actions.apiOrigin, mine.signal).then((r) => {
       if (mine.signal.aborted) return
       if ("refused" in r) { actions.refuse(r.refused); return }
-      if (!r.ok) { setHooks({ kind: "failed", code: r.code }); return }
-      setHooks({ kind: "ready", hooks: r.hooks, more: r.more })
-      if (r.hooks.length === 1) setHookId(r.hooks[0].hook_id)
+      if (!r.ok) { setDest(r.code === "not_supported" ? { kind: "unsupported" } : { kind: "failed", code: r.code }); return }
+      setDest({ kind: "ready", destinations: r.destinations })
     })
   }
 
-  const send = (pending: { key: string; req: StartRequest }) => {
+  const send = (pending: Pending) => {
     const mine = new AbortController()
     ctl.current = mine
     setSt({ kind: "busy", pending })
@@ -156,7 +194,7 @@ function Start({ incidentId, revision, account, gate, say, actions }: { incident
   if (st.kind === "closed" || st.kind === "done" || st.kind === "refused") {
     return (
       <div className="adm-notice-actions">
-        <button type="button" className="adm-btn adm-btn-small" onClick={() => { setSt({ kind: "picking" }); loadHooks() }}>{say("iv_start")}</button>
+        <button type="button" className="adm-btn adm-btn-small" onClick={() => { setSt({ kind: "picking" }); loadDestinations() }}>{say("iv_start")}</button>
         <span role="status" className={st.kind === "refused" ? "adm-stale" : "adm-fine"}>
           {st.kind === "done" ? say(st.replayed ? "iv_replayed" : "iv_startedOk") : st.kind === "refused" ? <>{say("iv_refused", { reason: refusalWord(say, st.code) })} <span className="adm-code">({st.code})</span></> : ""}
         </span>
@@ -164,34 +202,24 @@ function Start({ incidentId, revision, account, gate, say, actions }: { incident
     )
   }
   const locked = st.kind === "busy" || st.kind === "ambiguous"
-  const chosen = locked ? st.pending.req.hook_id : hookId
-  const ready = hooks.kind === "ready" && hooks.hooks.some((h) => h.hook_id === hookId)
+  const req = dest.kind === "ready" ? startRequestFor(dest.destinations, machineId, revision) : null
+  const retry = <button type="button" className="adm-btn adm-btn-small adm-btn-quiet" onClick={loadDestinations}>{say("tryAgain")}</button>
   return (
     <div className="adm-notice adh-iv-start" role="group" aria-label={say("iv_pickTitle")}>
       <p><strong>{say("iv_pickTitle")}</strong></p>
       <p className="adm-fine">{say("iv_bindNote")}</p>
-      {hooks.kind === "loading" ? <p className="adm-fine" role="status">{say("iv_hooksLoading")}</p>
-        : hooks.kind === "failed" ? (
-          <p className="adm-stale" role="status">{say("iv_hooksFailed", { reason: say(`st_fail_${hooks.code}` as HealthWord) })} <button type="button" className="adm-btn adm-btn-small adm-btn-quiet" onClick={loadHooks}>{say("tryAgain")}</button></p>
-        ) : hooks.hooks.length === 0 ? <p className="adm-stale" role="status">{say("iv_hooksNone")}</p> : (
-          <fieldset className="adh-iv-hooks" disabled={locked}>
-            <legend className="adm-fine">{say("iv_hookLegend")}</legend>
-            {hooks.hooks.map((h) => (
-              <label key={h.hook_id} className="adh-iv-hook">
-                <input type="radio" name={`iv-hook-${incidentId}`} value={h.hook_id} checked={chosen === h.hook_id} onChange={() => setHookId(h.hook_id)} />
-                <span><span className="adh-id">{h.machine_name ?? h.machine_id}</span><span className="adm-fine adh-id">{h.hook_id}</span></span>
-              </label>
-            ))}
-            {hooks.more ? <p className="adm-fine">{say("iv_hooksMore", { n: hooks.hooks.length })}</p> : null}
-          </fieldset>
-        )}
+      {dest.kind === "loading" ? <p className="adm-fine" role="status">{say("iv_destLoading")}</p>
+        : dest.kind === "unsupported" ? <p className="adm-fine" role="note">{say("iv_destUnsupported")}</p>
+          : dest.kind === "failed" ? <p className="adm-stale" role="status">{say("iv_destFailed", { reason: say(`st_fail_${dest.code}` as HealthWord) })} {retry}</p>
+            : dest.destinations.status === "unavailable" ? <p className="adm-stale" role="status">{say("iv_destUnavailable")} {retry}</p>
+              : <MachineList d={dest.destinations} name={`iv-machine-${incidentId}`} chosen={locked ? st.pending.machine : machineId} locked={locked} onPick={setMachineId} say={say} />}
       <p className="adm-fine">{say("iv_frozenNote", { n: revision })}</p>
       <div className="adm-notice-actions">
         {st.kind === "ambiguous" ? (
           <button type="button" className="adm-btn adm-btn-small" onClick={() => send(st.pending)}>{say("iv_retry")}</button>
         ) : (
-          <button type="button" className="adm-btn adm-btn-small" disabled={!ready || st.kind === "busy"} aria-busy={st.kind === "busy"}
-            onClick={() => send({ key: newIdempotencyKey(), req: { hook_id: hookId, expected_incident_revision: revision } })}>
+          <button type="button" className="adm-btn adm-btn-small" disabled={req === null || st.kind === "busy"} aria-busy={st.kind === "busy"}
+            onClick={() => { if (req !== null) send({ key: newIdempotencyKey(), req, machine: machineId }) }}>
             {st.kind === "busy" ? say("iv_sending") : say("iv_send")}
           </button>
         )}
