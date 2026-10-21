@@ -8407,5 +8407,9 @@
   "next.sessionStateFilterActive": "Filter: {state}. Change which Sessions are shown",
   "next.sessionStateFilterIncomplete": "Some statuses are still unavailable. Counts will appear once the reading is complete.",
   "next.sessionStateFilterEmpty": "No Sessions match “{state}”.",
-  "next.sessionStateFilterEmptyHint": "Choose All to see every Session."
+  "next.sessionStateFilterEmptyHint": "Choose All to see every Session.",
+  "next.sessionStateEmptyAttention": "No Sessions need your attention right now.",
+  "next.sessionStateEmptyWorking": "No Sessions are working right now.",
+  "next.sessionStateEmptyIdle": "No Sessions are idle right now.",
+  "next.sessionStateShowAll": "Show all Sessions"
 }

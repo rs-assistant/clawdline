@@ -9,6 +9,13 @@ starts at All. The original three-direction comparison is retained below as desi
 The interactive comparison is `docs/design/session-state-filter.html`. The script-free historical
 Cloud reading copy is `docs/design/session-state-filter-preview.html`.
 
+## Filtered empty results
+
+Show one compact card with a state-specific sentence and a Show all Sessions button. The fleet
+list must not also render its generic no-match sentence. Keep the schedule section independent
+below it. Both local and fleet views share the same result card; an incomplete fleet reading
+keeps its uncertainty sentence instead of claiming that no Session needs attention.
+
 ## Dashboard inspection keeps the current scope
 
 From All machines, choosing a machine for the wordmark dashboard opens a pinned usage read.
