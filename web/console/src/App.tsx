@@ -71,7 +71,7 @@ import {
  * stylesheet is that app's. The drawer is `input/sidebar.js` and the page
  * switch is `core/pages.js`, rule for rule.
  */
-type Page = "usage" | "sessions" | "devices" | "projects" | "workflow" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
+type Page = "usage" | "sessions" | "devices" | "projects" | "workflow" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access" | "transparency"
 
 /** What became of a session the address asked for: see `openAsked`. */
 type Asked = "none" | "waiting" | "opened" | "gone"
@@ -89,6 +89,7 @@ const PAGES: { id: Page; nav: string; icon: SidebarIconName; key?: string; text?
   { id: "plan", nav: "nav-plan", icon: "plan", key: "webPlan", ready: false },
   { id: "devices", nav: "nav-devices", icon: "devices", key: "webDevices", ready: false },
   { id: "notifications", nav: "nav-notifications", icon: "notifications", ready: false },
+  { id: "transparency", nav: "nav-transparency", icon: "access", ready: false },
   { id: "settings", nav: "nav-settings", icon: "settings", key: "webSettings", ready: false },
 ]
 
@@ -958,7 +959,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
       title={tooOldTitle(p.id)}
     >
       <SidebarIcon name={p.icon} />
-      {p.id === "usage" ? nextWord("usageOverview") : p.id === "notifications" ? nextWord("notificationNav") : p.id === "workflow" ? catalogWord("workflow", "workflow") : p.key ? T[p.key] : p.text}
+      {p.id === "transparency" ? catalogWord("transparency", "title") : p.id === "usage" ? nextWord("usageOverview") : p.id === "notifications" ? nextWord("notificationNav") : p.id === "workflow" ? catalogWord("workflow", "workflow") : p.key ? T[p.key] : p.text}
       {tooOldMark(p.id)}
     </button>
   )
@@ -1111,6 +1112,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
             </button>}
             {sidebarPages.filter((p) => p.id === "notifications").map(sidebarPage)}
             {sidebarPages.filter((p) => p.id === "plan").map(sidebarPage)}
+            {sidebarPages.filter((p) => p.id === "transparency").map(sidebarPage)}
             {sidebarPages.filter((p) => p.id === "settings").map(sidebarPage)}
             <OperationsDashboardLink allowed={cloudOperationsAccess} />
           </section>
