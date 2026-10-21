@@ -22,7 +22,7 @@
  * read; `empty` is probing off (no host registered); `probes_silent` is a registered host that has
  * sent nothing; `errors` answers `503 health_store_unavailable`. */
 
-export const FIXTURE_SCENARIOS = ["normal", "partial", "errors", "empty", "slow", "signed_out", "forbidden", "service", "incidents_disabled", "audit_fail", "tampered", "rollups_off", "many_incidents", "probes_silent"] as const
+export const FIXTURE_SCENARIOS = ["normal", "partial", "errors", "empty", "slow", "signed_out", "forbidden", "service", "incidents_disabled", "audit_fail", "tampered", "rollups_off", "many_incidents", "probes_silent", "investigations_old", "investigations_unavailable"] as const
 export type FixtureScenario = (typeof FIXTURE_SCENARIOS)[number]
 
 const MAC_A = "fixture_mac_a"
@@ -342,10 +342,11 @@ function probesAnswer(scenario: FixtureScenario, now: number): Response {
 }
 
 /** Answers one URL from the fixture. Exported for the module tests. */
-export async function fixtureAnswer(scenario: FixtureScenario, url: string, now: number, method = "GET"): Promise<Response> {
+export async function fixtureAnswer(scenario: FixtureScenario, url: string, now: number, method = "GET", ivRequest?: { key: string | null; body: string }): Promise<Response> {
   if (scenario === "signed_out") return refusal(401, "unauthorized")
   if (scenario === "forbidden") return refusal(404, "not_found")
   const u = new URL(url, "https://fixture.invalid")
+  if (u.pathname.endsWith("/v1/schedule-webhooks")) return hooksAnswer(now)
   const path = u.pathname.replace(/^.*\/su\/v1\/health\//, "")
   const q = u.searchParams
   const empty = scenario === "empty"
@@ -402,7 +403,7 @@ export async function fixtureAnswer(scenario: FixtureScenario, url: string, now:
       window: { from: q.get("from"), to: q.get("to") }, partial_reason: more ? "row_limit" : null, next_cursor: cursor, events: page,
     }, empty ? null : coverageOf()))
   }
-  if (path === "incidents" || path.startsWith("incidents/")) return incidentAnswer(scenario, path, q, now, method)
+  if (path === "incidents" || path.startsWith("incidents/")) return incidentAnswer(scenario, path, q, now, method, ivRequest)
   return refusal(404, "not_found")
 }
 
@@ -556,7 +557,73 @@ function incidentEnvelope(now: number, extra: Row): Row {
   }
 }
 
-async function incidentAnswer(scenario: FixtureScenario, path: string, q: URLSearchParams, asked: number, method: string): Promise<Response> {
+/* ---- agent investigations (the Cloud's investigation contract v1) ----------- */
+
+const HOOK_A = "swh_fixture00000000000000000000a1"
+const HOOK_B = "swh_fixture00000000000000000000b2"
+const FIX_COMMIT = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c"
+
+/** The operator's own schedule webhooks: two active, one disabled (which the picker leaves out). */
+function hooksAnswer(now: number): Response {
+  const hook = (id: string, machine: string, state: string) => ({
+    hook_id: id, machine_id: machine, state, availability: state, generation: 1, revision: 2,
+    created_at: new Date(now - 86_400_000).toISOString(), activated_at: new Date(now - 86_000_000).toISOString(),
+    rotated_at: null, disabled_at: state === "disabled" ? new Date(now - 3_600_000).toISOString() : null, credential_fingerprint: `fp_${id.slice(-4)}`,
+  })
+  return json(200, { schema: "clawdline.schedule_webhook.list.v1", hooks: [hook(HOOK_A, MAC_A, "active"), hook(HOOK_B, "fixture_mac_b", "active"), hook("swh_fixture00000000000000000000c3", MAC_A, "disabled")], next_cursor: null })
+}
+
+type IvSpec = { state: string; reason: string | null; delivery: string | null; task: string | null; ago: number; closed?: boolean; report?: { conclusion: string; fix_commit: string | null; evidence_refs: string[] }; recovery?: boolean }
+/** Investigations per incident, newest first; the active one has a live investigation. */
+const IV_SPECS: Record<string, IvSpec[]> = {
+  [INC.active]: [{ state: "investigating", reason: "running", delivery: "schedule_dispatch_accepted", task: null, ago: 600_000 }],
+  [INC.recovering]: [{ state: "needs_you", reason: "recovery_unverified", delivery: "task_execution_terminal", task: "success", ago: 5_400_000, closed: true, report: { conclusion: "fix_prepared", fix_commit: FIX_COMMIT, evidence_refs: [] } }],
+  [INC.review]: [
+    { state: "verified_recovered", reason: null, delivery: "task_execution_terminal", task: "success", ago: 7_200_000, closed: true, report: { conclusion: "fix_prepared", fix_commit: FIX_COMMIT, evidence_refs: ["he_f3a9c1d27b6e4f0a8c5d2e1b9f7a6c3d4e5f6a7b"] }, recovery: true },
+    { state: "needs_you", reason: "report_needs_evidence", delivery: "task_execution_terminal", task: "success", ago: 14_400_000, closed: true, report: { conclusion: "needs_evidence", fix_commit: null, evidence_refs: [] } },
+    { state: "needs_you", reason: "task_not_successful", delivery: "task_execution_terminal", task: "failure", ago: 21_600_000, closed: true },
+  ],
+  [INC.closed]: [{ state: "needs_you", reason: "report_verification_failed", delivery: "task_execution_terminal", task: "success", ago: 9_000_000, closed: true, report: { conclusion: "verification_failed", fix_commit: FIX_COMMIT, evidence_refs: [] } }],
+}
+/** Investigations started in this tab, by incident, and the Idempotency-Keys that started them. */
+const startedHere = new Map<string, { key: string; body: string; row: Row }>()
+
+function ivRow(incident: Row, i: number, v: IvSpec, now: number): Row {
+  const started = now - v.ago
+  const n = String(i + 1).padStart(2, "0")
+  return {
+    investigation_id: `hiv_${String(incident.id).slice(3, 31)}${n}00`, incident_id: incident.id, incident_revision: incident.revision, incident_content_hash: String(incident.content_hash).replace(/^sha256:/, ""),
+    hook_id: HOOK_A, machine_id: MAC_A, delivery_id: `swd_fixture${String(incident.id).slice(-6)}${n}`,
+    started_at: new Date(started).toISOString(), deadline_at: new Date(started + 4 * 3_600_000 + 120_000).toISOString(), closed_at: v.closed ? new Date(started + 1_800_000).toISOString() : null,
+    state: v.state, reason: v.reason, delivery_state: v.delivery, task_terminal_state: v.task, report: v.report ? { schema: "clawdline.health_investigation.report.v1", ...v.report } : null,
+    recovery: v.recovery ? { event_key: "he_f3a9c1d27b6e4f0a8c5d2e1b9f7a6c3d4e5f6a7b", producer_seq: 42, received_at: new Date(started + 1_500_000).toISOString(), basis: "evidence_ref" } : null,
+  }
+}
+
+function investigationsOf(scenario: FixtureScenario, incident: Row, now: number): Row | undefined {
+  if (scenario === "investigations_old") return undefined
+  if (scenario === "investigations_unavailable") return { status: "unavailable", items: null }
+  const here = startedHere.get(String(incident.id))
+  const items = (IV_SPECS[String(incident.id)] ?? []).map((v, i) => ivRow(incident, i, v, now))
+  return { status: "ok", state_rule: "investigation-state/1", items: here ? [here.row, ...items] : items }
+}
+
+/** POST …/investigations: the same key and body replay; a live one or a moved revision refuses. */
+async function startAnswer(scenario: FixtureScenario, incident: Row, key: string | null, body: string, now: number): Promise<Response> {
+  if (scenario === "investigations_unavailable") return refusal(503, "health_store_unavailable")
+  if (key === null) return refusal(400, "idempotency_key_required")
+  const here = startedHere.get(String(incident.id))
+  if (here && here.key === key) return here.body === body ? json(202, { schema: "clawdline.health_investigation.started.v1", investigation: here.row, replayed: true }) : refusal(409, "idempotency_conflict")
+  const input = JSON.parse(body) as { hook_id?: string; expected_incident_revision?: number }
+  if (input.expected_incident_revision !== incident.revision) return refusal(409, "incident_revision_moved")
+  if (here || (IV_SPECS[String(incident.id)] ?? []).some((v) => !v.closed)) return refusal(409, "investigation_open")
+  if (input.hook_id !== HOOK_A && input.hook_id !== HOOK_B) return refusal(409, "hook_unavailable")
+  const row = { ...ivRow(incident, 9, { state: "investigating", reason: "queued_unclaimed", delivery: "queued", task: null, ago: 0 }, now), hook_id: input.hook_id }
+  startedHere.set(String(incident.id), { key, body, row })
+  return json(202, { schema: "clawdline.health_investigation.started.v1", investigation: row, replayed: false })
+}
+
+async function incidentAnswer(scenario: FixtureScenario, path: string, q: URLSearchParams, asked: number, method: string, ivRequest?: { key: string | null; body: string }): Promise<Response> {
   incidentEpoch ??= asked
   const now = incidentEpoch
   const disabled = scenario === "incidents_disabled" || scenario === "empty"
@@ -608,6 +675,11 @@ async function incidentAnswer(scenario: FixtureScenario, path: string, q: URLSea
     return json(200, incidentEnvelope(now, { revised: !before, incident: await incidentRow(withAck(spec), now) }))
   }
   const row = await incidentRow(spec, now)
+  if (tail === "investigations") {
+    if (method !== "POST") return refusal(404, "not_found")
+    if (row.expired) return refusal(410, "incident_expired")
+    return startAnswer(scenario, row, ivRequest?.key ?? null, ivRequest?.body ?? "", now)
+  }
   if (row.expired) return json(410, { error: { code: "incident_expired", message: "incident_expired", details: { expired_at: row.retain_until } } })
   const raw = q.get("revision")
   const n = raw === null ? spec.revisions.length : Number(raw)
@@ -627,6 +699,7 @@ async function incidentAnswer(scenario: FixtureScenario, path: string, q: URLSea
     incident: { ...row, revisions: Array.from({ length: spec.revisions.length }, (_, i) => i + 1) },
     revision: { number: n, created_at: b.created, content_hash: b.hash, bytes: b.bytes },
     bundle: b.bundle,
+    investigations: investigationsOf(scenario, row, now),
   }))
 }
 
@@ -636,7 +709,7 @@ export function fixtureFetch(name: string): typeof fetch {
   return ((input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((resolve, reject) => {
     const signal = init?.signal
     const delay = scenario === "slow" ? 8_000 : 120
-    const timer = setTimeout(() => resolve(fixtureAnswer(scenario, String(input), Date.now(), init?.method ?? "GET")), delay)
+    const timer = setTimeout(() => resolve(fixtureAnswer(scenario, String(input), Date.now(), init?.method ?? "GET", { key: new Headers(init?.headers).get("idempotency-key"), body: typeof init?.body === "string" ? init.body : "" })), delay)
     signal?.addEventListener("abort", () => { clearTimeout(timer); reject(new DOMException("aborted", "AbortError")) }, { once: true })
   })) as typeof fetch
 }

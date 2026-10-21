@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { Refusal } from "./cloud"
 import type { Investigation, Investigations, StartGate } from "./investigations"
-import { startGate } from "./investigations"
+import { reasonWords, startGate } from "./investigations"
 import { fetchHooks, newIdempotencyKey, startInvestigation, START_REFUSALS, type HookChoice, type StartRequest } from "./investigation-actions"
 import type { HealthSay, HealthWord } from "./words"
 import { At, Id } from "./stored-screens"
@@ -27,16 +27,6 @@ export function InvestigationBadge({ inv, say }: { inv: Investigation; say: Heal
   if (!inv.state.known) return <span className="adh-badge adh-iv-unknown"><span aria-hidden="true" className="adh-glyph">?</span>{say("iv_state_unknown", { raw: inv.state.raw ?? "—" })}</span>
   const s = inv.state.value
   return <span className={`adh-badge adh-iv-${s}`}><span aria-hidden="true" className="adh-glyph">{GLYPH[s]}</span>{say(`iv_state_${s}` as HealthWord)}</span>
-}
-
-/** The reason in words and its next step. A verified recovery has no reason; an unknown one says so. */
-export function reasonWords(inv: Investigation, say: HealthSay): { why: string; next: string } {
-  if (inv.reason === null) {
-    if (inv.state.known && inv.state.value === "verified_recovered") return { why: say("iv_why_verified"), next: say("iv_next_verified") }
-    return { why: say("iv_why_none"), next: say("iv_next_unknown") }
-  }
-  if (!inv.reason.known) return { why: say("iv_why_unknown", { raw: inv.reason.raw ?? "—" }), next: say("iv_next_unknown") }
-  return { why: say(`iv_why_${inv.reason.value}` as HealthWord), next: say(`iv_next_${inv.reason.value}` as HealthWord) }
 }
 
 function Report({ inv, say }: { inv: Investigation; say: HealthSay }) {
