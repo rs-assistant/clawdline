@@ -42,7 +42,7 @@ function chinese(): boolean {
 }
 
 /**
- * The machine dashboard, opened from the session counts beside the wordmark:
+ * The machine dashboard, opened from the wordmark:
  * whether this machine is why everything is slow, and which session is using
  * it. Mounted only while open, so a closed dashboard asks nothing.
  */

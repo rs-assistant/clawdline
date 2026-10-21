@@ -11,7 +11,7 @@ import type { ConnectionLight } from "../connection-state.js"
 import * as L from "../legacy/bridge.js"
 import { nextWord, type NextWord } from "../next-strings.js"
 import { focusModalContainer } from "../modal-focus.js"
-import { bootCatalog } from "../catalog.js"
+import { bootCatalog, catalogWord } from "../catalog.js"
 import { cardsAreFor } from "../session/send.js"
 import { namesSession, sessionFragment } from "../session/address.js"
 import { startedRow } from "../session/started-row.js"
@@ -421,14 +421,20 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [reading, fleetScope, fleetTarget && destinationKey(fleetTarget), consoleUp])
   const [pendingTool, setPendingTool] = useState<PendingMachineAction | null>(pendingMachineTool)
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [dashboardPicker, setDashboardPicker] = useState(false)
+  const [dashboardRequested, setDashboardRequested] = useState(false)
+  const switchOpener = useRef<HTMLElement | null>(null)
+  const dashboardClosed = useCallback(() => setDashboardRequested(false), [])
   const switcherRef = useRef<HTMLDivElement>(null)
   const switchButtonRef = useRef<HTMLButtonElement>(null)
   const closeSwitcher = useCallback(() => {
     // Return focus before inert removes the closing menu from keyboard access.
     if (switcherRef.current?.querySelector(".cloud-switch-menu")?.contains(document.activeElement)) {
-      switchButtonRef.current?.focus({ preventScroll: true })
+      const opener = switchOpener.current ?? switchButtonRef.current
+      opener?.focus({ preventScroll: true })
     }
     setSwitcherOpen(false)
+    setDashboardPicker(false)
   }, [])
   // Forgetting a machine (`forget.ts`): which one is being asked about, which
   // ones this tab or the account says are forgotten, and what the account
@@ -1346,14 +1352,16 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   useEffect(() => {
     if (!switcherOpen) return
     const outside = (event: PointerEvent) => {
-      if (!switcherRef.current?.contains(event.target as Node)) closeSwitcher()
+      if (!switcherRef.current?.contains(event.target as Node) &&
+        !switchOpener.current?.contains(event.target as Node)) closeSwitcher()
     }
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
       event.preventDefault()
       event.stopPropagation()
       closeSwitcher()
-      switchButtonRef.current?.focus()
+      const opener = switchOpener.current ?? switchButtonRef.current
+      opener?.focus()
     }
     document.addEventListener("pointerdown", outside)
     document.addEventListener("keydown", escape, true)
@@ -1598,7 +1606,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [scheduleFleetKey])
 
   const switchMachine = (machine: CloudMachine) => {
+    const openDashboard = dashboardPicker
     closeSwitcher()
+    setDashboardRequested(openDashboard)
     setFleetScope(false)
     setFleetTarget(null)
     // The address names a fleet that is being left, or a Session on the machine
@@ -1701,7 +1711,14 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         aria-expanded={switcherOpen}
         aria-controls="cloud-quick-machines"
         ref={switchButtonRef}
-        onClick={() => switcherOpen ? closeSwitcher() : setSwitcherOpen(true)}
+        onClick={() => {
+          if (switcherOpen) closeSwitcher()
+          else {
+            switchOpener.current = switchButtonRef.current
+            setDashboardPicker(false)
+            setSwitcherOpen(true)
+          }
+        }}
       >
         <span className="dot" aria-hidden="true" />
         <span className="cloud-switch-name">{fleetScope ? nextWord("cloudAllMachines") : named.name || named.label || named.id}</span>
@@ -1718,7 +1735,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           className="cloud-switch-menu"
           id="cloud-quick-machines"
           role="dialog"
-          aria-label={nextWord("cloudSwitch")}
+          aria-label={dashboardPicker ? catalogWord("literal", "b9fcf1d5c799") : nextWord("cloudSwitch")}
         >
           <div className="cloud-switch-conn" data-state={fleetScope ? "unknown" : light.state}>
             <span className="dot" aria-hidden="true" />
@@ -1733,7 +1750,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           </div>
           <p className="cloud-switch-title">{nextWord("cloudMachinesLede")}</p>
           <div className="cloud-switch-options">
-            {quickMachines.length >= 2 && <button type="button" className="cloud-switch-option"
+            {!dashboardPicker && quickMachines.length >= 2 && <button type="button" className="cloud-switch-option"
               data-current={fleetScope ? "true" : undefined}
               onClick={openAllSessions}>{nextWord("cloudAllMachines")}</button>}
             {quickMachines.map((machine) => {
@@ -1927,6 +1944,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
           <App key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
+            onChooseDashboardMachine={fleetScope ? () => {
+              switchOpener.current = document.getElementById("machine-dashboard-open")
+              setDashboardPicker(true)
+              setSwitcherOpen(true)
+            } : undefined}
+            dashboardRequested={!fleetScope && dashboardRequested}
+            onDashboardClosed={dashboardClosed}
             confirmedTitle={fleetTarget ? confirmedTitles.current.get(destinationKey(fleetTarget)) : undefined}
             onTitleSaved={(id, title) => {
               const target = fleetTargetRef.current

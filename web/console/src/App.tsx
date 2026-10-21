@@ -212,7 +212,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   cloudStartedRow = null, onCloudStartedObserved, cloudMachineOffline = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
-  hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved, confirmedTitle }: {
+  hideSessionCounts = false, onChooseDashboardMachine, dashboardRequested = false, onDashboardClosed, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved, confirmedTitle }: {
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
   cloudSessions?: ReactNode
   cloudPeerAccess?: ReactNode | ((active: boolean) => ReactNode)
@@ -235,6 +235,9 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   fleetCloseIntent?: { target: SessionDestination; title: string; kind?: "end" | "archive"; recovered?: boolean } | null
   onFleetCloseIntentHandled?: () => void
   hideSessionCounts?: boolean
+  onChooseDashboardMachine?: () => void
+  dashboardRequested?: boolean
+  onDashboardClosed?: () => void
   focusCloudSessions?: boolean
   onLeaveCloudSessions?: () => void
   onTitleSaved?: (id: string, title: string | undefined) => void
@@ -271,9 +274,16 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
     return () => worker.removeEventListener("message", follow)
   }, [])
   const [menu, setMenu] = useState(false)
-  // The machine dashboard, opened from the counts (machine/MachineDashboard.tsx).
+  // The wordmark opens this machine, or asks Cloud to choose one from the fleet.
   const [machine, setMachine] = useState(false)
-  const closeMachine = useCallback(() => setMachine(false), [])
+  useEffect(() => {
+    if (dashboardRequested) setMachine(true)
+  }, [dashboardRequested])
+  const closeMachine = useCallback(() => {
+    setMachine(false)
+    onDashboardClosed?.()
+    document.getElementById("machine-dashboard-open")?.focus({ preventScroll: true })
+  }, [onDashboardClosed])
   const [, setLoaded] = useState(0)
   const brandRef = useRef<HTMLButtonElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
@@ -969,8 +979,14 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
               <path d="m6 4 4 4-4 4" />
             </svg>
           </span>
-          <b>clawdline</b>
           <span className="brand-tooltip" aria-hidden="true">{nextWord(menu ? "sidebarHide" : "sidebarShow")}</span>
+        </button>
+        <button type="button" className="brand-wordmark" id="machine-dashboard-open"
+          title={catalogWord("literal", "b9fcf1d5c799")}
+          aria-label={catalogWord("literal", "b9fcf1d5c799")}
+          aria-haspopup="dialog"
+          onClick={() => onChooseDashboardMachine ? onChooseDashboardMachine() : setMachine(true)}>
+          <b>clawdline</b>
         </button>
         {!hideSessionCounts && <Counts
           reading={sessionCountState(fleet)}
@@ -978,7 +994,6 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
           partialCloudList={fleet.snapshot?.scan.provenance === "cloud" && !fleet.snapshot.scan.complete &&
             fleet.snapshot.sessions.length > 0}
           offline={!!cloudMachineOffline}
-          onOpen={() => setMachine(true)}
         />}
         {typeof aside === "function" ? aside(light) : (
           <>
@@ -1171,22 +1186,18 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
  * `failures` part has no input here; when it does, its words need
  * `describeFailure` (`core/failure-text.js`) from the bridge.
  *
- * Pressing the counts opens the machine dashboard: how many sessions are
- * running is half of "why is everything slow", and what they are using is the
- * other half (machine/MachineDashboard.tsx).
+ * Machine load opens from the separate wordmark button.
  */
 function Counts({
   reading,
   recovering,
   partialCloudList,
   offline,
-  onOpen,
 }: {
   reading: ReturnType<typeof sessionCountState>
   recovering: boolean
   partialCloudList: boolean
   offline: boolean
-  onOpen: () => void
 }) {
   const T = L.strings
   const rows = reading.phase === "ready" ? reading.value : []
@@ -1239,18 +1250,8 @@ function Counts({
     <div
       className="counts"
       id="counts"
-      role="button"
-      tabIndex={0}
       data-waiting={waiting > 0 ? "true" : undefined}
       aria-label={bits.map((bit) => bit.text).join(" · ")}
-      title={catalogWord("literal", "b9fcf1d5c799")}
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault()
-          onOpen()
-        }
-      }}
     >
       {bits.map((b, i) => (
         <span key={i} className={b.cls}>
