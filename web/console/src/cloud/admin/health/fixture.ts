@@ -592,7 +592,7 @@ function ivRow(incident: Row, i: number, v: IvSpec, now: number): Row {
   const started = now - v.ago
   const n = String(i + 1).padStart(2, "0")
   return {
-    investigation_id: `hiv_${String(incident.id).slice(3, 31)}${n}00`, incident_id: incident.id, incident_revision: incident.revision, incident_content_hash: String(incident.content_hash).replace(/^sha256:/, ""),
+    investigation_id: `hiv_fixture${String(incident.id).slice(-3)}${n}`, incident_id: incident.id, incident_revision: incident.revision, incident_content_hash: String(incident.content_hash).replace(/^sha256:/, ""),
     hook_id: HOOK_A, machine_id: MAC_A, delivery_id: `swd_fixture${String(incident.id).slice(-6)}${n}`,
     started_at: new Date(started).toISOString(), deadline_at: new Date(started + 4 * 3_600_000 + 120_000).toISOString(), closed_at: v.closed ? new Date(started + 1_800_000).toISOString() : null,
     state: v.state, reason: v.reason, delivery_state: v.delivery, task_terminal_state: v.task, report: v.report ? { schema: "clawdline.health_investigation.report.v1", ...v.report } : null,
