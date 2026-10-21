@@ -2642,21 +2642,32 @@ function GateCard(props: {
                       {/* Kept mounted while folded, so the version row keeps reading. */}
                       <div className="cloud-machine-more" id={"cloud-more-" + m.id} hidden={!open}>
                         <p className="cloud-machine-more-title">{nextWord("cloudMachineInfo")}</p>
-                        <span className="cloud-machine-identity">
-                          {platformWord(identity.platform)}
-                          {" · "}
-                          {nextWord("cloudMachineID", { id: identity.shortID })}
-                        </span>
-                        <span className="cloud-machine-facts">
-                          {machineSeenWord(identity.seenAt)}
-                          {" · "}
-                          {typeof count === "object"
-                            ? nextWord("cloudMachineSessions", { count: count.count })
-                            : count === "unread"
-                              ? nextWord("cloudMachineSessionsUnread")
-                              : nextWord("cloudMachineSessionsUnknown")}
-                        </span>
-                        <span className="cloud-machine-access">{machineAccessFacts(m).join(" · ")}</span>
+                        <dl className="cloud-machine-details">
+                          <div>
+                            <dt>{nextWord("cloudMachineIdentityLabel")}</dt>
+                            <dd className="cloud-machine-identity">
+                              <span>{platformWord(identity.platform)}</span>
+                              <span>{nextWord("cloudMachineID", { id: identity.shortID })}</span>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>{nextWord("cloudMachineActivityLabel")}</dt>
+                            <dd>
+                              <span>{machineSeenWord(identity.seenAt)}</span>
+                              <span>{typeof count === "object"
+                                ? nextWord("cloudMachineSessions", { count: count.count })
+                                : count === "unread"
+                                  ? nextWord("cloudMachineSessionsUnread")
+                                  : nextWord("cloudMachineSessionsUnknown")}</span>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>{nextWord("cloudMachineAccessLabel")}</dt>
+                            <dd className="cloud-machine-access">
+                              {machineAccessFacts(m).map((fact, index) => <span key={index}>{fact}</span>)}
+                            </dd>
+                          </div>
+                        </dl>
                         <FleetUpdateRow
                           client={updateClient}
                           machine={m}

@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8796,
+  "englishKeys": 8800,
   "counts": {
     "negation": 2561,
     "state": 1445,
-    "permission": 488,
+    "permission": 489,
     "deletion": 197,
     "uncertainty": 269
   },
-  "unionCount": 3909,
+  "unionCount": 3910,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -4259,6 +4259,7 @@
       "next.cloudInstallFine",
       "next.cloudInstallStep3",
       "next.cloudInstallWhyBody",
+      "next.cloudMachineAccessLabel",
       "next.cloudMachineNeedsPair",
       "next.cloudMachinesNoneNext",
       "next.cloudMachinesRefusedPair",
@@ -7731,6 +7732,7 @@
     "next.cloudInstallStep3",
     "next.cloudInstallWhy",
     "next.cloudInstallWhyBody",
+    "next.cloudMachineAccessLabel",
     "next.cloudMachineForgetShort",
     "next.cloudMachineNeedsPair",
     "next.cloudMachinePlatformUnknown",

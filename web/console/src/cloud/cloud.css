@@ -266,10 +266,21 @@
 .cloud-machines .cloud-more:hover { color: var(--ink); background: var(--card-hi); }
 .cloud-machines .cloud-more[aria-expanded="true"] { color: var(--ink); background: var(--card-hi); }
 .cloud-machine-more {
-    display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; border-top: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 10px; padding: 12px; border-top: 1px solid var(--line);
 }
 .cloud-machine-more[hidden] { display: none; }
 .cloud-machine-more-title { margin: 0 0 2px 0; font-size: 12px; font-weight: 600; color: var(--ink); }
+.cloud-machine-details { margin: 0; display: grid; gap: 10px; font-size: 12px; line-height: 1.5; }
+.cloud-machine-details > div { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 12px; }
+.cloud-machine-details dt { color: var(--dim); font-weight: 400; overflow-wrap: anywhere; }
+.cloud-machine-details dd { margin: 0; min-width: 0; color: var(--ink); overflow-wrap: anywhere; }
+.cloud-machine-details dd > span { display: block; }
+.cloud-machine-details .cloud-machine-identity { font-size: 12px; }
+.cloud-machine-details .cloud-machine-access { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.cloud-machine-access > span { padding: 2px 7px; border-radius: 5px; background: var(--card-hi); }
+@media (max-width: 390px) {
+  .cloud-machine-details > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+}
 .cloud-machine-more-actions { display: flex; gap: 8px; margin-top: 8px; }
 .cloud-machines .cloud-forget,
 .cloud-machines .cloud-rename {

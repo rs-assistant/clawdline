@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8796,
-  "riskKeys": 3909,
-  "nonRiskCount": 4887,
+  "englishContentKeys": 8800,
+  "riskKeys": 3910,
+  "nonRiskCount": 4890,
   "groups": [
     {
       "name": "admin / other",
@@ -2891,7 +2891,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 251,
+      "count": 254,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2998,7 +2998,9 @@
         "next.cloudInstallStep2",
         "next.cloudInstallTitle",
         "next.cloudMachineActions",
+        "next.cloudMachineActivityLabel",
         "next.cloudMachineID",
+        "next.cloudMachineIdentityLabel",
         "next.cloudMachineInfo",
         "next.cloudMachineMore",
         "next.cloudMachineOffline",
@@ -3010,6 +3012,7 @@
         "next.cloudMachineSeen",
         "next.cloudMachineSeenAt",
         "next.cloudMachineSessions",
+        "next.cloudMachineUpdateResultLabel",
         "next.cloudMachinesAccount",
         "next.cloudMachinesFine",
         "next.cloudMachinesLede",
