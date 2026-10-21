@@ -32,7 +32,7 @@ import { destinationFragment, destinationFromFragment, destinationKey, identifyO
 import { notificationAddress } from "./push/navigation.js"
 import { hasDocumentIntent } from "./legacy/documents-bridge.js"
 import { NewBuild } from "./NewBuild.js"
-import { MachineDashboard } from "./machine/MachineDashboard.js"
+import { MachineDashboard, type DashboardSource } from "./machine/MachineDashboard.js"
 import { Start } from "./session/Start.js"
 import { startedRow } from "./session/started-row.js"
 import { askedSession } from "./session/asked-session.js"
@@ -215,7 +215,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
   cloudStartedRow = null, onCloudStartedObserved, cloudMachineOffline = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
-  hideSessionCounts = false, onChooseDashboardMachine, dashboardRequested = false, onDashboardClosed, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved, confirmedTitle }: {
+  hideSessionCounts = false, onChooseDashboardMachine, dashboardSource, dashboardRequested = false, onDashboardClosed, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved, confirmedTitle }: {
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
   cloudSessions?: ReactNode
   cloudOperationsAccess?: boolean
@@ -240,6 +240,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
   onFleetCloseIntentHandled?: () => void
   hideSessionCounts?: boolean
   onChooseDashboardMachine?: () => void
+  dashboardSource?: DashboardSource
   dashboardRequested?: boolean
   onDashboardClosed?: () => void
   focusCloudSessions?: boolean
@@ -1170,10 +1171,13 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
       {!surveyAccount ? <SurveyCoordinator /> : null}
       <Overlays />
       {machine ? <MachineDashboard
-        sessions={fleet.snapshot?.sessions ?? []}
+        sessions={dashboardSource?.sessions ?? fleet.snapshot?.sessions ?? []}
+        readUsage={dashboardSource?.readUsage}
+        machineName={dashboardSource?.name}
         onClose={closeMachine}
         onClawdfather={(id) => {
           closeMachine()
+          if (dashboardSource) { dashboardSource.onClawdfather(id); return }
           if (id) openSession(id)
           else Start.openMachine()
         }}

@@ -9,6 +9,14 @@ starts at All. The original three-direction comparison is retained below as desi
 The interactive comparison is `docs/design/session-state-filter.html`. The script-free historical
 Cloud reading copy is `docs/design/session-state-filter-preview.html`.
 
+## Dashboard inspection keeps the current scope
+
+From All machines, choosing a machine for the wordmark dashboard opens a pinned usage read.
+It does not choose the console's machine, repoint its active reader, change the URL, or remount
+the fleet list. Closing the dashboard preserves the list's search, state filter and group state.
+The dashboard names the inspected machine. An explicit Open Clawdfather press is a separate
+navigation action; its destination still belongs to the inspected machine.
+
 ## What changes for the person
 
 - The header's count area (`Counts` in `web/console/src/App.tsx`) stops opening the machine
