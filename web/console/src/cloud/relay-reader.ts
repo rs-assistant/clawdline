@@ -116,6 +116,7 @@ export interface CloudSnippets {
 
 /** What `CloudClient.events()` hands a listener; only these fields are read. */
 export interface CloudEvent {
+  realign?: boolean
   type: string
   state?: string
   machine?: string

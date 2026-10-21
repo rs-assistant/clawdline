@@ -575,3 +575,7 @@
 /* In the machine list, Pair is the row's one action for a machine that needs it. */
 .cloud-machines .cloud-pair { background: var(--accent); border-color: var(--accent); color: #17110e; font-size: 13px; padding: 0 14px; }
 .cloud-machines .cloud-pair:hover:not(:disabled) { background: #e08b6e; }
+
+.cloud-read-problem { position: fixed; bottom: 16px; inset-inline: 16px; z-index: 100; max-width: 560px; margin-inline: auto; padding: 16px; border: 1px solid var(--accent-ed); border-radius: 12px; background: var(--panel, #18181b); overflow-wrap: anywhere; }
+.cloud-read-problem p { margin: 0 0 8px; }
+.cloud-read-problem button + button { margin-inline-start: 8px; }

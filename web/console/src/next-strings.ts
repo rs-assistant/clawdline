@@ -725,6 +725,8 @@ const words = {
     cloudAllRefreshing: "Refreshing…",
     cloudAllRefreshDone: "Refreshed",
     cloudAllRefreshFailed: "Refresh unavailable",
+    cloudReadPairingRequired: "Cannot read {machine}: this browser needs to confirm its pairing. Existing content may be out of date.",
+    cloudReadUnknownFailure: "No current reply from {machine}. The cause is not confirmed; existing content may be out of date. Try again.",
     cloudAccessProblem:
       "Machine {machine}'s data could not be read in this browser ({code}). Pair that machine with this browser again; if it still cannot be read, sign in again.",
     cloudSwitch: "Other machines",
@@ -2548,6 +2550,8 @@ const words = {
     cloudAllRefreshing: "正在重新整理…",
     cloudAllRefreshDone: "已重新整理",
     cloudAllRefreshFailed: "無法重新整理",
+    cloudReadPairingRequired: "無法讀取 {machine}：這個瀏覽器需要重新確認配對。已顯示的內容可能不是最新狀態。",
+    cloudReadUnknownFailure: "目前讀不到 {machine} 的最新回覆，原因尚未確認。已顯示的內容可能已過時，請重試。",
     cloudAccessProblem: "機器 {machine} 的資料在這個瀏覽器讀不出來（{code}）。請重新配對這台機器；若仍然讀不到，請重新登入。",
     cloudSwitch: "換一台機器",
     cloudAllMachines: "所有機器",

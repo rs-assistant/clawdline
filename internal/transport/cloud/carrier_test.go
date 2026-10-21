@@ -384,3 +384,46 @@ func TestAPublishedSessionRowTakesTheCarrierToo(t *testing.T) {
 	case <-time.After(500 * time.Millisecond):
 	}
 }
+
+// The refusal must survive the exact content-key failure that blocks the read.
+func TestCarrierReportsMissingPairingWithoutDisclosingContent(t *testing.T) {
+	for _, pinned := range []bool{false, true} {
+		t.Run(map[bool]string{false: "missing-pin", true: "paired"}[pinned], func(t *testing.T) {
+			f := newDirectFixture(t)
+			b, _, _ := f.carrier(t)
+			f.l.pinned = adaptercloud.NewPinnedStore(t.TempDir())
+			if pinned {
+				if err := f.l.pinned.Pin("account", adaptercloud.PinnedDevice{DeviceID: "viewer", PublicKey: base64.StdEncoding.EncodeToString(f.viewer.PublicKey())}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			epoch, err := domaincloud.NewKeyEpoch(domaincloud.ContentKeyState{Epoch: 1, KeyID: "ms-1", Key: f.master})
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.l.contentEpoch = epoch
+			err = f.l.sendCarrierEnvelope("viewer", "t/machine/session", domaincloud.ClassStream, []byte(`{"secret":"must-not-leak"}`))
+			if pinned && err != nil {
+				t.Fatal(err)
+			}
+			if !pinned && !errors.Is(err, domaincloud.ErrRekey) {
+				t.Fatalf("missing typed refusal: %v", err)
+			}
+			select {
+			case raw := <-b.msgs:
+				var frame map[string]any
+				if err := json.Unmarshal(raw, &frame); err != nil {
+					t.Fatal(err)
+				}
+				if !pinned && (len(frame) != 2 || frame["t"] != "read_error" || frame["code"] != "machine_pairing_required") {
+					t.Fatalf("unexpected disclosure: %s", raw)
+				}
+				if pinned && frame["t"] != "env" {
+					t.Fatalf("paired read was refused: %s", raw)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatal("browser received no outcome")
+			}
+		})
+	}
+}

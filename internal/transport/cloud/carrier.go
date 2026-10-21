@@ -217,6 +217,21 @@ func (l *Link) sendCarrierAtEpoch(viewer, channel string, class domaincloud.Clas
 		peer.mu.Unlock()
 		return ErrNoDirectCarrier
 	}
+	// This DTLS channel was authenticated by the signed carrier offer/answer.
+	// A fixed refusal carries no content or authority and needs no content key.
+	if l.contentEpoch != nil {
+		refused, pinErr := l.pinned.Refused(viewer)
+		_, pinned, keyErr := l.pinned.PublicKeyFor(viewer)
+		if pinErr == nil && keyErr == nil && !refused && !pinned {
+			dc := peer.dc
+			peer.mu.Unlock()
+			peer.sendMu.Lock()
+			err := dc.SendText(`{"t":"read_error","code":"machine_pairing_required"}`)
+			peer.sendMu.Unlock()
+			l.logf("cloud: carrier read refused: code=machine_pairing_required sender=%s control_delivered=%t", viewer, err == nil)
+			return domaincloud.ErrRekey
+		}
+	}
 	peer.carrierSeq++
 	seq := peer.carrierSeq
 	peer.mu.Unlock()

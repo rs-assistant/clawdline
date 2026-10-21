@@ -457,7 +457,7 @@ export class StatusCloudClient extends CatalogCloudClient {
     if (carrier && !this.carrierWatched.has(carrier)) {
       this.carrierWatched.add(carrier)
       this.carrierMachines.add(machine)
-      carrier.whenDown(() => this._carrierDown(machine))
+      carrier.whenDown((code) => this._carrierDown(machine, code))
     }
     return carrier
   }
@@ -821,7 +821,20 @@ export class StatusCloudClient extends CatalogCloudClient {
   }
 
   /** The carrier went: every read it was holding is asked again on the relay. */
-  _carrierDown(machine) {
+  _carrierDown(machine, code) {
+    if (code === "machine_pairing_required") {
+      const error = refused(code, "This browser needs to confirm its pairing with this machine.")
+      error.detail = { machine }
+      for (const [key, flight] of [...this.carrierReads]) {
+        if (flight.identity.machine === machine) {
+          this.carrierReads.delete(key)
+          this._settleRead(key, null, error)
+        }
+      }
+      this.viewerEvents?.record?.("cloud.read.failed", { machine, code, stage: "carrier_refused" })
+      this._emit({ type: "error", machine, error })
+      return
+    }
     for (const [key, flight] of [...this.carrierReads]) {
       if (flight.identity.machine === machine) this._relayAfterCarrier(key, null)
     }
@@ -983,6 +996,10 @@ export class StatusCloudClient extends CatalogCloudClient {
   }
 
   _settleRead(key, body, error) {
+    const waiters = this.readWaiters.get(key)
+    if (waiters && !waiters.action && error?.code === "cloud_read_timeout") {
+      this._emit({ type: "error", machine: waiters.machine, error: this._withRef(error, waiters.ref) })
+    }
     this.pinnedReadProofs?.delete(key)
     this.carrierReads?.delete(key)
     return super._settleRead(key, body, error)

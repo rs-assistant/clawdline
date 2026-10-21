@@ -8794,5 +8794,7 @@
   "capacityRow.cloud.rekey_pending.what": "At most eight signed raw key exchanges may be running on this machine.",
   "capacityRow.cloud.rekey_pending.full": "Additional offers are refused immediately; ordinary relay messages keep flowing.",
   "capacityRow.cloud.rekey_interval.what": "This machine admits one raw key offer every two seconds across all viewers.",
-  "capacityRow.cloud.rekey_interval.full": "Offers inside the interval are refused; viewers can retry after the interval."
+  "capacityRow.cloud.rekey_interval.full": "Offers inside the interval are refused; viewers can retry after the interval.",
+  "next.cloudReadPairingRequired": "Cannot read {machine}: this browser needs to confirm its pairing. Existing content may be out of date.",
+  "next.cloudReadUnknownFailure": "No current reply from {machine}. The cause is not confirmed; existing content may be out of date. Try again."
 }

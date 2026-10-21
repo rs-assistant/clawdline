@@ -1267,3 +1267,18 @@ test("thumbnails have a separate exact waiter and older machines keep their orig
   assert.equal(calls[2][2].size, undefined)
   assert.equal(calls[2][3], "image.p")
 })
+
+
+test("pairing refusal settles only that machine's carrier reads without replaying on relay", () => {
+  const c = Object.create(StatusCloudClient.prototype)
+  c.carrierReads = new Map([["one", {identity: {machine: "m"}}], ["two", {identity: {machine: "other"}}]])
+  const settled = [], events = []
+  c._settleRead = (key, body, error) => settled.push([key, error.code])
+  c._emit = (event) => events.push(event)
+  c._relayAfterCarrier = () => assert.fail("must not replay a confirmed pairing refusal")
+  c._carrierDown("m", "machine_pairing_required")
+  assert.deepEqual(settled, [["one", "machine_pairing_required"]])
+  assert.equal(c.carrierReads.has("two"), true)
+  assert.equal(events[0].machine, "m")
+  assert.equal(events[0].error.code, "machine_pairing_required")
+})

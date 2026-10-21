@@ -1,3 +1,5 @@
+import { accessProblemAfterRead } from "./state.js"
+import { CloudReadProblem } from "./CloudReadProblem.js"
 import { dashboardFetch } from "./dashboard-reader.js"
 import { readMachineUsage } from "../machine/read.js"
 import { Start } from "../session/Start.js"
@@ -1213,13 +1215,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             // When every row was stale the timer below was also stopped, so
             // no later pass could repair either machine's status.
             if (reportsMachinePresence(event)) listMachines()
-            // A decryptable inventory clears only the problem attributed to
-            // that machine. One machine answering is not evidence that a
-            // different machine's key problem went away.
-            if (event.type === "sessions") {
-              const machine = event.machine ?? event.identity?.machine
-              setProblem((held) => !held || !machine || held.machine === machine ? null : held)
-            }
+            // Only a live successful read repairs this machine's read path.
+            setProblem((held) => accessProblemAfterRead(held, event))
             const listed = machinesRef.current
             const access = machineAccessProblem(
               event,
@@ -1961,6 +1958,14 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   return (
     <>
       <IdentityHandoverDialog relay={screen.at === "pairing" ? "pairing_required" : "connected"} />
+      {problem && (screen.at === "console" || screen.at === "machines") && (
+        <CloudReadProblem message={nextWord(problem.code === "machine_pairing_required" ? "cloudReadPairingRequired" : "cloudReadUnknownFailure", {
+          machine: machinesRef.current?.find((row) => row.id === problem.machine)?.label ?? problem.machine,
+        })} code={problem.code} trace={problem.trace} pairLabel={nextWord("cloudPairStart")} retryLabel={nextWord("cloudRetry")}
+          onPair={problem.code === "machine_pairing_required" ? () => pairOffer({
+            id: problem.machine, name: machinesRef.current?.find((row) => row.id === problem.machine)?.label ?? problem.machine,
+          }) : undefined} onRetry={() => { line.current?.retry(); listMachines() }} />
+      )}
       {words && who && transport.kind === "cloud" ? <SurveyCoordinator key={who.account}
         account={{ id: who.account, apiOrigin: transport.config.apiOrigin }}
         eligible={!pairing && !asking && !naming && (screen.at === "machines" || screen.at === "console")}
@@ -2750,11 +2755,6 @@ function GateCard(props: {
               <button className="go" type="button" id="cloud-forget-leave" onClick={onLeave}>
                 {nextWord("cloudSwitch")}
               </button>
-            )}
-            {problem && (
-              <p className="say">
-                {nextWord("cloudAccessProblem", { machine: problem.machine, code: problem.code })}
-              </p>
             )}
           </>
         )

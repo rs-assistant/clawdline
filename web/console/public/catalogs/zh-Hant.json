@@ -8794,5 +8794,7 @@
   "capacityRow.cloud.rekey_pending.what": "這台機器最多同時處理八筆已簽署的原始換鑰請求。",
   "capacityRow.cloud.rekey_pending.full": "額外請求會立即被拒絕，一般中繼訊息仍可繼續處理。",
   "capacityRow.cloud.rekey_interval.what": "這台機器每兩秒最多接受一筆原始換鑰請求，所有檢視裝置共用此間隔。",
-  "capacityRow.cloud.rekey_interval.full": "間隔內的請求會被拒絕，檢視裝置可在間隔結束後重試。"
+  "capacityRow.cloud.rekey_interval.full": "間隔內的請求會被拒絕，檢視裝置可在間隔結束後重試。",
+  "next.cloudReadPairingRequired": "無法讀取 {machine}：這個瀏覽器需要重新確認配對。已顯示的內容可能不是最新狀態。",
+  "next.cloudReadUnknownFailure": "目前讀不到 {machine} 的最新回覆，原因尚未確認。已顯示的內容可能已過時，請重試。"
 }
