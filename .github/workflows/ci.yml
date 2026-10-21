@@ -220,6 +220,12 @@ jobs:
         if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         run: tools/test-go-ci.sh
 
+      # check.sh does not run in CI; the native shell's pairing flow is
+      # exercised here, on the runner's own architecture.
+      - name: Check that the native shell saves a pairing's permission before showing its code
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        run: sh tools/test-shell-pairing-permission.sh
+
       - name: Check the release evidence, including the macOS signature cases
         if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         run: bash tools/release/supply-chain.test.sh

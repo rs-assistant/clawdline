@@ -619,23 +619,34 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
 
     // MARK: - Pairing
 
-    /// The Swift app's alert, word for word, with its one button.
+    /// The pairing in flight, held until its flow ends.
+    private var pairingFlow: PairingPermissionFlow?
+
+    /// Choose a permission, save it, and only then show the code.
+    ///
+    /// The code never reaches the screen before the daemon has said the
+    /// permission is saved: a refusal, no answer or an expired pairing shows
+    /// why and no code. Saving runs off the main queue; the alerts are modal,
+    /// as the one before them was.
     ///
     /// One at a time: something hammering the pairing route must not stack a
     /// wall of alerts to dismiss one by one. The watcher holds that gate (see
-    /// PairingWatcher for why it cannot be held here); the daemon's rate limit
-    /// is the other half.
+    /// PairingWatcher for why it cannot be held here); the flow opens it again
+    /// on every way out. The daemon's rate limit is the other half.
     private func showPairing(_ pending: PairingNotice) {
-        defer { pairing.alertClosed() }
         // The name, never the code.
-        shellLog("pairing: \(pending.name) is asking; alert shown")
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = L.t.pairingAsks(pending.name)
-        alert.informativeText = L.t.pairingCode(pending.code)
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: L.t.pairingIgnore)
-        alert.runModal()
+        shellLog("pairing: \(pending.name) is asking; choosing a permission")
+        let client = PairingPermissionClient(base: home)
+        let flow = PairingPermissionFlow(
+            pending,
+            screens: PairingDialogs.screens,
+            save: client.save,
+            finished: { [weak self] in
+                self?.pairingFlow = nil
+                self?.pairing.alertClosed()
+            })
+        pairingFlow = flow
+        flow.start()
     }
 
     // MARK: - Where the hotkey applies

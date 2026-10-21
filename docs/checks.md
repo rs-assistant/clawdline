@@ -104,6 +104,18 @@ CI does not run `tools/check.sh`. It drives the SBOM, provenance, rebuild,
 macOS signature and gate checks through their passing case and each failure
 on synthetic releases; it proves no real attestation or notarization.
 
+The native shell's pairing test, `tools/test-shell-pairing-permission.sh`,
+compiles `shell/darwin/Pairing.swift` with a stub session and drives the flow
+that saves the chosen permission before the code is shown. It runs on macOS
+only: in every `--full` check, in an ordinary check whenever a path outside the
+narrow Go/web/docs inputs changes (any `shell/darwin/` or `tools/` file selects
+the full tooling group), and by name in CI's darwin job. It builds for the
+host's own architecture with a macOS 13 minimum, so an Intel runner runs what
+it compiled. Its request timeout is the registered bound
+`console.native_pairing_save_seconds`; `internal/domain/capacity`'s
+`TestNativePairingSaveTimeoutMatchesTheShell` fails when the Swift constant and
+the row disagree or the row is missing.
+
 Dev installation builds the selected commit without repeating full verification.
 After switching, verify the running version and served stamp, `GET /` returning
 200 and existing Sessions remaining available. Startup failure rolls back through

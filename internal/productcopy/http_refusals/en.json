@@ -1238,5 +1238,12 @@
   "http.bfa52fe77bfb1bda": "The schedule is not investigation-bound.",
   "http.87cdc6f672c5e3a4": "The task belongs to another schedule.",
   "http.cf3b8368c6c23d5d": "The investigation evidence could not be saved.",
-  "http.7662b55a28331c3d": "The broker could not confirm the scheduled dispatch."
+  "http.7662b55a28331c3d": "The broker could not confirm the scheduled dispatch.",
+  "http.71c481ff2e948805": "A viewer grant is changed with POST.",
+  "http.c15e361d2f09ebe5": "Name a pinned viewer and choose readonly or operate.",
+  "http.987c7be6547f1395": "The viewer has no active local pin.",
+  "http.5d831f38b0407861": "Choose readonly or operate.",
+  "http.4f1e84af963c02ab": "the viewer grant cannot be verified",
+  "http.84c550dd21a49bd4": "The viewer scope was saved, but terminal leases could not be revalidated. Retry the same grant.",
+  "http.4a474057620510c7": "A scope can only be chosen when pairing with this machine; choose it on the other machine instead."
 }

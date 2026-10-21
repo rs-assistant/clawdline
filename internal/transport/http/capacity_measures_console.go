@@ -176,6 +176,9 @@ func (s *Server) consoleCapacityMeasures() map[string]func() capacity.Reading {
 		capacity.ConsolePinnedListReadTimeout: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console pinned machine list read deadline; daemon cannot measure another device's wait"}
 		},
+		capacity.ConsoleNativePairingSaveSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "macOS shell's deadline for saving a pairing's permission; the daemon answers the save but does not see the shell's timer"}
+		},
 		capacity.ConsoleStatusMarkerRecoveryWait: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console retained inventory replay deadline; daemon cannot measure another device's wait"}
 		},

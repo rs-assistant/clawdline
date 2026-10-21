@@ -142,6 +142,7 @@ type Status struct {
 // Viewer is one enrolled device, as the status route shows it. It carries no
 // key material: a fingerprint is what a person compares, a public key is not.
 type Viewer struct {
+	Scope       string   `json:"scope,omitempty"`
 	ID          string   `json:"id"`
 	Kind        string   `json:"kind,omitempty"`
 	Name        string   `json:"name,omitempty"`
@@ -659,11 +660,12 @@ func Open(opts LinkOptions) (*Link, error) {
 		// Read from the store rather than captured, so that a rotation
 		// between two pairings cannot hand the second browser the first
 		// browser's key.
-		Keys:     link.pairingKeys,
-		Pinned:   link.pinned,
-		OnRevoke: link.revokeTerminalViewer,
-		Now:      opts.Now,
-		Log:      opts.Log,
+		Keys:          link.pairingKeys,
+		Pinned:        link.pinned,
+		OnRevoke:      link.revokeTerminalViewer,
+		OnScopeChange: link.viewerScopeChanged,
+		Now:           opts.Now,
+		Log:           opts.Log,
 	}
 	// The identity pairing hands the master secret over with a recorded
 	// content-key epoch; its epoch record sits beside the key files.
@@ -1400,6 +1402,14 @@ func (l *Link) authority(ctx context.Context, sender string, verifiedKey ed25519
 			return a
 		}
 		a.WriteGateAllows = l.allowCommands()
+		if l.pinned != nil {
+			scope, err := l.pinned.ViewerScope(sender)
+			if err != nil {
+				a.RosterAllowsSender = false
+				return a
+			}
+			a.ViewerReadOnly = scope != adaptercloud.ScopeOperate
+		}
 		return a
 	}
 	return a
@@ -1539,7 +1549,7 @@ func (l *Link) Status() Status {
 			seen[device.DeviceID] = len(out.Devices)
 			out.Devices = append(out.Devices, Viewer{
 				ID: device.DeviceID, Name: device.Name, Fingerprint: device.Fingerprint,
-				Pinned: true, PairedAt: device.PairedAt,
+				Scope: device.EffectiveScope(), Pinned: true, PairedAt: device.PairedAt,
 				Revoked: !device.Active(), RevokedAt: device.RevokedAt,
 			})
 		}
@@ -1849,4 +1859,34 @@ func (l *Link) Fingerprint() string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.fingerprint
+}
+
+// TerminalViewerOperate is distinct from read access and is rechecked by the
+// terminal service after lane waits and immediately before each effect.
+func (l *Link) TerminalViewerOperate(device string) error {
+	// A local downgrade is definitive even when the account cannot be read.
+	// Check it before a retryable roster failure so Revalidate voids the lease.
+	if l.pinned != nil {
+		scope, err := l.pinned.ViewerScope(device)
+		if err != nil {
+			return terminal.Refuse(terminal.CodeForbidden, "the viewer grant cannot be verified")
+		}
+		if scope != adaptercloud.ScopeOperate {
+			return terminal.Refuse(terminal.CodeViewerReadOnly, "This device may read, and not send.")
+		}
+	}
+	return l.TerminalViewerAccess(device)
+}
+
+func (l *Link) viewerScopeChanged(_ string) error {
+	if l.opts.TerminalService != nil {
+		svc, err := l.opts.TerminalService()
+		if err != nil {
+			return err
+		}
+		if svc != nil {
+			svc.Revalidate()
+		}
+	}
+	return nil
 }

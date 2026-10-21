@@ -895,6 +895,11 @@
     "Note": true
   },
   {
+    "Name": "console.native_pairing_save_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.opened_row_quiet_seconds",
     "Known": true,
     "Note": true

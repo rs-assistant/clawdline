@@ -441,6 +441,7 @@ const HTTP_STATUS: Readonly<Record<string, number>> = {
   // is for one that arrives without it, so a page that backs off on 429
   // (`pages/work/reference-images.ts`) still sees one.
   cloud_read_busy: 429,
+  viewer_read_only: 403,
   cloud_read_only: 403,
   cloud_read_needs_send_prompt: 403,
   cloud_commands_disabled: 403,
