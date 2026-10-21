@@ -50,6 +50,18 @@ Each client holds one operation across all machines (`VIEWER_REKEY_PENDING_LIMIT
 the contract's 120-second lifetime and a 120-second minimum offer interval
 (`VIEWER_REKEY_COOLDOWN_MS`). It retains zero unknown envelopes and schedules zero retries.
 New traffic after the interval may request another operation; expiry itself sends nothing.
+The relay's `content_key_routed` receipt confirms routing only, never recipient adoption or
+successful key delivery. It neither consumes nor completes the pending offer. Both clients
+validate control types, fields, operation identifiers and the finite relay error-code set.
+Only a valid `content_key_error` for `frame=content_key_offer` with the exact current operation
+identifier, before expiry, cancels the browser's pending exchange. It surfaces the fixed
+`cloud_reconnecting` transient failure without exposing relay strings. Unrelated, expired,
+answer-side or malformed controls cannot cancel another operation. Cancellation invalidates
+the adoption authority callback and prevents later in-memory adoption; the durable transaction
+boundary described above still applies. Cancellation keeps the original minimum offer interval,
+retains no envelope or action and initiates no retry. The machine recognizes routed/error
+controls and logs only validated fixed codes; it retains and retries no answer and treats no
+control receipt as successful key delivery.
 Both browser-owned bounds are registered with English and Taiwan Traditional Chinese copy,
 and daemon readings explicitly report that live browser usage cannot be measured.
 

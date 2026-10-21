@@ -9,6 +9,7 @@ package cloud
 // original guards at four separate sites.
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/tls"
@@ -524,6 +525,9 @@ func (t *Transport) handleFrame(conn *Conn, data []byte, h connectionhealth.Hand
 		return nil
 	}
 	switch kind {
+	case "content_key_routed", "content_key_error":
+		t.handleRekeyControl(data, kind)
+		return nil
 	case "content_key_offer":
 		t.dispatchRawRekey(data)
 		return nil
@@ -619,6 +623,57 @@ func (t *Transport) handleFrame(conn *Conn, data []byte, h connectionhealth.Hand
 	}
 	t.logf("cloud ignored an unknown frame type=%s", kind)
 	return nil
+}
+
+// A route receipt is not key adoption. Answers are never retained or retried.
+func (t *Transport) handleRekeyControl(data []byte, kind string) {
+	var frame struct {
+		Type      string  `json:"type"`
+		Frame     string  `json:"frame"`
+		Operation *string `json:"operation_id"`
+		Code      *string `json:"code"`
+		Delivered *int64  `json:"delivered"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	valid := decoder.Decode(&frame) == nil && (frame.Frame == "content_key_offer" || frame.Frame == "content_key_answer")
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(data, &fields) != nil {
+		valid = false
+	}
+	for _, value := range fields {
+		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			valid = false
+		}
+	}
+	if frame.Operation != nil {
+		id := *frame.Operation
+		valid = valid && len(id) > 0 && len(id) <= 128
+		for _, c := range id {
+			if c < '!' || c > '~' || c == '<' || c == '>' || c == '&' {
+				valid = false
+			}
+		}
+	}
+	code := "content_key_routed"
+	if kind == "content_key_routed" {
+		valid = valid && frame.Operation != nil && frame.Delivered != nil && *frame.Delivered > 0 && frame.Code == nil
+	} else {
+		valid = valid && frame.Delivered == nil && frame.Code != nil
+		if frame.Code != nil {
+			code = *frame.Code
+		}
+		switch code {
+		case "content_key_malformed", "content_key_forbidden", "content_key_no_target", "content_key_rate_limited", "content_key_unavailable":
+		default:
+			valid = false
+		}
+	}
+	if !valid {
+		t.logf("cloud dropped rekey control code=malformed_control")
+		return
+	}
+	t.logf("cloud rekey control code=%s", code)
 }
 
 func (t *Transport) handleAck(data []byte) {

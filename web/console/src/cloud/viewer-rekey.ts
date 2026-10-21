@@ -24,6 +24,20 @@ interface Options {
 const rejected = () => Object.assign(new Error("content key exchange rejected"), { code: "unknown_key" })
 const b64 = (b: Uint8Array) => btoa(String.fromCharCode(...b))
 
+/** Relay receipts carry routing information, never key or pairing authority. */
+export function validRekeyControl(value: unknown): value is {type: string; frame: string; operation_id?: string; code?: string} {
+ if (!value || typeof value !== "object" || Array.isArray(value)) return false
+ const f = value as Record<string, unknown>
+ const routed = f.type === "content_key_routed"
+ if (!routed && f.type !== "content_key_error") return false
+ if (f.frame !== "content_key_offer" && f.frame !== "content_key_answer") return false
+ const fields = routed ? "type frame operation_id delivered" : "type frame code operation_id"
+ if (Object.keys(f).some(key => !fields.split(" ").includes(key))) return false
+ if (f.operation_id !== undefined && (typeof f.operation_id !== "string" || !/^[\x21-\x7e]{1,128}$/.test(f.operation_id) || /[<>&]/.test(f.operation_id))) return false
+ if (routed) return typeof f.operation_id === "string" && Number.isSafeInteger(f.delivered) && (f.delivered as number) > 0
+ return ["content_key_malformed", "content_key_forbidden", "content_key_no_target", "content_key_rate_limited", "content_key_unavailable"].includes(f.code as string)
+}
+
 /** The account and pins here come from boot/storage, never a relay header or roster. */
 export class ViewerRekey {
  private pending: Pending | null = null
@@ -32,6 +46,14 @@ export class ViewerRekey {
  constructor(options: Options) { this.options = options }
  get pendingCount() { return this.pending ? VIEWER_REKEY_PENDING_LIMIT : 0 }
  isPending(machine: string) { return this.pending?.machine === machine }
+ control(frame: unknown) {
+  if (!validRekeyControl(frame)) throw Object.assign(new Error("content key exchange rejected"), {code:"bad_frame"})
+  const p = this.pending
+  if (frame.type !== "content_key_error" || frame.frame !== "content_key_offer" || !p?.offer ||
+      this.options.now() >= p.expires || frame.operation_id !== JSON.parse(p.offer).operation_id) return
+  this.cancel()
+  throw Object.assign(new Error("content key exchange rejected"), {code:"cloud_reconnecting"})
+ }
  private authority(machine: string): RekeyAuthority {
   return { account_id: this.options.account, machine_id: machine,
    viewer_device_id: this.options.viewer, activeViewerKey: this.options.viewerKey }

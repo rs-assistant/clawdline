@@ -16,7 +16,7 @@ import {
     sealEnvelope
 } from "./cloud-crypto.js";
 import { T } from "../core/i18n.js";
-import { ViewerRekey } from "../../../cloud/viewer-rekey.ts";
+import { ViewerRekey, validRekeyControl } from "../../../cloud/viewer-rekey.ts";
 import { classifyViewerError, viewerHealthBegin, viewerHealthFailed } from "./viewer-health-hook.js";
 import { machinePresentation, machinePresentationForFleet } from "../session/selection.js";
 import {
@@ -815,6 +815,11 @@ export class CloudClient {
             throw cloudError("bad_frame", "the relay frame is not an object");
         }
         this.framesHeard += 1;
+        if (frame.type === "content_key_routed" || frame.type === "content_key_error") {
+            if (!validRekeyControl(frame)) throw cloudError("bad_frame", "content key exchange rejected");
+            if (this.viewerRekey) return this.viewerRekey.control(frame);
+            return;
+        }
         if (frame.type === "content_key_answer" && this.viewerRekey) return this.viewerRekey.answer(raw);
         if (frame.type === "challenge") return this._answerChallenge(frame);
         if (frame.type === "ready") return this._becameReady(frame);

@@ -9,6 +9,89 @@ import { sealRekeyAnswer, rekeyKeyID, rekeyCanonical, openRekeyAnswer } from "./
 // @ts-expect-error Node executes TypeScript directly.
 import { storedPairing } from "./viewer-rekey-storage.test.ts"
 
+// Recorded AccountDO control shapes; operation identifiers are anonymized.
+const recordedRouted = '{"type":"content_key_routed","frame":"content_key_offer","operation_id":"recorded-route-operation","delivered":1}'
+const recordedError = '{"type":"content_key_error","frame":"content_key_offer","code":"content_key_no_target","operation_id":"recorded-error-operation"}'
+
+test("recorded relay controls do not adopt; exact offer errors release pending and preserve cooldown", async () => {
+ const s = await scenario()
+ try {
+  await s.client.viewerRekey.request(s.pairing)
+  const operation = s.sent.find(f=>f.type==="content_key_offer").operation_id
+  await s.client._receive(recordedRouted)
+  await s.client._receive(JSON.stringify({...JSON.parse(recordedRouted),operation_id:operation}))
+  assert.equal(s.client.viewerRekey.pendingCount,1)
+  assert.equal((await s.session.machinePairing("machine-test")).keyID,"ms-1")
+  assert.equal(s.client.machinePairings.get("machine-test"),undefined)
+  await s.client._receive(recordedError) // recorded, unrelated operation
+  assert.equal(s.client.viewerRekey.pendingCount,1)
+  const matching = {...JSON.parse(recordedError),operation_id:operation}
+  await s.client._receive(JSON.stringify({type:"content_key_error",frame:"content_key_offer",code:"content_key_malformed"}))
+  assert.equal(s.client.viewerRekey.pendingCount,1)
+  for (const wrong of [{operation_id:"other"},{frame:"content_key_answer"}]) {
+   await s.client._receive(JSON.stringify({...matching,...wrong}))
+   assert.equal(s.client.viewerRekey.pendingCount,1)
+  }
+  for (const wrong of [{code:"secret raw error"},{operation_id:42},{operation_id:""},{frame:[]},{extra:"secret"}]) {
+   await assert.rejects(s.client._receive(JSON.stringify({...matching,...wrong})), {code:"bad_frame"})
+   assert.equal(s.client.viewerRekey.pendingCount,1)
+  }
+  await assert.rejects(s.client._receive(JSON.stringify(matching)), {code:"cloud_reconnecting",message:"content key exchange rejected"})
+  assert.equal(s.client.viewerRekey.pendingCount,0)
+  assert.equal(await s.client.viewerRekey.request(s.pairing),false)
+  assert.equal(s.sent.filter(f=>f.type==="content_key_offer").length,1)
+  s.clock.now += VIEWER_REKEY_COOLDOWN_MS
+  assert.equal(await s.client.viewerRekey.request(s.pairing),true)
+  await s.client._receive(JSON.stringify(matching)) // stale refusal cannot cancel the next operation
+  assert.equal(s.client.viewerRekey.pendingCount,1)
+ } finally {s.client.stop()}
+})
+
+test("relay cancellation during adoption invalidates durable authority and never updates memory", async () => {
+ const s=await scenario()
+ let release!:()=>void, entered!:()=>void, valid!:()=>boolean, adopted=0
+ const waiting=new Promise<void>(resolve=>{entered=resolve}), barrier=new Promise<void>(resolve=>{release=resolve})
+ let offer=""
+ const rekey=new ViewerRekey({account:s.authority.account_id,viewer:s.authority.viewer_device_id,
+  signing:s.viewer.privateKey,viewerKey:s.viewerKey,now:()=>s.clock.now,send:raw=>{offer=raw},
+  persist:async(pairing,state,operation,check)=>{valid=check;entered();await barrier;return s.session.persistMachineRekey(pairing,state,operation,check)},
+  adopted:()=>{adopted++}})
+ try {
+  await rekey.request(s.pairing)
+  const answering=rekey.answer(await s.answer(offer))
+  await waiting
+  assert.throws(()=>rekey.control({...JSON.parse(recordedError),operation_id:JSON.parse(offer).operation_id}),{code:"cloud_reconnecting"})
+  assert.equal(valid(),false)
+  release()
+  await assert.rejects(answering) // The synthetic database reports its abort as a transaction failure.
+  assert.equal((await s.session.machinePairing("machine-test")).keyID,"ms-1")
+  assert.equal(adopted,0)
+  assert.equal(await rekey.request(s.pairing),false)
+ } finally {release?.();rekey.cancel();s.client.stop()}
+})
+
+test("relay cancellation after a durable commit cannot adopt into memory", async () => {
+ const s=await scenario()
+ let release!:()=>void, entered!:()=>void, adopted=0, offer=""
+ const waiting=new Promise<void>(resolve=>{entered=resolve}), barrier=new Promise<void>(resolve=>{release=resolve})
+ const rekey=new ViewerRekey({account:s.authority.account_id,viewer:s.authority.viewer_device_id,
+  signing:s.viewer.privateKey,viewerKey:s.viewerKey,now:()=>s.clock.now,send:raw=>{offer=raw},
+  persist:async(pairing,state,operation,check)=>{
+   const saved=await s.session.persistMachineRekey(pairing,state,operation,check)
+   entered();await barrier;return saved
+  },adopted:()=>{adopted++}})
+ try {
+  await rekey.request(s.pairing)
+  const answering=rekey.answer(await s.answer(offer))
+  await waiting
+  assert.throws(()=>rekey.control({...JSON.parse(recordedError),operation_id:JSON.parse(offer).operation_id}),{code:"cloud_reconnecting"})
+  release()
+  assert.equal(await answering,false)
+  assert.equal(adopted,0)
+  assert.equal((await s.session.machinePairing("machine-test")).epoch,2,"already authorized durable commit is retained")
+ } finally {release?.();rekey.cancel();s.client.stop()}
+})
+
 async function scenario(options: {enabled?:boolean; writes?:boolean; auto?:boolean} = {}) {
  const saved = await storedPairing(), viewer = await crypto.subtle.generateKey("Ed25519",false,["sign","verify"])
  const viewerKey = new Uint8Array(await crypto.subtle.exportKey("raw",viewer.publicKey))
