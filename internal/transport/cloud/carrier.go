@@ -187,6 +187,18 @@ func sealCarrierAnswer(key domaincloud.ContentKey, connection, sdp string) (stri
 // sequence as strictly increasing, and an answer that travelled the short way
 // must not be able to sit in front of a relay answer's number.
 func (l *Link) sendCarrierEnvelope(viewer, channel string, class domaincloud.Class, payload []byte) error {
+	if l.contentEpoch != nil {
+		return l.contentEpoch.Use(func(state domaincloud.ContentKeyState) error {
+			return l.sendCarrierAtEpoch(viewer, channel, class, payload, state.Key, state.KeyID)
+		})
+	}
+	if l.relay == nil {
+		return ErrNoDirectCarrier
+	}
+	return l.sendCarrierAtEpoch(viewer, channel, class, payload, l.relay.Secret, l.relay.keyID())
+}
+
+func (l *Link) sendCarrierAtEpoch(viewer, channel string, class domaincloud.Class, payload []byte, key domaincloud.ContentKey, keyID string) error {
 	if !strings.HasPrefix(channel, "t/") {
 		// Only a read's answer travels this way. A status row or an
 		// orchestrator snapshot is the relay's retained value, and moving one
@@ -210,7 +222,7 @@ func (l *Link) sendCarrierEnvelope(viewer, channel string, class domaincloud.Cla
 	peer.mu.Unlock()
 	envelope, err := domaincloud.Seal(payload, domaincloud.SealParams{
 		Ch: channel, Seq: seq, Ts: uint64(l.opts.Now().UnixMilli()), Class: class,
-		KeyID: l.relay.keyID(), Sender: l.identity.MachineID, Key: l.relay.Secret, Signer: l.relay.Signer,
+		KeyID: keyID, Sender: l.identity.MachineID, Key: key, Signer: l.relay.Signer,
 	})
 	if err != nil {
 		return err
@@ -223,7 +235,7 @@ func (l *Link) sendCarrierEnvelope(viewer, channel string, class domaincloud.Cla
 	if err != nil {
 		return err
 	}
-	return peer.send(data)
+	return peer.sendWithinEpoch(data)
 }
 
 // mirrorStatusRow puts one Session row this machine has just published on
@@ -258,7 +270,7 @@ func (l *Link) mirrorStatusRow(channel string, sealed []byte) {
 	for _, peer := range peers {
 		// A channel that will not take it is not a failure of this publish:
 		// the row is on the relay, where that page reads it.
-		_ = peer.send(data)
+		_ = peer.sendWithinEpoch(data)
 	}
 }
 

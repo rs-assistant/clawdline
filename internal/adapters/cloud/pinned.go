@@ -69,10 +69,13 @@ func ValidViewerScope(scope string) bool { return scope == ScopeReadOnly || scop
 // public keys, ids and times, which is why it is JSON a person can read.
 type PinnedDevice struct {
 	// Scope is machine-local authority. Empty preserves pre-scope grants.
-	Scope       string `json:"scope,omitempty"`
-	DeviceID    string `json:"device_id"`
-	PublicKey   string `json:"public_key"`
-	Fingerprint string `json:"fingerprint"`
+	Scope string `json:"scope,omitempty"`
+	// PairingPending distinguishes a readonly ceiling reservation from a
+	// completed handover; raw key exchange never treats it as a pairing pin.
+	PairingPending bool   `json:"pairing_pending,omitempty"`
+	DeviceID       string `json:"device_id"`
+	PublicKey      string `json:"public_key"`
+	Fingerprint    string `json:"fingerprint"`
 	// PairedAt is when this machine sealed the handover, in Unix seconds.
 	PairedAt int64 `json:"paired_at"`
 	// Name is what the person will recognise the browser by, as the offer's
@@ -250,6 +253,27 @@ func (s *PinnedStore) Refused(sender string) (bool, error) {
 	return false, nil
 }
 
+// ActiveRekeyPin excludes legacy roster fallback and pre-delivery reservations.
+// All pin facts are read together, including the owning account.
+func (s *PinnedStore) ActiveRekeyPin(account, viewer string) (ed25519.PublicKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.loadLocked(); err != nil {
+		return nil, err
+	}
+	if s.record.AccountID != account || account == "" {
+		return nil, ErrViewerNotPinned
+	}
+	for _, row := range s.record.Devices {
+		if row.DeviceID == viewer && row.Active() && !row.PairingPending && ValidViewerScope(row.Scope) {
+			if key, ok := row.Key(); ok {
+				return key, nil
+			}
+		}
+	}
+	return nil, ErrViewerNotPinned
+}
+
 // Pin records a browser this machine has just handed the account key to.
 //
 // Re-pinning an existing device replaces its key and clears any refusal: that
@@ -308,6 +332,7 @@ func (s *PinnedStore) pin(accountID string, device PinnedDevice, keepScope bool)
 		device.PairedAt = time.Now().Unix()
 	}
 	device.RevokedAt = 0
+	device.PairingPending = false
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.loadLocked(); err != nil {
@@ -372,6 +397,7 @@ func (s *PinnedStore) ReserveReadOnly(accountID string, device PinnedDevice) err
 		device.PairedAt = time.Now().Unix()
 	}
 	device.Scope, device.RevokedAt = ScopeReadOnly, 0
+	device.PairingPending = true
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.loadLocked(); err != nil {
@@ -421,7 +447,12 @@ func (s *PinnedStore) Revoke(deviceID string, at time.Time) (bool, error) {
 			continue
 		}
 		s.record.Devices[i].RevokedAt = when
-		return true, s.saveLocked()
+		if err := s.saveLocked(); err != nil {
+			s.record.Devices[i].RevokedAt = 0
+			s.loaded = false
+			return false, err
+		}
+		return true, nil
 	}
 	return false, nil
 }
@@ -477,6 +508,15 @@ func (s *PinnedStore) saveLocked() error {
 		return err
 	}
 	if err := writeFileAtomically(s.dir, s.Path(), append(body, '\n')); err != nil {
+		return err
+	}
+	d, err := os.Open(s.dir)
+	if err != nil {
+		return err
+	}
+	err = d.Sync()
+	_ = d.Close()
+	if err != nil {
 		return err
 	}
 	s.stamp = stampOf(s.Path())

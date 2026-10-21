@@ -8790,5 +8790,9 @@
   "workflowSettings.iterm_integrationOn": "允許 Clawdline 列出 iTerm2 分頁、讀取畫面、傳送輸入，以及開啟、顯示或關閉分頁。第一次操作可能要求 macOS 自動化授權。",
   "workflowSettings.iterm_integrationOff": "不偵測、讀取或控制 iTerm2，包含派工、傳訊、檢視分頁與清理，也不要求其自動化權限。",
   "workflowSettings.iterm_integrationScope": "新舊安裝皆預設關閉，套用於這台機器的 macOS iTerm2。關閉後保留分頁與既有系統授權；已送出的 Apple Event 仍可能完成。",
-  "workflowSettings.itermUpdateRequired": "請更新這台機器的 Clawdline，才能管理 iTerm2 整合；此處目前無法判定其存取狀態。"
+  "workflowSettings.itermUpdateRequired": "請更新這台機器的 Clawdline，才能管理 iTerm2 整合；此處目前無法判定其存取狀態。",
+  "capacityRow.cloud.rekey_pending.what": "這台機器最多同時處理八筆已簽署的原始換鑰請求。",
+  "capacityRow.cloud.rekey_pending.full": "額外請求會立即被拒絕，一般中繼訊息仍可繼續處理。",
+  "capacityRow.cloud.rekey_interval.what": "這台機器每兩秒最多接受一筆原始換鑰請求，所有檢視裝置共用此間隔。",
+  "capacityRow.cloud.rekey_interval.full": "間隔內的請求會被拒絕，檢視裝置可在間隔結束後重試。"
 }

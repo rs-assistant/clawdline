@@ -1,10 +1,11 @@
-# Content-key runtime cutover (in preparation)
+# Content-key runtime cutover (disabled by default)
 
-**Status: preparation only.** This page describes a runtime foundation for
-rotating this machine's master content key after a revocation. Nothing in the
-daemon constructs it yet: `Link`, pairing and the direct carrier are unchanged,
-production rotation is not enabled, and revocation is not complete. Do not cite
-this page as evidence that revoked devices lose access.
+**Status: opt-in runtime integration; production remains disabled.**
+`LinkOptions.ContentKeyRuntime` defaults to false; no production caller enables
+it. The foundation record below describes the original inactive implementation.
+Its remaining-obligations list is historical; the integration section at the end
+records the new wiring and the acceptance still outstanding. Neither section
+establishes deployed future-content revocation.
 
 ## The problem it closes
 
@@ -141,3 +142,127 @@ now permits 128 bytes; this is an additive reader change, not a new ID format.
 Browser and private relay readers must accept the same bound before production
 rotation is enabled. The existing short IDs remain valid. The relay reader
 upgrade and actual end-to-end acceptance remain pending.
+
+## Opt-in runtime integration
+
+`Link.wire` loads or recovers durable content state and constructs one
+`KeyEpoch`, shared by `Relay.Keys` and machine `Options.KeyEpoch`. It resumes
+pending revocation before constructing the publisher. Recovery errors refuse
+startup, without a legacy-key fallback. Ordinary pairing hands over the current
+durable key and actual ID. The pure control contract and full epoch/hash IDs
+are unchanged.
+
+`runtimeAuthority.mu` orders ordinary request handling, terminal handling,
+pairing disclosure/final pin, revocation and raw rekey disclosure. Pairing saves
+the generation before its invitation or pasted-offer operation starts. Revocation
+invalidates that generation; stale unfinished pairing cannot clear the refusal.
+A new explicit successful pairing can restore a pin. Pin persistence failures
+are errors, including directory-sync failures.
+
+Revocation first writes a fixed-size intent in `cloudkeys.Files`, containing
+viewer ID, stable random operation ID and expected epoch. Under the exclusive
+epoch fence it persists deny, rotates with that operation, retires old spool
+rows and marks all direct peers closed/removes their mappings. Closing SCTP
+also retires accepted-but-undelivered direct data. After reopening the fence,
+it retires revoked-viewer terminal connections, marks the journal complete and
+requests a full publisher restatement on the next normal pass. Errors inside
+the epoch transaction halt publication. Restart/retry resumes the exact intent,
+even when the pin already says revoked; it never remints an already durable
+operation. Missing or already-revoked devices without pending work return
+unchanged. A new intent replaces only a completed intent. This is a single
+daemon transaction owner, not an interprocess transaction lock.
+
+`Transport.dispatchRawRekey` bounds raw workers at eight and refuses excess
+with `ErrRekeyOverload`; slow handlers do not block the normal reader. The
+4096-byte contract bound applies before copying. Link admission additionally
+allows one offer per two seconds globally. There is no unbounded nonce set;
+duplicate offers share the admission budget and can only receive the current
+key. Raw answers never enter retained publication or the spool.
+
+The answer handler uses configured account/machine context, an active local
+nonlegacy pin with explicit valid scope, its verified signature, a fresh roster
+fetch and matching active roster key with `read_transcript`. Readonly qualifies;
+`send_prompt` is unnecessary. It re-reads the pin immediately before sealing,
+uses fresh `crypto/rand` ephemeral/nonce bytes, and sends the targeted signed raw
+answer inside the authority sequence and epoch fence. Contract expiry and epoch
+checks still apply. Routing metadata grants no authority.
+
+Carrier master answers seal/send inside `Use`. Mirrored status already owns
+the relay's fence and calls `sendWithinEpoch` without recursively entering it.
+Other direct sends check the queued envelope's key ID inside `Use`. After
+acquiring `sendMu`, the final direct send rechecks closure and the active local
+pin. Cutover retirement avoids `terminalMu` while holding the epoch fence:
+terminal publishers can themselves wait for that fence. Per-connection `rk-*`
+keys remain separate; revoked-viewer terminal connections are retired too.
+
+The complete cutover wait is **not latency bounded**. The epoch owner waits
+for relay callbacks and direct `sendMu` owners. `OpeningTimeout` bounds socket
+I/O after WebSocket `writeMu` acquisition, not mutex wait or callbacks. Pion
+owns data-channel enqueue/backpressure and network delivery. There is no measured
+whole-cutover bound or remote erasure of already delivered bytes.
+
+The alternate `IdentityPairing` adapter now joins the same authority through
+short guarded disclosure and confirm/pin sections, as described below. Its
+compatibility epoch record no longer selects the runtime key or resets its floor;
+disabled-mode behavior remains unchanged.
+
+Synthetic tests cover real answer seal/open and future ciphertext, readonly B,
+revoked A, restart and operation idempotence, journal persistence boundaries,
+failed pin writes, stale pairing generations, concurrent answer/revoke, wrong
+or missing pins, bounded slow raw callbacks and late direct frame rejection.
+Task artifacts hold actual run results. Deployment, real hosted-browser
+acceptance, cross-system end-to-end recovery, independent review and operational
+latency measurements remain pending.
+Keep the producer off until the required acceptance is complete; never roll
+back durable floors as a compatibility workaround.
+
+
+## Identity handover participates in runtime authority
+
+When `ContentKeyRuntime` is enabled, `IdentityPairing.Begin` captures the same
+revocation generation as ordinary pairing. `MachineIdentityPairing.Authorize`
+enters the shared authority only to read the selected durable state, reserve the
+local scope and seal/write the grant, or verify activation and write the attested
+confirm plus local epoch and pin. Offer/activate polling and the person's code
+comparison run outside that lock. A revoked generation cannot disclose again or
+finish a pin, including a revoke of a viewer not yet pinned. Cancellation and
+replacement serialize with these short critical sections; the signed QR's expiry
+also bounds the adapter context. Network writes retain their existing request
+deadlines; this does not claim an overall cutover latency bound.
+
+`ContentState` selects key bytes and epoch together. The old
+`ContentEpochStore` is a compatibility record for the diagnostics uploader,
+not a second authority: a historical lower epoch may remain until a successful
+confirmed handover records the current epoch. A future floor, same-epoch key
+mismatch, malformed record, or different account fails closed without overwriting
+that record. Local persistence failure never reports paired. The completed pin
+uses the decoded offer's verified signing key and fingerprint, never a roster
+lookup. New diagnostic viewers reserve readonly scope before disclosure; existing
+ceilings are preserved. Pending reservations are not completed rekey pins.
+
+### Browser data flow and capability boundary
+
+`#pairid` → `pairThisViewer` → `openIdentityGrant` authenticates the exact QR,
+offer, machine key and epoch, imports non-extractable AES-GCM/HKDF keys, and
+produces activation key confirmation. Only `openIdentityConfirm` accepting that
+exact activation allows `saveHandover` → `storeHealthHandover`. That existing
+account-and-machine IndexedDB record feeds `heldMasterKeyFor` → `sealedKeyFor`
+→ the diagnostic attachment reader. Its transaction now retains the content and
+identity epoch floors, the authenticated machine signing key, and the full
+ordinary-envelope content key ID (`ms-1` or `mk-<epoch>-<SHA256(raw key)>`). Equal
+epoch key substitution and machine pin substitution are refused. An older record
+without the additive pin/ID can be upgraded by a newly confirmed handover; no
+account-wide fallback is introduced.
+
+This diagnostic handover does not establish ordinary Session access. The existing
+`handoverDoneWord` and `RelayAccess` explicitly retain that distinction, including
+for a signed-in browser still on the ordinary pairing screen. Ordinary envelopes
+continue to obtain their key and machine pin from `storePairingCryptoKeys` and
+`adoptMachineRekey`; their per-machine binding and epoch floor are unchanged.
+The AES-GCM key imported by identity handover is cryptographically usable with the
+same full hash ID at later epochs, but the diagnostic page does not silently
+adopt it into an ordinary relay binding or claim that Session access was granted.
+
+Production `ContentKeyRuntime` remains off by default. Synthetic tests exercise
+real signatures and AEAD; production relay, real browser and phone acceptance
+remain separate integration requirements.

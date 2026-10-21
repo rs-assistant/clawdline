@@ -28,7 +28,14 @@ import (
 )
 
 // Options configure one transport.
+// ErrRekeyOverload is a bounded raw-control admission refusal.
+const RawRekeyPendingLimit = 8
+
+var ErrRekeyOverload = errors.New("content_key_offer_overloaded")
+
 type Options struct {
+	// RawRekeyOffer runs in a bounded worker, outside the socket reader.
+	RawRekeyOffer func([]byte) error
 	// RelayURL is ws:// or wss:// and either has no path or ends in
 	// /v1/connect. A path this does not recognise is refused rather than
 	// rewritten, because silently sending a device token to somebody else's
@@ -119,7 +126,8 @@ type Options struct {
 
 // Transport is one line to the relay.
 type Transport struct {
-	opts Options
+	rawRekeyPending chan struct{}
+	opts            Options
 
 	mu         sync.Mutex
 	conn       *Conn
@@ -516,6 +524,9 @@ func (t *Transport) handleFrame(conn *Conn, data []byte, h connectionhealth.Hand
 		return nil
 	}
 	switch kind {
+	case "content_key_offer":
+		t.dispatchRawRekey(data)
+		return nil
 	case FramePing:
 		return conn.WriteText([]byte(`{"type":"pong"}`), t.opts.Now().Add(KeepaliveInterval))
 	case FramePong, FrameSubscriptions:
@@ -1151,4 +1162,61 @@ func trimSlash(s string) string {
 
 func (t *Transport) PublishPeerDiscovery(frame []byte) error {
 	return t.publishPeerFrame(frame, "peer_discovery_publish")
+}
+
+// PublishRekeyAnswer sends a targeted signed raw answer; it never enters the spool.
+func (t *Transport) PublishRekeyAnswer(raw []byte) error {
+	if len(raw) == 0 || len(raw) > cloud.MaxRekeyBodyBytes {
+		return cloud.ErrRekey
+	}
+	var answer cloud.RekeyAnswer
+	if json.Unmarshal(raw, &answer) != nil || answer.Type != "content_key_answer" {
+		return cloud.ErrRekey
+	}
+	t.mu.Lock()
+	conn := t.conn
+	t.mu.Unlock()
+	if conn == nil {
+		return ErrNotConnected
+	}
+	if err := conn.WriteText(raw, t.opts.Now().Add(OpeningTimeout)); err != nil {
+		_ = conn.Close()
+		return err
+	}
+	return nil
+}
+
+func (t *Transport) dispatchRawRekey(raw []byte) {
+	if t.opts.RawRekeyOffer == nil {
+		return
+	}
+	if len(raw) > cloud.MaxRekeyBodyBytes {
+		t.logf("cloud: raw rekey refused: oversized")
+		return
+	}
+	t.mu.Lock()
+	if t.rawRekeyPending == nil {
+		t.rawRekeyPending = make(chan struct{}, RawRekeyPendingLimit)
+	}
+	slots := t.rawRekeyPending
+	t.mu.Unlock()
+	select {
+	case slots <- struct{}{}:
+	default:
+		t.logf("cloud: raw rekey refused: %v", ErrRekeyOverload)
+		return
+	}
+	body := append([]byte(nil), raw...)
+	go func() {
+		defer func() { <-slots }()
+		if err := t.opts.RawRekeyOffer(body); err != nil {
+			t.logf("cloud: raw rekey refused: %v", err)
+		}
+	}()
+}
+
+func (t *Transport) RekeyPending() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.rawRekeyPending)
 }
