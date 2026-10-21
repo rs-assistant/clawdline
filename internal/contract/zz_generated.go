@@ -9332,12 +9332,20 @@ var WorkStateValues = []WorkState{WorkStateReady, WorkStateWorking, WorkStateHol
 
 type WorkflowSettingsRequest struct {
 	DispatchFullPermission *bool `json:"dispatch_full_permission"`
-	SessionAutoDiscovery   *bool `json:"session_auto_discovery"`
+
+	// Explicit opt-in to iTerm2 access. False by default; older daemons omit this
+	// field.
+	ItermIntegration     *bool `json:"iterm_integration"`
+	SessionAutoDiscovery *bool `json:"session_auto_discovery"`
 }
 
 type WorkflowSettingsSnapshot struct {
 	DispatchFullPermission bool `json:"dispatch_full_permission"`
-	SessionAutoDiscovery   bool `json:"session_auto_discovery"`
+
+	// Explicit opt-in to iTerm2 access. False by default; older daemons omit this
+	// field.
+	ItermIntegration     *bool `json:"iterm_integration"`
+	SessionAutoDiscovery bool  `json:"session_auto_discovery"`
 }
 
 type WorktreeCanonical struct {

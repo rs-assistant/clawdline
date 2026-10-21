@@ -11193,11 +11193,23 @@ export const WorkStateValues: readonly WorkState[] = ["ready", "working", "holdi
 
 export interface WorkflowSettingsRequest {
   dispatch_full_permission: boolean | null
+
+  /**
+   * Explicit opt-in to iTerm2 access. False by default; older daemons omit this
+   * field.
+   */
+  iterm_integration: boolean | null
   session_auto_discovery: boolean | null
 }
 
 export interface WorkflowSettingsSnapshot {
   dispatch_full_permission: boolean
+
+  /**
+   * Explicit opt-in to iTerm2 access. False by default; older daemons omit this
+   * field.
+   */
+  iterm_integration: boolean | null
   session_auto_discovery: boolean
 }
 

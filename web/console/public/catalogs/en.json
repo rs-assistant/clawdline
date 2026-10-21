@@ -8767,5 +8767,11 @@
   "capacityRow.cloud.viewer_rekey_pending.what": "How many content-key exchanges one browser client may hold at once. Only an explicitly paired machine can answer; read-only browsers are eligible.",
   "capacityRow.cloud.viewer_rekey_pending.full": "Further unknown-key envelopes retain no payload and start no extra operation. One exchange expires within 120 seconds; it is never automatically retried. This feature is disabled by default. The machine cannot measure live browser use.",
   "capacityRow.cloud.viewer_rekey_cooldown.what": "The minimum seconds between content-key offers from one browser client, shared across its machines. This bounds retries caused by unknown-key traffic.",
-  "capacityRow.cloud.viewer_rekey_cooldown.full": "An earlier offer blocks another until the interval ends. New traffic may then request one fresh exchange; no timer retries it. Disconnect discards pending secrets. The machine cannot measure this browser interval."
+  "capacityRow.cloud.viewer_rekey_cooldown.full": "An earlier offer blocks another until the interval ends. New traffic may then request one fresh exchange; no timer retries it. Disconnect discards pending secrets. The machine cannot measure this browser interval.",
+  "workflowSettings.introWithITerm": "These settings apply to the selected machine. iTerm2 integration stays off until you enable it. Select ⓘ to see what each switch changes.",
+  "workflowSettings.iterm_integrationTitle": "Enable iTerm2 integration",
+  "workflowSettings.iterm_integrationOn": "Allow Clawdline to list iTerm2 tabs, read their screens, send input, and open, show or close tabs. The first operation may request macOS Automation permission.",
+  "workflowSettings.iterm_integrationOff": "Do not detect, read or control iTerm2, including for dispatch, messages, viewer tabs and cleanup. Do not request its Automation permission.",
+  "workflowSettings.iterm_integrationScope": "Off by default for new and existing installations. Applies to this machine and iTerm2 on macOS. Turning it off leaves tabs open and existing macOS grants intact; an Apple Event already sent may still complete.",
+  "workflowSettings.itermUpdateRequired": "Update Clawdline on this machine to manage iTerm2 integration. Its current access cannot be determined here."
 }

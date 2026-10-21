@@ -281,7 +281,7 @@ func (s *Server) workGateSettingsRoute(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// workflowSettingsRoute exposes only dispatch defaults and Session discovery.
+// workflowSettingsRoute exposes only workflow defaults, discovery and iTerm2 consent.
 func (s *Server) workflowSettingsRoute(w http.ResponseWriter, r *http.Request) {
 	f := s.settingsFile()
 	read := func() (contract.WorkflowSettingsSnapshot, error) {
@@ -290,7 +290,8 @@ func (s *Server) workflowSettingsRoute(w http.ResponseWriter, r *http.Request) {
 			return contract.WorkflowSettingsSnapshot{}, err
 		}
 
-		return contract.WorkflowSettingsSnapshot{DispatchFullPermission: v.DispatchPermission() == "full", SessionAutoDiscovery: v.SessionAutoDiscovery()}, nil
+		integration, _ := v.Bool("iterm_integration")
+		return contract.WorkflowSettingsSnapshot{ItermIntegration: &integration, DispatchFullPermission: v.DispatchPermission() == "full", SessionAutoDiscovery: v.SessionAutoDiscovery()}, nil
 	}
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
@@ -313,7 +314,7 @@ func (s *Server) workflowSettingsRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for name := range body {
-			if name != "dispatch_full_permission" && name != "session_auto_discovery" {
+			if name != "dispatch_full_permission" && name != "session_auto_discovery" && name != "iterm_integration" {
 				writeRawRefusal(w, http.StatusBadRequest, "bad_request", "not a workflow setting key: "+name)
 				return
 			}
@@ -339,14 +340,18 @@ func (s *Server) workflowSettingsRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var err error
+		var values nextconfig.Values
 		if len(changes) == 0 {
-			_, err = f.Read()
+			values, err = f.Read()
 		} else {
-			_, err = f.Set(changes)
+			values, err = f.Set(changes)
 		}
 		if err != nil {
 			writeSettingsFailure(w, f, err)
 			return
+		}
+		if _, changed := changes["iterm_integration"]; changed {
+			applyITermScan(values)
 		}
 		answer, err := read()
 		if err != nil {
