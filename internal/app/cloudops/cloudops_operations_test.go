@@ -2010,3 +2010,42 @@ func TestSameNetworkEnableIsNarrowAndRequiresOperationPermission(t *testing.T) {
 		t.Fatal("enabled with operations forbidden")
 	}
 }
+
+func TestWorkflowSettingsCrossOnlyTheirNarrowSettingsRoute(t *testing.T) {
+	r := &router{}
+	answer := Bridge{MachineID: "mac-01", Router: r}.Handle(context.Background(), request(t, ClassCtl,
+		map[string]any{"type": "workflow-settings", "session": MachineReplySession, "request": "req-read"}))
+	if answer.Status != 200 || len(r.seen) != 1 || r.last().Method != "GET" || r.last().Path != "/v1/settings/workflow" {
+		t.Fatalf("read answered %+v, asked %+v", answer, r.seen)
+	}
+
+	r = &router{}
+	answer = open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "workflow-settings-update", "session": MachineReplySession, "request": "req-write",
+		"changes": map[string]any{"dispatch_full_permission": false, "session_auto_discovery": true},
+	}))
+	if answer.Status != 200 || len(r.seen) != 1 {
+		t.Fatalf("write answered %+v, asked %+v", answer, r.seen)
+	}
+	got := r.last()
+	if got.Method != "POST" || got.Path != "/v1/settings/workflow" ||
+		string(got.Body) != `{"dispatch_full_permission":false,"session_auto_discovery":true}` ||
+		got.Header[actorHeader] != actorDevice || got.Header["Idempotency-Key"] != "req-write" {
+		t.Fatalf("write crossed too broadly: %+v body=%s", got, got.Body)
+	}
+
+	for _, changes := range []any{
+		map[string]any{"remote": true},
+		map[string]any{"dispatch_full_permission": "on"},
+		map[string]any{"dispatch_full_permission": true, "session_auto_discovery": false, "remote": nil},
+		[]any{true},
+	} {
+		r := &router{}
+		bad := open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{
+			"type": "workflow-settings-update", "session": MachineReplySession, "request": "req-bad", "changes": changes,
+		}))
+		if bad.Code != "malformed_command" || len(r.seen) != 0 {
+			t.Fatalf("took changes %#v: %+v, asked %+v", changes, bad, r.seen)
+		}
+	}
+}

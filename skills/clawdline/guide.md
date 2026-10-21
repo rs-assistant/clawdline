@@ -693,7 +693,7 @@ included — so the task the child reads is the one that was validated, and it d
 | `instructions` | required, at most 16 KiB. They must stand on their own: the child knows nothing else. Carry the facts you already verified, each with its `file:line` or command; an investigation child also gets a stop condition and a turn limit |
 | `claims` | **required**: at most 32 relative paths the child may write. `[]` means it writes nothing and is warned about (`claims_missing`) |
 | `isolation` | `none` (default) or `worktree` for a private checkout on its own branch |
-| `permission_mode` | `ask`, `edits` or `full` |
+| `permission_mode` | `ask`, `edits` or `full`; absent follows the machine setting (initially `full`) |
 | `timeout_minutes` | 1–240, default 30 |
 | `kind`, `deliverables`, `model` | optional; `model` is `[a-z0-9._-]`, at most 64 characters |
 | `work_id` | optional UUID of the board item this serves |

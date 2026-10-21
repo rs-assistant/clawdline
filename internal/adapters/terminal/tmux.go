@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -118,6 +119,17 @@ func (t *Tmux) Name() string { return "tmux" }
 // authoritative "there are no panes" — the one answer that lets the broker
 // call a live child's tab gone (docs/design-decisions.md D05 ③).
 func (t *Tmux) Inventory(ctx context.Context) (session.Inventory, error) {
+	return t.inventory(ctx, false)
+}
+
+// ManagedInventory retains bare presence for external panes, without reading their screens or records.
+func (t *Tmux) ManagedInventory(ctx context.Context) (session.Inventory, error) {
+	return t.inventory(ctx, true)
+}
+
+var managedSessionName = regexp.MustCompile(`^clawdline-(session|task)-[0-9a-f]{8}$`)
+
+func (t *Tmux) inventory(ctx context.Context, managedOnly bool) (session.Inventory, error) {
 	inv := session.Inventory{
 		ObservedAt: time.Now(),
 		Provenance: "tmux",
@@ -134,7 +146,7 @@ func (t *Tmux) Inventory(ctx context.Context) (session.Inventory, error) {
 
 	format := strings.Join([]string{
 		"#{pane_id}", "#{pane_tty}", "#{pane_current_command}",
-		"#{session_name}", "#{pane_title}", "#{pane_current_path}",
+		"#{session_name}", "#{pane_title}", "#{pane_current_path}", "#{@clawdline_managed}",
 	}, paneSeparator)
 
 	// `-u`: under LC_ALL=C tmux treats the client as non-UTF-8 and rewrites
@@ -180,6 +192,10 @@ func (t *Tmux) Inventory(ctx context.Context) (session.Inventory, error) {
 			CWD:      parts[5],
 			State:    session.StateUnknown,
 			Evidence: session.EvidenceProcess,
+		}
+		if managedOnly && !managedSessionName.MatchString(parts[3]) && !(len(parts) > 6 && parts[6] == "1") {
+			inv.Sessions = append(inv.Sessions, session.Session{ID: s.ID, Backend: s.Backend, TTY: s.TTY, DiscoveryExcluded: true})
+			continue
 		}
 		switch parts[2] {
 		case "claude":

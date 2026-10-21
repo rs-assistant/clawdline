@@ -128,6 +128,8 @@ func init() {
 		// /v1/settings: a paired device can neither read nor write another
 		// machine setting through this word.
 		op{name: "work-gate-settings", read: true},
+		op{name: "workflow-settings", read: true},
+		op{name: "workflow-settings-update"},
 
 		op{name: "notification-settings", read: true},
 

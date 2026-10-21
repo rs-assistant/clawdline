@@ -2414,6 +2414,34 @@
         {"body": ["id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}/{id}/images", "local_body": ["data_url", "expected_version"]}
       ],
       "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 18874368, "copies": {"max_bytes": "workV2CloudImageBodyLimit"}}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}/{id}/images", "body": {"object": "item"}}}
+    },
+    {
+      "op": "workflow-settings",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/settings/workflow",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-read", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/settings/workflow"}
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/settings/workflow"}}
+    },
+    {
+      "op": "workflow-settings-update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/settings/workflow",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"changes": {"dispatch_full_permission": false, "session_auto_discovery": true}, "request": "req-write", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["changes", "request", "session"], "path": "/v1/settings/workflow", "local_body": ["dispatch_full_permission", "session_auto_discovery"]}
+      ],
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "max_keys": 2, "properties": {"dispatch_full_permission": {"type": "bool", "nullable": true}, "session_auto_discovery": {"type": "bool", "nullable": true}}, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/settings/workflow", "body": {"object": "changes"}}}
     }
   ]
 }

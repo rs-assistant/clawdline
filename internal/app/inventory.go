@@ -15,10 +15,12 @@ import (
 )
 
 type Inventory struct {
-	Process   ports.ProcessHost
-	Terminals []ports.TerminalHost
-	Identity  ports.IdentityHost
-	Agents    ports.AgentHost
+	// DiscoverExternal defaults to true; false keeps external terminal presence only.
+	DiscoverExternal func() bool
+	Process          ports.ProcessHost
+	Terminals        []ports.TerminalHost
+	Identity         ports.IdentityHost
+	Agents           ports.AgentHost
 	// Screen is one capture, now, on the caller's own clock. It is what
 	// answers a menu (Actions.Key) and what the broker reads before it types a
 	// briefing into a child — both of which act on what is drawn now, and a
@@ -65,6 +67,9 @@ func (in Inventory) screens() ports.ScreenHost {
 // much narrower than "this source is unreliable", and Inventory.ProvesAbsence
 // is where the narrower thing is read.
 func (in Inventory) Read(ctx context.Context) session.Inventory {
+	if in.DiscoverExternal != nil && !in.DiscoverExternal() {
+		in = in.managedOnly(ctx)
+	}
 	// The identity source is refreshed here rather than by whoever calls this.
 	// It used to be the caller's job, and of the six places that read an
 	// inventory only two remembered — so the board, the coordinator, the
@@ -191,6 +196,10 @@ func (in Inventory) Read(ctx context.Context) session.Inventory {
 		h.Begin()
 	}
 	for _, key := range order {
+		if byTTY[key].DiscoveryExcluded {
+			merged.Sessions = append(merged.Sessions, byTTY[key])
+			continue
+		}
 		row := in.enrich(ctx, byTTY[key])
 		if in.Agents != nil {
 			row = in.Agents.ForSession(row)

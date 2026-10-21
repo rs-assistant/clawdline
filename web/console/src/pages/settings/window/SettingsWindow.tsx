@@ -53,6 +53,7 @@ import { gateModeOptions, gateModeText } from "./gate-mode.js"
 import { BrowserLanguageControl } from "../../../ui-language/BrowserLanguageControl.js"
 import { CATALOG_TAGS, catalogWord } from "../../../catalog.js"
 import { askShell } from "../shell.js"
+import { WorkflowSettingsBlock } from "../WorkflowSettingsBlock.js"
 import { DispatchPolicyPane } from "./DispatchPolicyPane.js"
 
 /**
@@ -360,7 +361,7 @@ export function SettingsWindow({ embedded = false, pane, hideNavigation = false 
 
   // MARK: the tabs
 
-  const panes = [generalPane, ...(INPUT_BAR_ENABLED ? [barPane] : []), ...(VOICE_ENABLED ? [voicePane] : []), remotePane, orchestratorPane, () => <DispatchPolicyPane />, ...(HOOKS_ENABLED ? [hooksPane] : [])]
+  const panes = [generalPane, ...(INPUT_BAR_ENABLED ? [barPane] : []), ...(VOICE_ENABLED ? [voicePane] : []), remotePane, orchestratorPane, () => <DispatchPolicyPane />, () => <div className="sw-column"><WorkflowSettingsBlock shown /></div>, ...(HOOKS_ENABLED ? [hooksPane] : [])]
   const titles = [
     W.settingsGeneral,
     ...(INPUT_BAR_ENABLED ? [W.settingsBar] : []),
@@ -368,6 +369,7 @@ export function SettingsWindow({ embedded = false, pane, hideNavigation = false 
     W.settingsRemote,
     W.settingsOrchestrator,
     catalogWord("dispatchPolicy", "navTitle"),
+    catalogWord("workflowSettings", "tab"),
     ...(HOOKS_ENABLED ? [W.settingsHooks] : []),
   ]
 

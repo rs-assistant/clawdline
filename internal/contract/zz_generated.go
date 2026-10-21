@@ -6222,7 +6222,8 @@ type SettingsRequest struct {
 	ReopenOnReturn *bool `json:"reopen_on_return"`
 
 	// Bundle identifiers separated by commas, or empty for every app.
-	ScopeApp *string `json:"scope_app"`
+	ScopeApp             *string `json:"scope_app"`
+	SessionAutoDiscovery *bool   `json:"session_auto_discovery"`
 
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
@@ -6434,7 +6435,8 @@ type SettingsSnapshot struct {
 
 	// The file's `scope_app`, or null when absent — which the shell reads as
 	// com.googlecode.iterm2. Empty is every app.
-	ScopeApp *string `json:"scope_app"`
+	ScopeApp             *string `json:"scope_app"`
+	SessionAutoDiscovery *bool   `json:"session_auto_discovery"`
 
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
@@ -9276,6 +9278,16 @@ const (
 
 // WorkStateValues is every value the contract allows, in contract order.
 var WorkStateValues = []WorkState{WorkStateReady, WorkStateWorking, WorkStateHolding, WorkStateWaitingYou, WorkStateWaitingSession, WorkStateUnknown, WorkStateMilestoneComplete, WorkStateWorkComplete}
+
+type WorkflowSettingsRequest struct {
+	DispatchFullPermission *bool `json:"dispatch_full_permission"`
+	SessionAutoDiscovery   *bool `json:"session_auto_discovery"`
+}
+
+type WorkflowSettingsSnapshot struct {
+	DispatchFullPermission bool `json:"dispatch_full_permission"`
+	SessionAutoDiscovery   bool `json:"session_auto_discovery"`
+}
 
 type WorktreeCanonical struct {
 	Error      *WorktreeIssue           `json:"error"`

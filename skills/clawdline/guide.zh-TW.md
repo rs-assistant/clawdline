@@ -607,7 +607,7 @@ writes、deliverables、kind 和 timeout 都在裡面——所以 child 讀到�
 | `instructions` | 必填，最多 16 KiB。內容必須自己就講得清楚：除此之外 child 什麼都不知道。寫進你已經查證過的事實，每一條附 `file:line` 或指令；調查 child 還要有停止條件與 turn 上限 |
 | `claims` | **必填**：最多 32 個 child 可以寫入的相對路徑。`[]` 表示它什麼都不寫，派工會帶一個警告（`claims_missing`） |
 | `isolation` | `none`（預設），或 `worktree`：在自己的 branch 上開一份私有 checkout |
-| `permission_mode` | `ask`、`edits` 或 `full` |
+| `permission_mode` | `ask`、`edits` 或 `full`；省略時依機器設定（初始為 `full`） |
 | `timeout_minutes` | 1–240，預設 30 |
 | `kind`、`deliverables`、`model` | 選填；`model` 只能用 `[a-z0-9._-]`，最多 64 字元 |
 | `work_id` | 選填，這個 task 所服務的看板項目的 UUID |

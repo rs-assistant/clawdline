@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8280,
+  "englishKeys": 8300,
   "counts": {
-    "negation": 2414,
-    "state": 1353,
-    "permission": 459,
-    "deletion": 196,
+    "negation": 2420,
+    "state": 1355,
+    "permission": 463,
+    "deletion": 197,
     "uncertainty": 253
   },
-  "unionCount": 3690,
+  "unionCount": 3699,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -2417,6 +2417,12 @@
       "workflow.sourceUnavailable",
       "workflow.workflowUnavailable",
       "workflow.zeroReviewBody",
+      "workflowSettings.dispatch_full_permissionOff",
+      "workflowSettings.dispatch_full_permissionOn",
+      "workflowSettings.readFailed",
+      "workflowSettings.saveFailed",
+      "workflowSettings.session_auto_discoveryOff",
+      "workflowSettings.session_auto_discoveryScope",
       "worktree.inventoryNotObserved",
       "worktree.noBranch",
       "worktree.noWorktrees",
@@ -3774,6 +3780,8 @@
       "workflow.sourceStartUnavailable",
       "workflow.sourceUnavailable",
       "workflow.workflowCount",
+      "workflowSettings.dispatch_full_permissionScope",
+      "workflowSettings.saved",
       "worktree.cleanupUnavailable",
       "worktree.failed",
       "worktree.inventoryNotObserved",
@@ -4240,6 +4248,10 @@
       "template.5c513a465185",
       "verify.reasonNeeded",
       "workflow.linkedMessageHint",
+      "workflowSettings.dispatch_full_permissionOff",
+      "workflowSettings.dispatch_full_permissionOn",
+      "workflowSettings.dispatch_full_permissionTitle",
+      "workflowSettings.session_auto_discoveryScope",
       "worktree.refreshed"
     ],
     "deletion": [
@@ -4438,7 +4450,8 @@
       "workflow.skillImportHint",
       "workflow.sourceScopeConflict",
       "workflow.sourceStartUnavailable",
-      "workflow.unlinkSource"
+      "workflow.unlinkSource",
+      "workflowSettings.session_auto_discoveryScope"
     ],
     "uncertainty": [
       "admin.demoDescription",
@@ -8369,6 +8382,15 @@
     "workflow.workflowCount",
     "workflow.workflowUnavailable",
     "workflow.zeroReviewBody",
+    "workflowSettings.dispatch_full_permissionOff",
+    "workflowSettings.dispatch_full_permissionOn",
+    "workflowSettings.dispatch_full_permissionScope",
+    "workflowSettings.dispatch_full_permissionTitle",
+    "workflowSettings.readFailed",
+    "workflowSettings.saveFailed",
+    "workflowSettings.saved",
+    "workflowSettings.session_auto_discoveryOff",
+    "workflowSettings.session_auto_discoveryScope",
     "worktree.cleanupEligible",
     "worktree.cleanupUnavailable",
     "worktree.countUnknown",

@@ -285,7 +285,9 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("notification-rules" in CARRIED)
   assert.ok("notification-rules-update" in CARRIED)
   assert.ok("work-gate-settings" in CARRIED)
+  assert.ok("workflow-settings" in CARRIED)
   assert.ok("work-gate-settings-update" in CARRIED)
+  assert.ok("workflow-settings-update" in CARRIED)
   assert.ok("machine-usage" in CARRIED)
   assert.ok("update" in CARRIED)
   assert.ok("update-apply" in CARRIED)
@@ -320,7 +322,7 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("session-snippets" in CARRIED)
   assert.ok("usage.overview" in CARRIED)
   assert.ok("direct-local-network-enable" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 162)
+  assert.equal(Object.keys(CARRIED).length, 164)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {
@@ -773,7 +775,9 @@ test("the work-gate block stays visible on Cloud and asks only its narrow route"
   const api = readFileSync(resolve(console_, "src/pages/settings/api.ts"), "utf8")
   assert.match(page, /<GateSettingsBlock shown=\{shown && tab === 1\} \/>/)
   assert.equal(writeRoute("GET", "/v1/settings/work-gates")?.word, "work-gate-settings")
+  assert.equal(writeRoute("GET", "/v1/settings/workflow")?.word, "workflow-settings")
   assert.equal(writeRoute("POST", "/v1/settings/work-gates")?.word, "work-gate-settings-update")
+  assert.equal(writeRoute("POST", "/v1/settings/workflow")?.word, "workflow-settings-update")
 })
 
 test("full browser machine settings stay on the local console", () => {

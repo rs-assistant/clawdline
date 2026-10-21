@@ -161,6 +161,8 @@ var generatedDecoders = map[string]genDecoder{
 	"work.v2.todo-action":                genDecodeWorkV2TodoAction,
 	"work.v2.todo-create":                genDecodeWorkV2TodoCreate,
 	"work.v2.todo-image-create":          genDecodeWorkV2TodoImageCreate,
+	"workflow-settings":                  genDecodeWorkflowSettings,
+	"workflow-settings-update":           genDecodeWorkflowSettingsUpdate,
 }
 
 // generatedUnrouted is every generated word whose decode states no local
@@ -3652,5 +3654,42 @@ func genDecodeWorkV2TodoImageCreate(b body) (plan, LocalRequest, bool) {
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
+	return p, req, true
+}
+
+// genDecodeWorkflowSettings is the `workflow-settings` row's decode.
+func genDecodeWorkflowSettings(b body) (plan, LocalRequest, bool) {
+	if !b.hasOneOf(
+		[]string{"type", "request", "session"},
+	) {
+		return plan{}, LocalRequest{}, false
+	}
+	p, ok := machinePlan(b)
+	if !ok {
+		return plan{}, LocalRequest{}, false
+	}
+	path := "/v1/settings/workflow"
+	req := LocalRequest{Method: "GET", Path: path}
+	return p, req, true
+}
+
+// genDecodeWorkflowSettingsUpdate is the `workflow-settings-update` row's decode.
+func genDecodeWorkflowSettingsUpdate(b body) (plan, LocalRequest, bool) {
+	if !b.hasOneOf(
+		[]string{"type", "changes", "request", "session"},
+	) {
+		return plan{}, LocalRequest{}, false
+	}
+	if !b.genValid("changes", genRule{kind: "object", maxBytes: 65536, properties: map[string]genRule{"dispatch_full_permission": genRule{kind: "bool", nullable: true}, "session_auto_discovery": genRule{kind: "bool", nullable: true}}, closed: true, maxKeys: 2}) {
+		return plan{}, LocalRequest{}, false
+	}
+	p, ok := actionPlan(b, false)
+	if !ok {
+		return plan{}, LocalRequest{}, false
+	}
+	path := "/v1/settings/workflow"
+	req := LocalRequest{Method: "POST", Path: path}
+	req.Header = asDevice()
+	req.Body = b.genObject("changes")
 	return p, req, true
 }
