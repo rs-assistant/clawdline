@@ -1,19 +1,22 @@
 # Remote access: another browser, a phone, Clawdline Cloud
 
 After this page you can open the console somewhere other than the machine's own browser — another
-computer, or your phone — pair that device so it can read and send, and revoke it when needed.
+computer, or your phone — pair that device to read only or to read and operate, and revoke it when needed.
 Your agents and code stay on your machine whichever way you choose.
 
 ## Which way to choose
 
 | Way | Account | Reaches | What it can do | State |
 | --- | --- | --- | --- | --- |
-| A. SSH port forward | None | Another computer you can SSH from | Read and send | Works |
-| B. Tailscale Serve | A Tailscale account, signed in on both ends | Devices on your own tailnet, including a phone | Read and send after pairing | Built; verified over a real tailnet |
+| A. SSH port forward | None | Another computer you can SSH from | Read and operate unless set to read only | Works |
+| B. Tailscale Serve | A Tailscale account, signed in on both ends | Devices on your own tailnet, including a phone | Read only or read and operate, chosen per device after pairing | Built; verified over a real tailnet |
 | C. Clawdline Cloud | Clawdline account (GitHub sign-in) | Any browser, including a phone; several machines | Read and act on paired machines while their Cloud commands are on | Preview |
 
 The daemon itself listens on `127.0.0.1` only. None of these opens a port on your network.
-Every paired device has full access, read and send; there is no read-only device.
+A device paired directly with this machine is either **read only** or **read and operate**, chosen
+per device on this machine (see [Read only or read and operate](#read-only-or-read-and-operate)).
+Clawdline Cloud has a separate switch for the whole machine and a local grant for each pinned
+browser (C below). Both must allow operation before that browser can act.
 
 Clawdline no longer runs a Cloudflare tunnel of its own (removed on 2026-10-20; the automatically
 generated `trycloudflare.com` address went the day before). A settings file that still holds the
@@ -88,13 +91,30 @@ the attempt.
 **Tailscale address**; revoke the phone (see
 [Signed-in devices](#see-and-revoke-devices-signed-in-directly)).
 
-### Send from paired devices
+### Read only or read and operate
 
-Devices paired with a code, signed in with the password, or opened with `clawdline open`
-can read sessions and send prompts. Older paired devices issued read-only keys gain sending
-automatically when the daemon is upgraded. Sending can run code on this machine through the
-assistant. Revoke a device to remove its access. Clawdline Cloud has a separate machine command
-switch (below).
+Each device paired with a code, signed in with the password, or opened with `clawdline open` has
+one of two grants:
+
+- **Read only** — it sees Sessions, terminal screens, and the documents and images Clawdline shows.
+  It cannot send, type in a terminal, or start or close anything. Notifications still reach it.
+- **Read and operate** — it can also send messages, type in terminals, and start or close Sessions.
+  An assistant can run programs on this machine because of what it sends.
+
+Only this machine chooses. On the **Devices** page, under **Signed in to this machine**, each
+device shows its grant and offers the other one; the page reads the list again before it shows
+the change. From a terminal on the machine:
+
+```sh
+./bin/clawdline devices permission <device-id> read-only           # or read-and-operate
+./bin/clawdline pair --permission read-only                        # choose before showing the code
+./bin/clawdline devices pairing-permission <pairing-id> read-only  # a pairing still waiting for its code
+```
+
+A device paired before this choice existed, and a new pairing the machine did not set, stays
+read and operate. A device cannot raise its own grant: the pairing request and its confirmation
+ignore any permission they carry. Clawdline Cloud has its own machine-wide command switch (below),
+which does not change these grants.
 
 ### See and revoke devices signed in directly
 
@@ -115,6 +135,7 @@ password are listed in two places. Only this machine's own key can see the list 
 A browser signed in as a device of its own is not shown the list. Its Devices page says **This browser is signed in as its own device** and offers **Sign this browser out**, which asks first and then revokes that browser's own key.
 
 **Check:** a revoked device's next request is refused and it is back at the pairing page.
+Revoking does not take back what the device has already seen or downloaded.
 
 These are not the browsers Clawdline Cloud relays for; those are `clawdline cloud devices` (C below).
 
@@ -162,12 +183,17 @@ Both screens show the same fingerprint when pairing finishes; compare them.
 
 ### Let paired devices act
 
-A paired device can send text, answer, and start or close sessions on this machine while its
-Cloud command switch is on:
+A paired browser can send text, answer, and start or close Sessions only when both its local
+`operate` grant and this machine's Cloud command switch allow it:
 
 ```sh
 ./bin/clawdline cloud commands on     # takes effect on the next request; `off` stops it at once
 ```
+
+Choose a browser's grant on the machine with `clawdline cloud grant <device-id> readonly` or
+`operate`. Use `clawdline cloud pair --scope readonly` to pair a read-only browser. Omitting scope
+when pairing again preserves its existing grant; a never-pinned browser keeps the legacy
+`operate` default. A remote browser cannot promote itself. See [per-browser machine grants](../cloud.md#per-browser-machine-grants).
 
 ### See and remove devices
 
@@ -192,7 +218,7 @@ and needs no account.
 - **The Cloud line stays off**: `./bin/clawdline cloud status` says why. A broken Cloud setting
   never stops the daemon.
 - **A phone can read but not act**: check that it is paired with the selected machine and that
-  `clawdline cloud commands` is on there. Over Tailscale Serve, check that its sign-in is still valid.
+  `clawdline cloud commands` is on there and its local grant is `operate`. Over Tailscale Serve, check that its sign-in is still valid.
 - **Notifications on the phone**: [notifications.md](notifications.md).
 
 ## Deeper
