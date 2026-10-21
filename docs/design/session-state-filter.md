@@ -1,9 +1,13 @@
 # Session state filter in the header
 
-Design proposal, not implemented. The interactive comparison is
-`docs/design/session-state-filter.html` (self-contained, no external assets). This page is the
-engineering reading of it. A script-free Cloud reading copy is
-`docs/design/session-state-filter-preview.html`; it embeds actual captures of the three designs.
+The person selected **C** on 2026-10-21, with one amendment: the header keeps its existing
+counts and colors while showing all Sessions; only an applied filter names its state in orange.
+The implementation uses All / Attention / Working / Idle, applies a single choice immediately,
+and keeps Refresh in the dialog footer. Local and all-machine views share this control. A reload
+starts at All. The original three-direction comparison is retained below as design history.
+
+The interactive comparison is `docs/design/session-state-filter.html`. The script-free historical
+Cloud reading copy is `docs/design/session-state-filter-preview.html`.
 
 ## What changes for the person
 
@@ -79,9 +83,9 @@ clearing; C is safest to build but drops multi-select.
 **Empty result.** All three show "沒有符合「…」的 Session" in the list with a 全部顯示 button that
 clears the filter. A zero-count option stays selectable; it is not disabled.
 
-## Implementation notes (for after approval)
+## Original implementation proposals (historical)
 
-- `FleetFilter` becomes a set (`ReadonlySet<"attention" | "working" | "idle" | "stale">`), empty
+- The unselected A/B proposal would have changed `FleetFilter` to a set (`ReadonlySet<"attention" | "working" | "idle" | "stale">`), empty
   meaning all; `matchesFleetFilter` returns true for an empty set and ORs the members otherwise.
 - The filter state must move up from `FleetSessionList` to where the header can read it (the
   header is in `App.tsx`), or the header entry must dispatch to the list. Counts per option should
@@ -89,7 +93,7 @@ clears the filter. A zero-count option stays selectable; it is not disabled.
 - Product copy changes need English and zh-Hant in the same change (`docs/localization.md`).
 - The existing refresh feedback states (`loading/done/failed`) carry over unchanged.
 
-## Questions awaiting the person's decision
+## Original design questions (historical)
 
 1. Which direction: A, B, C, or a mix (e.g. A's checklist with B's refresh-in-panel).
 2. Multi-select with union semantics, with "show all" equal to clearing the selection — yes or no.

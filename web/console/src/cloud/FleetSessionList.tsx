@@ -1,3 +1,7 @@
+import { createPortal } from "react-dom"
+import { SessionStateFilterControl, stateFilterLabel } from "../session/SessionStateFilter.js"
+import { stateFilterCounts } from "../session/state-filter.js"
+import { totalSessionWords } from "../session-reading.js"
 import { LoadingSkeleton } from "../LoadingSkeleton.js"
 import { useEffect, useRef, useState } from "react"
 import { nextWord } from "../next-strings.js"
@@ -49,6 +53,8 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   onArchiveRequest: (target: SessionDestination, title: string) => void
 }) {
   const [readings, setReadings] = useState<Record<string, Reading>>({})
+  const [filterSlot, setFilterSlot] = useState<HTMLElement | null>(null)
+  useEffect(() => { setFilterSlot(document.getElementById("session-state-filter-slot")) }, [])
   useEffect(() => {
     for (const machine of machines) {
       const reading = readings[machine.id]
@@ -286,6 +292,17 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     }
   }, [source, passesKey, presentationRevision, onPresentations])
 
+  const filterRows = machines.flatMap((machine) => {
+    const reading = readings[machine.id]
+    return reading?.phase === "settled" ? reading.value.rows ?? [] : []
+  })
+  const filterIncomplete = machines.some((machine) => {
+    const reading = readings[machine.id]
+    return !reading || reading.phase !== "settled" || reading.value.kind !== "ready"
+  })
+  const filterCounts = stateFilterCounts(filterRows, (row, value) => matchesFleetFilter(row, value,
+    displayedPresentationStatus(row, presentations.current.get(destinationKey(row.destination)))))
+
   const search = filter.trim().toLocaleLowerCase()
   const groups = machines.map((machine) => {
     const reading = readings[machine.id]
@@ -374,25 +391,14 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     <div className="scroller list-scroll cloud-all-list-scroll" id="list-scroll" ref={listScroll}
       onMouseEnter={freezeOrder} onMouseLeave={thawOrder} onTouchStart={freezeOrder}
       onTouchEnd={() => window.setTimeout(() => { if (swipe.openId() === null) thawOrder() }, 1200)}>
-      <div className="cloud-all-status-filters" role="group" aria-label={nextWord("cloudAllState")}>
-        <button type="button" className="cloud-all-status-filter cloud-all-refresh" onClick={refreshFromButton}
-          data-state={refreshFeedback} disabled={refreshFeedback === "loading"} aria-busy={refreshFeedback === "loading"}
-          aria-label={refreshFeedback === "done" ? nextWord("cloudAllRefreshDone") : undefined}>
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            {refreshFeedback === "done" ? <path d="m5 12 4 4L19 6" /> :
-              <><path d="M19 12a7 7 0 1 1-2.05-4.95" /><path d="M19 4.5V9h-4.5" /></>}
-          </svg>
-          <span aria-live="polite">{nextWord(refreshFeedback === "loading" ? "cloudAllRefreshing" :
-            refreshFeedback === "failed" ? "cloudAllRefreshFailed" : "cloudAllRefresh")}</span>
-          <span className="sr-only" aria-live="polite">{refreshFeedback === "done" ? nextWord("cloudAllRefreshDone") : ""}</span>
-        </button>
-        <button type="button" className="cloud-all-status-filter" aria-pressed={statusFilter === "attention"}
-          onClick={() => setStatusFilter((value) => value === "attention" ? "all" : "attention")}>{nextWord("cloudAllAttention")}</button>
-        <button type="button" className="cloud-all-status-filter" aria-pressed={statusFilter === "working"}
-          onClick={() => setStatusFilter((value) => value === "working" ? "all" : "working")}>{nextWord("cloudAllStateWorking")}</button>
-        <button type="button" className="cloud-all-status-filter" aria-pressed={statusFilter === "idle"}
-          onClick={() => setStatusFilter((value) => value === "idle" ? "all" : "idle")}>{nextWord("cloudAllFilterIdle")}</button>
-      </div>
+      {filterSlot && createPortal(<SessionStateFilterControl value={statusFilter} onChange={setStatusFilter}
+        counts={filterCounts} incomplete={filterIncomplete} onRefresh={refreshFromButton} refreshState={refreshFeedback}
+        summary={<span id="counts">{filterCounts.working ? L.fillString(L.strings.webCountWorking, { n: filterCounts.working }) :
+          filterIncomplete ? nextWord("sessionsListWaitTitle") : totalSessionWords(filterCounts.all)}</span>} />, filterSlot)}
+      {statusFilter !== "all" && groups.length === 0 && <div className="session-state-empty" role="status">
+        {filterIncomplete ? nextWord("sessionStateFilterIncomplete") : nextWord("sessionStateFilterEmpty", { state: stateFilterLabel(statusFilter) })}
+        <button type="button" onClick={() => setStatusFilter("all")}>{nextWord("sessionStateFilterAll")}</button>
+      </div>}
       <div className="cloud-all-groups">
         {groups.map(({ machine, reading, rows, presentationFailed, presentationLoading }) => {
           const carrier = machineLight(machine.freshness, carrierOf?.(machine.id) ?? null)
