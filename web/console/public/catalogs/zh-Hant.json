@@ -7326,7 +7326,7 @@
   "next.cloudInstallWhy": "為什麼不能直接用 Safari",
   "next.cloudInstallWhyBody": "Safari 和主畫面的 App 各自保存配對金鑰，在 Safari 配對的機器，主畫面 App 讀不到。",
   "next.doorAskTitle": "讓這個瀏覽器連上你的機器",
-  "next.doorAskBenefit": "配對後，就能在這裡看到並回覆那台機器上的 Session。",
+  "next.doorAskBenefit": "配對後，就能在這裡查看這台機器的 Session。",
   "next.doorAskStep1": "按「要求配對」",
   "next.doorAskStep2": "機器的畫面會跳出六位數字",
   "next.doorAskStep3": "把數字輸入到下一步",

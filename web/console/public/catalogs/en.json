@@ -7326,7 +7326,7 @@
   "next.cloudInstallWhy": "Why not just use Safari",
   "next.cloudInstallWhyBody": "Safari and the Home Screen app keep separate pairing keys, so a machine paired in Safari can't be read by the Home Screen app.",
   "next.doorAskTitle": "Connect this browser to your machine",
-  "next.doorAskBenefit": "Once paired, you can see and answer that machine's Sessions here.",
+  "next.doorAskBenefit": "Pair to see this machine's Sessions here.",
   "next.doorAskStep1": "Press Ask to pair",
   "next.doorAskStep2": "Six digits appear on the machine's screen",
   "next.doorAskStep3": "Type them in on the next step",
