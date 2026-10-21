@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -735,5 +736,147 @@ func TestIdentityRuntimeSignedInvitationExpiresWithoutPin(t *testing.T) {
 	}
 	if h.grants.Load() != 0 || h.confirms.Load() != 0 {
 		t.Fatal("expired invitation disclosed content")
+	}
+}
+
+// A persistence error may precede rename or follow a readable durable intent.
+// Both outcomes must stop all old-key publication until a retry recovers.
+func TestRuntimeJournalCreationFailureStopsPublication(t *testing.T) {
+	for _, durable := range []bool{false, true} {
+		t.Run(fmt.Sprintf("durable=%v", durable), func(t *testing.T) {
+			l, a, b := runtimeFixture(t)
+			old, _ := l.contentEpoch.Current()
+			_, err := l.revokeContentViewerWithJournal("A", func(viewer string, epoch uint64) (cloudkeys.RevocationIntent, error) {
+				var intent cloudkeys.RevocationIntent
+				if durable {
+					var err error
+					intent, err = l.keys.BeginRevocation(viewer, epoch)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				return intent, errors.New("injected uncertain journal persistence")
+			})
+			if err == nil {
+				t.Fatal("journal failure was not returned")
+			}
+			intent, pending, err := l.keys.PendingRevocation()
+			if err != nil || pending != durable {
+				t.Fatal("unexpected durable intent", pending, err)
+			}
+			if err := l.contentEpoch.Use(func(domaincloud.ContentKeyState) error {
+				t.Fatal("old key publication remained admitted after journal failure")
+				return nil
+			}); !errors.Is(err, domaincloud.ErrKeyEpochHalted) {
+				t.Fatal("epoch did not halt", err)
+			}
+			offer, _ := runtimeOffer(t, "A", a, time.Now().UnixMilli())
+			if err := l.answerRekey(offer, func([]byte) error { t.Fatal("A received a key after uncertain revoke"); return nil }); err == nil {
+				t.Fatal("uncertain revoke allowed key disclosure")
+			}
+			changed, err := l.revokeContentViewer("A")
+			if err != nil || !changed {
+				t.Fatal("retry failed", changed, err)
+			}
+			current, err := l.contentEpoch.Current()
+			if err != nil || current.Epoch != old.Epoch+1 {
+				t.Fatal("retry did not rotate exactly once", current.Epoch, err)
+			}
+			if pending {
+				again, err := l.keys.RotateContentKey(intent.Operation, intent.ExpectedEpoch, rand.Reader)
+				if err != nil || again.KeyID != current.KeyID {
+					t.Fatal("retry replaced the durable operation", err)
+				}
+			}
+			if changed, err := l.revokeContentViewer("A"); err != nil || changed {
+				t.Fatal("completed revoke repeated", changed, err)
+			}
+			final, _ := l.contentEpoch.Current()
+			if final.KeyID != current.KeyID {
+				t.Fatal("completed retry minted another key")
+			}
+			if err := l.answerRekey(offer, func([]byte) error { t.Fatal("revoked A received a key"); return nil }); err == nil {
+				t.Fatal("A was resurrected")
+			}
+			offerB, _ := runtimeOffer(t, "B", b, time.Now().UnixMilli())
+			answered := false
+			if err := l.answerRekey(offerB, func([]byte) error { answered = true; return nil }); err != nil || !answered {
+				t.Fatal("readonly B could not recover", err)
+			}
+		})
+	}
+}
+
+func TestRuntimePendingRevocationReadAndPinFailuresHalt(t *testing.T) {
+	for _, stage := range []string{"journal-read", "pin-write"} {
+		t.Run(stage, func(t *testing.T) {
+			l, a, _ := runtimeFixture(t)
+			old, _ := l.contentEpoch.Current()
+			intent, err := l.keys.BeginRevocation("A", old.Epoch)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var repair func()
+			if stage == "journal-read" {
+				path := filepath.Join(l.keys.Dir(), "content-key-revocation-v1")
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte("invalid journal"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				repair = func() {
+					if err := os.WriteFile(path, raw, 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+			} else {
+				path := l.pinned.Path()
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Remove(path); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(path, 0700); err != nil {
+					t.Fatal(err)
+				}
+				repair = func() {
+					if err := os.Remove(path); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(path, raw, 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if _, err := l.revokeContentViewer("A"); err == nil {
+				t.Fatal("storage failure was ignored")
+			}
+			if err := l.contentEpoch.Use(func(domaincloud.ContentKeyState) error {
+				t.Fatal("pending revoke left publication open")
+				return nil
+			}); !errors.Is(err, domaincloud.ErrKeyEpochHalted) {
+				t.Fatal("pending failure did not halt", err)
+			}
+			repair()
+			if changed, err := l.revokeContentViewer("A"); err != nil || !changed {
+				t.Fatal("repair did not resume", changed, err)
+			}
+			state, err := l.contentEpoch.Current()
+			if err != nil || state.Epoch != old.Epoch+1 {
+				t.Fatal("repair rotated incorrectly", state.Epoch, err)
+			}
+			again, err := l.keys.RotateContentKey(intent.Operation, intent.ExpectedEpoch, rand.Reader)
+			if err != nil || again.KeyID != state.KeyID {
+				t.Fatal("repair replaced intent", err)
+			}
+			offer, _ := runtimeOffer(t, "A", a, time.Now().UnixMilli())
+			if err := l.answerRekey(offer, func([]byte) error { t.Fatal("repair resurrected A"); return nil }); err == nil {
+				t.Fatal("revoked A was accepted")
+			}
+		})
 	}
 }

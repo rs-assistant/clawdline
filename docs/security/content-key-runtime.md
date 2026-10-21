@@ -159,14 +159,19 @@ invalidates that generation; stale unfinished pairing cannot clear the refusal.
 A new explicit successful pairing can restore a pin. Pin persistence failures
 are errors, including directory-sync failures.
 
-Revocation first writes a fixed-size intent in `cloudkeys.Files`, containing
-viewer ID, stable random operation ID and expected epoch. Under the exclusive
+Revocation enters the exclusive epoch fence before writing a fixed-size intent
+in `cloudkeys.Files`, containing viewer ID, stable random operation ID and expected epoch. Under the exclusive
 epoch fence it persists deny, rotates with that operation, retires old spool
 rows and marks all direct peers closed/removes their mappings. Closing SCTP
 also retires accepted-but-undelivered direct data. After reopening the fence,
 it retires revoked-viewer terminal connections, marks the journal complete and
 requests a full publisher restatement on the next normal pass. Errors inside
-the epoch transaction halt publication. Restart/retry resumes the exact intent,
+the epoch transaction halt publication, including intent creation failures before
+or after rename. An unreadable existing journal or failed deny persistence while
+resuming it also halts publication. A retry with no durable intent recovers the
+current durable key before starting one; a readable intent retains its operation
+ID. Neither path reopens the old epoch after an uncertain write.
+Restart/retry resumes the exact intent,
 even when the pin already says revoked; it never remints an already durable
 operation. Missing or already-revoked devices without pending work return
 unchanged. A new intent replaces only a completed intent. This is a single
