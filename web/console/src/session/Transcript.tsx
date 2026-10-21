@@ -58,6 +58,7 @@ import "./lightbox-steps.css"
 import "./transcript-error.css"
 import { atNewest, jumpOffered } from "./jump.js"
 import { joinTranscript } from "./history.js"
+import { HistoryFill, HISTORY_FILL_PAGES, historyAdvanced } from "./history-fill.js"
 import { recordSendDiagnostic } from "../cloud/install.js"
 import "./jump.css"
 import "./history.css"
@@ -242,6 +243,12 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
   const [olderLoading, setOlderLoading] = useState(false)
   const [olderError, setOlderError] = useState<string | null>(null)
   const olderBusy = useRef(false)
+  const historyFill = useRef(new HistoryFill())
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
   const olderAnchor = useRef<{ top: number; height: number } | null>(null)
   // The list row's spinner and live line, repeated under the conversation's
   // newest end, where the reader's eye already is. Only the session's own
@@ -262,9 +269,10 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
   const olderCursor = earlier
     ? earlier.pages.length ? earlier.pages[earlier.pages.length - 1].nextBefore : earlier.base.nextBefore
     : data?.nextBefore
-  const loadOlder = useCallback(async () => {
+  const loadOlder = useCallback(async (automatic = false) => {
     if (!olderCursor || olderBusy.current || !data) return
     olderBusy.current = true
+    historyFill.current.begin(automatic)
     setOlderLoading(true)
     setOlderError(null)
     const scroll = document.getElementById("tx-scroll")
@@ -272,16 +280,45 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
       const page = agentId
         ? await client.agentTranscript(id, agentId, LIMIT, olderCursor)
         : await client.transcript(id, LIMIT, olderCursor)
+      if (!alive.current) return
+      if (!historyAdvanced(olderCursor, page.nextBefore)) {
+        setOlderError(nextWord("transcriptEarlierStalled"))
+        return
+      }
       if (page.evidence !== "transcript") throw new Error(page.note || "Earlier conversation could not be read")
       if (scroll) olderAnchor.current = { top: scroll.scrollTop, height: scroll.scrollHeight }
       setEarlier((was) => ({ base: was?.base ?? data, pages: [...(was?.pages ?? []), page] }))
     } catch (error) {
+      if (!alive.current) return
       setOlderError(L.failureSentence(error, nextWord("transcriptEarlierFailed")))
     } finally {
       olderBusy.current = false
-      setOlderLoading(false)
+      if (alive.current) setOlderLoading(false)
     }
   }, [agentId, data, id, olderCursor])
+  // Empty raw-record windows and compact tool groups may leave no scrollbar.
+  // Fill after layout without requiring a scroll gesture. The per-opening
+  // budget survives polling and resizes; only the person can restart it.
+  useEffect(() => {
+    const scroll = document.getElementById("tx-scroll")
+    const box = document.getElementById("tx")
+    if (!scroll || !box || !data || data.evidence !== "transcript") return
+    let frame = 0
+    const fill = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        if (historyFill.current.needed({
+          cursor: olderCursor, contentHeight: scroll.scrollHeight, viewportHeight: scroll.clientHeight,
+          loading: olderBusy.current, failed: !!olderError || show === "failure",
+        })) void loadOlder(true)
+      })
+    }
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fill)
+    observer?.observe(scroll)
+    observer?.observe(box)
+    fill()
+    return () => { observer?.disconnect(); cancelAnimationFrame(frame) }
+  }, [data, earlier, olderCursor, olderError, olderLoading, show, loadOlder])
   useLayoutEffect(() => {
     const anchor = olderAnchor.current
     if (!anchor) return
@@ -458,9 +495,13 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
   const olderControl = olderCursor ? (
     <div className="tx-older" key="tx-older" aria-live="polite">
       <button type="button" className="go" disabled={olderLoading} onClick={() => void loadOlder()}>
-        {nextWord(olderLoading ? "transcriptLoadingEarlier" : olderError ? "transcriptRetryEarlier" : "transcriptLoadEarlier")}
+        {olderLoading
+          ? nextWord("transcriptFillingEarlier", { count: historyFill.current.reads, limit: HISTORY_FILL_PAGES })
+          : nextWord(olderError ? "transcriptRetryEarlier" : "transcriptLoadEarlier")}
       </button>
       {olderError && <span role="alert">{olderError}</span>}
+      {!olderLoading && !olderError && historyFill.current.reads >= HISTORY_FILL_PAGES &&
+        <span>{nextWord("transcriptFillPaused", { count: HISTORY_FILL_PAGES })}</span>}
     </div>
   ) : null
   if (skeleton) return <Skeleton />

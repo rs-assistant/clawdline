@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8275,
+  "englishKeys": 8280,
   "counts": {
-    "negation": 2412,
+    "negation": 2414,
     "state": 1353,
     "permission": 459,
     "deletion": 196,
     "uncertainty": 253
   },
-  "unionCount": 3688,
+  "unionCount": 3690,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -279,6 +279,7 @@
       "capacityRow.console.status_marker_recovery_wait_seconds.full",
       "capacityRow.console.status_marker_retry_seconds.full",
       "capacityRow.console.status_marker_retry_seconds.what",
+      "capacityRow.console.transcript_fill_pages.what",
       "capacityRow.console.transcript_follow_fast_seconds.full",
       "capacityRow.console.transcript_follow_later_seconds.full",
       "capacityRow.console.transcript_follow_seconds.full",
@@ -2188,6 +2189,7 @@
       "next.terminalUnavailableWindows",
       "next.todosReadFailed",
       "next.transcriptEarlierFailed",
+      "next.transcriptEarlierStalled",
       "next.updateAutoFailed",
       "next.updateAutoSay",
       "next.updateCheckFailed",
@@ -5067,6 +5069,7 @@
     "capacityRow.console.status_marker_recovery_wait_seconds.full",
     "capacityRow.console.status_marker_retry_seconds.full",
     "capacityRow.console.status_marker_retry_seconds.what",
+    "capacityRow.console.transcript_fill_pages.what",
     "capacityRow.console.transcript_follow_fast_seconds.full",
     "capacityRow.console.transcript_follow_fast_seconds.what",
     "capacityRow.console.transcript_follow_later_seconds.full",
@@ -7957,6 +7960,7 @@
     "next.todosRefreshFailed",
     "next.todosRetryTip",
     "next.transcriptEarlierFailed",
+    "next.transcriptEarlierStalled",
     "next.updateAutoFailed",
     "next.updateAutoSay",
     "next.updateCheckFailed",

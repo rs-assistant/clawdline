@@ -190,6 +190,7 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `console.status_marker_recovery_wait_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
 | `console.status_marker_retry_seconds` | 60 | `seconds` | `expire` | `diagnostics` | — |
 | `console.transcript_backoff_seconds` | 30 | `seconds` | `expire` | `diagnostics` | — |
+| `console.transcript_fill_pages` | 8 | `rows` | `refuse` | `sender, diagnostics` | — |
 | `console.transcript_follow_fast_seconds` | 10 | `seconds` | `expire` | `diagnostics` | — |
 | `console.transcript_follow_later_seconds` | 4 | `seconds` | `expire` | `diagnostics` | — |
 | `console.transcript_follow_seconds` | 90 | `seconds` | `expire` | `diagnostics` | — |

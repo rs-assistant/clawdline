@@ -137,6 +137,9 @@ func (s *Server) consoleCapacityMeasures() map[string]func() capacity.Reading {
 		capacity.ConsoleTranscriptFollowSeconds: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console tab cadence; daemon cannot measure live browser timers"}
 		},
+		capacity.ConsoleTranscriptFillPages: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console opening history fill budget; daemon cannot measure another device’s reads"}
+		},
 		capacity.ConsoleTranscriptMergedRows: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console tab guard; daemon cannot measure a tab's merged page"}
 		},
