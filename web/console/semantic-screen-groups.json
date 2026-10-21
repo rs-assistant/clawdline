@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8409,
+  "englishContentKeys": 8407,
   "riskKeys": 3749,
-  "nonRiskCount": 4660,
+  "nonRiskCount": 4658,
   "groups": [
     {
       "name": "admin / other",
@@ -3132,7 +3132,7 @@
     },
     {
       "name": "next / other",
-      "count": 357,
+      "count": 355,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3398,8 +3398,6 @@
         "next.swipeCloseAction",
         "next.swipeEndLabel",
         "next.todosRetrying",
-        "next.transcriptFillPaused",
-        "next.transcriptFillingEarlier",
         "next.transcriptJumpLatest",
         "next.transcriptJumpNew",
         "next.transcriptLoadEarlier",

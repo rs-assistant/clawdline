@@ -1,5 +1,5 @@
 /** Registered as console.transcript_fill_pages: one automatic fill, including a manual restart. */
-export const HISTORY_FILL_PAGES = 8
+export const HISTORY_FILL_PAGES = 32
 
 /** A fill survives polling and resize; only an explicit request starts another batch. */
 export class HistoryFill {

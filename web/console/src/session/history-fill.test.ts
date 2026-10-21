@@ -63,3 +63,17 @@ test("opening another Session starts a fresh fill budget", () => {
   assert.equal(previous.needed(empty), false)
   assert.equal(new HistoryFill().needed(empty), true)
 })
+
+
+test("sixteen empty windows do not expose an incomplete conversation", () => {
+  const fill = new HistoryFill()
+  let state = { ...empty, cursor: 10000 }
+  let reads = 0
+  while (fill.needed(state)) {
+    fill.begin(true)
+    reads++
+    state = { ...state, cursor: state.cursor - 100, contentHeight: reads === 17 ? 900 : 600 }
+  }
+  assert.equal(reads, 17)
+  assert.equal(state.contentHeight, 900)
+})
