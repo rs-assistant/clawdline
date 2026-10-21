@@ -8767,5 +8767,11 @@
   "capacityRow.cloud.viewer_rekey_pending.what": "一個瀏覽器用戶端可同時保留的內容金鑰交換數量。只有明確配對的機器能回答；只讀瀏覽器也能交換。",
   "capacityRow.cloud.viewer_rekey_pending.full": "後續未知金鑰封包不保留內容，也不另開作業。每次交換最多保留 120 秒，不會自動重試。此功能預設關閉；機器無法量測瀏覽器目前的使用量。",
   "capacityRow.cloud.viewer_rekey_cooldown.what": "一個瀏覽器用戶端兩次內容金鑰提案間的最短秒數，由所有機器共用，限制未知金鑰流量引起的重試。",
-  "capacityRow.cloud.viewer_rekey_cooldown.full": "前次提案的間隔尚未結束時，不會再發提案。間隔結束後，新的流量可觸發一次交換；計時器不會自動重試。斷線會丟棄待完成的私密資料。機器無法量測此瀏覽器間隔。"
+  "capacityRow.cloud.viewer_rekey_cooldown.full": "前次提案的間隔尚未結束時，不會再發提案。間隔結束後，新的流量可觸發一次交換；計時器不會自動重試。斷線會丟棄待完成的私密資料。機器無法量測此瀏覽器間隔。",
+  "workflowSettings.introWithITerm": "這些設定套用到目前選取的機器。iTerm2 整合預設關閉，只有你主動啟用才會開啟。選擇 ⓘ 可查看每個開關的作用。",
+  "workflowSettings.iterm_integrationTitle": "啟用 iTerm2 整合",
+  "workflowSettings.iterm_integrationOn": "允許 Clawdline 列出 iTerm2 分頁、讀取畫面、傳送輸入，以及開啟、顯示或關閉分頁。第一次操作可能要求 macOS 自動化授權。",
+  "workflowSettings.iterm_integrationOff": "不偵測、讀取或控制 iTerm2，包含派工、傳訊、檢視分頁與清理，也不要求其自動化權限。",
+  "workflowSettings.iterm_integrationScope": "新舊安裝皆預設關閉，套用於這台機器的 macOS iTerm2。關閉後保留分頁與既有系統授權；已送出的 Apple Event 仍可能完成。",
+  "workflowSettings.itermUpdateRequired": "請更新這台機器的 Clawdline，才能管理 iTerm2 整合；此處目前無法判定其存取狀態。"
 }

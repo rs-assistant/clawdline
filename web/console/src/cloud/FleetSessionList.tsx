@@ -11,6 +11,7 @@ import * as L from "../legacy/bridge.js"
 import { ProjectedRow } from "../session/List.js"
 import { onAttentionRead } from "../session/attention-changed.js"
 import { Swipes, sessionSwipeActions } from "../session/swipe.js"
+import { usePullToRefresh } from "../session/use-pull-to-refresh.js"
 import { useSwipeToEnd } from "../session/use-swipe.js"
 import type { OrderHold } from "../session/order.js"
 import { SessionToolbar } from "../session/SessionToolbar.js"
@@ -69,6 +70,13 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   const [manualRefresh, setManualRefresh] = useState(0)
   const [refreshFeedback, setRefreshFeedback] = useState<"idle" | "loading" | "done" | "failed">("idle")
   const refreshStartedAt = useRef(0)
+  const refreshCompletion = useRef<{ promise: Promise<void>; resolve: () => void } | null>(null)
+  useEffect(() => {
+    if (refreshFeedback === "loading") return
+    refreshCompletion.current?.resolve()
+    refreshCompletion.current = null
+  }, [refreshFeedback])
+  useEffect(() => () => { refreshCompletion.current?.resolve() }, [])
   const previousTarget = useRef(target)
   useEffect(() => {
     if (!target || !source?.refreshSessionStatus) return
@@ -95,11 +103,15 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     if (titleRevision) refreshList()
   }, [titleRevision])
   const refreshFromButton = () => {
-    if (refreshFeedback === "loading") return
+    if (refreshCompletion.current) return refreshCompletion.current.promise
     if (!source) { setRefreshFeedback("failed"); return }
+    let resolve!: () => void
+    const promise = new Promise<void>((done) => { resolve = done })
+    refreshCompletion.current = { promise, resolve }
     refreshStartedAt.current = Date.now()
     setRefreshFeedback("loading")
     refreshList()
+    return promise
   }
   useEffect(() => {
     if (refreshFeedback !== "done" && refreshFeedback !== "failed") return
@@ -119,6 +131,8 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   const listScroll = useRef<HTMLDivElement | null>(null)
   const swipe = useRef(new Swipes()).current
   const swiped = useSwipeToEnd(listScroll, swipe)
+  const pullPad = useRef<HTMLDivElement | null>(null)
+  const pullWord = usePullToRefresh(listScroll, pullPad, refreshFromButton, swipe)
   const orderHolds = useRef(new Map<string, OrderHold>())
   const [, redrawOrder] = useState(0)
 
@@ -396,6 +410,10 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
         counts={filterCounts} incomplete={filterIncomplete} onRefresh={refreshFromButton} refreshState={refreshFeedback}
         summary={<span id="counts">{filterCounts.working ? L.fillString(L.strings.webCountWorking, { n: filterCounts.working }) :
           filterIncomplete ? nextWord("sessionsListWaitTitle") : totalSessionWords(filterCounts.all)}</span>} />, filterSlot)}
+      <div className="ptr" id="ptr" ref={pullPad}>
+        <span id="ptr-label">{pullWord === "release" ? L.strings.webPullRelease :
+          pullWord === "busy" ? L.strings.webPullBusy : L.strings.webPull}</span>
+      </div>
       <div className="cloud-all-groups">
         {groups.map(({ machine, reading, rows, presentationFailed, presentationLoading }) => {
           const carrier = machineLight(machine.freshness, carrierOf?.(machine.id) ?? null)
