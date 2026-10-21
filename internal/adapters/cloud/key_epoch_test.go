@@ -3,7 +3,9 @@ package cloud
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"net"
 	"sync/atomic"
 	"testing"
@@ -47,7 +49,7 @@ func nextEpoch(t *testing.T, epoch uint64) domain.ContentKeyState {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return domain.ContentKeyState{Epoch: epoch, KeyID: "mk-test-" + string(rune('0'+epoch)), Key: key}
+	return domain.ContentKeyState{Epoch: epoch, KeyID: fmt.Sprintf("mk-%d-%x", epoch, sha256.Sum256(key.Bytes())), Key: key}
 }
 
 func labelledRow(t *testing.T, s *Spool, recipient, keyID string) uint64 {

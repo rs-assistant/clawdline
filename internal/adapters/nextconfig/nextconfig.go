@@ -543,7 +543,9 @@ var Settables = []Settable{
 	// (internal/adapters/healthsealed); cloud_health_upload alone never
 	// permits it, and absent is off.
 	{Name: "cloud_health_owner_retention", Kind: "bool"},
-	// Whether the daemon polls iTerm2 over Apple Events; absent is on
+	// Explicit consent for all iTerm2 access; absent is off.
+	{Name: "iterm_integration", Kind: "bool"},
+	// Whether the enabled integration polls iTerm2; absent is on
 	// (docs/interface.md "Turning iTerm2 scanning off").
 	{Name: "iterm_scan", Kind: "bool"},
 	{Name: "session_auto_discovery", Kind: "bool"},

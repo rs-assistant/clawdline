@@ -11,6 +11,11 @@ import { catalogWord } from "../../../catalog.ts"
 
 const ownWords = {
   en: {
+    settingsITermIntegration: "Enable iTerm2 integration",
+    settingsITermIntegrationHint: "Off by default. While off, Clawdline does not detect, read or control iTerm2 or request its Automation permission. Enabling permits listing tabs, reading screens, sending input, and opening, showing or closing tabs, and may request macOS Automation permission. Existing installations must also opt in.",
+    settingsITermIntegrationUpgrade: "This daemon does not support the iTerm2 consent switch. Update Clawdline on this machine to control all iTerm2 access. Its current access cannot be inferred from this page.",
+    settingsSessionTerminalConsentHint: "Automatic uses tmux while iTerm2 integration is off. With integration enabled, Automatic uses iTerm2 while it is open; with tmux installed, the Session runs in tmux and is shown in an iTerm2 tab. Explicit iTerm2 choices require enabled integration and a running iTerm2. iTerm2 (native tab) runs directly in its tab. tmux always uses tmux. The next Session follows this choice.",
+
     settingsRemoteHint:
       "When this is off, nothing outside this machine can reach it. When it is on, the session list is available on 127.0.0.1 — to a browser here, a phone connected through a tunnel, or a script. What it exposes is repository names, branches, and work titles, so it stays off until you turn it on.",
     settingsTailscaleHostname: "Tailscale address",
@@ -106,6 +111,11 @@ const ownWords = {
     dictationNoWhisper: "Voice: Apple only — whisper-cli is not installed",
   },
   "zh-Hant": {
+    settingsITermIntegration: "啟用 iTerm2 整合",
+    settingsITermIntegrationHint: "預設關閉。關閉時不偵測、讀取或控制 iTerm2，也不要求其自動化權限。開啟後可列出分頁、讀取畫面、傳送輸入與開啟、顯示或關閉分頁，並可能要求 macOS 自動化授權。舊安裝也需要主動開啟。",
+    settingsITermIntegrationUpgrade: "這台機器的 daemon 尚未支援 iTerm2 授權總開關。請更新這台機器的 Clawdline，才能關閉所有 iTerm2 存取；此頁目前無法判定其存取狀態。",
+    settingsSessionTerminalConsentHint: "iTerm2 整合關閉時，「自動」使用 tmux。開啟整合後，「自動」會在 iTerm2 開著時使用它；有 tmux 時，Session 在 tmux 裡執行，並以 iTerm2 分頁顯示。明確選擇 iTerm2 時，必須先啟用整合並開啟 iTerm2。「iTerm2（原生分頁）」直接在分頁內執行；「tmux」一律使用 tmux。下一個 Session 開始套用。",
+
     settingsRemoteHint:
       "關著的時候，這台機器以外的東西什麼都碰不到。打開之後，session 清單就在 127.0.0.1 上讀得到——給這裡的瀏覽器、隔著通道連進來的手機，或一支腳本。交出去的是儲存庫名稱、分支和工作標題，所以在你開口之前，它一直是關著的。",
     settingsTailscaleHostname: "Tailscale 位址",
@@ -211,6 +221,11 @@ function ownWord(key: OwnWord): string {
 }
 
 const baseW = {
+  settingsITermIntegration: ownWord("settingsITermIntegration"),
+  settingsITermIntegrationHint: ownWord("settingsITermIntegrationHint"),
+  settingsITermIntegrationUpgrade: ownWord("settingsITermIntegrationUpgrade"),
+  settingsSessionTerminalConsentHint: ownWord("settingsSessionTerminalConsentHint"),
+
   settingsTitle: "Clawdline 設定",
   settingsGeneral: "一般",
   settingsBar: "輸入條",

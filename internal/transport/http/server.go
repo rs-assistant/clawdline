@@ -313,7 +313,8 @@ func New(cfg config.Config) (*Server, error) {
 	if v, err := srv.settingsFile().Read(); err == nil {
 		applyITermScan(v)
 	} else {
-		log.Printf("settings: could not read iterm_scan, iTerm2 scanning stays on: %v", err)
+		terminal.SetITermIntegration(false)
+		log.Printf("settings: could not read iTerm2 consent; integration stays off: %v", err)
 	}
 	srv.restore = srv.newSessionRestore()
 	srv.archive = srv.newSessionArchive()

@@ -209,7 +209,6 @@ internal/domain/cloud.LedgerNormalActorLimit # store: the Cloud command ledger, 
 internal/domain/cloud.MaxChannelBytes # admission: an envelope's channel
 internal/domain/cloud.MaxCiphertextBytes # admission: an envelope's ciphertext
 internal/domain/cloud.MaxClockDiscontinuity # parameter: clock drift tolerated between two readings
-internal/domain/cloud.MaxKeyIDBytes # admission: an envelope's key id
 internal/domain/cloud.MaxNestingDepth # admission: canonical JSON nesting
 internal/domain/cloud.MaxPairingBodyBytes # admission: one pairing document
 internal/domain/cloud.maxPairingIDBytes # admission: an id in a pairing document

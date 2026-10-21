@@ -19,8 +19,9 @@ import (
 //
 // Cutover and Recover hold the fence exclusively. sync.RWMutex blocks new
 // readers once a writer waits, so a cutover first stops new publishes and
-// sends, then waits for the ones already inside Use; each of those is bounded
-// by its own deadline (a socket write's), not by this type. Lock order is
+// sends, then waits for the ones already inside Use; the socket I/O has its
+// own deadline, but lock acquisition and callbacks need separate bounds from
+// their owners. This type does not bound the whole wait. Lock order is
 // always KeyEpoch, then whatever the callback locks (the spool): a function
 // passed to Use must never call Use, Current, Cutover or Recover again, and a
 // rotate, recover or retire callback must never publish.
@@ -56,9 +57,7 @@ func NewKeyEpoch(state ContentKeyState) (*KeyEpoch, error) {
 }
 
 func validEpochState(state ContentKeyState) error {
-	if state.Epoch == 0 || !state.Key.Valid() || state.KeyID == "" ||
-		strings.HasPrefix(state.KeyID, "rk-") || (state.Epoch == 1 && state.KeyID != "ms-1") ||
-		(state.Epoch > 1 && state.KeyID == "ms-1") {
+	if state.Epoch == 0 || !state.Key.Valid() || state.KeyID != rekeyKeyID(state.Epoch, state.Key.Bytes()) {
 		return ErrContentKeyState
 	}
 	return nil

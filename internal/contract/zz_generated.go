@@ -6167,12 +6167,14 @@ type SettingsRequest struct {
 	// A combination the shell can register (`cmd+shift+k`), or empty for none.
 	Hotkey *string `json:"hotkey"`
 
-	// Whether this daemon asks iTerm2 for its sessions, their screens and their input
-	// over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
-	// setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
-	// sessions are refused before any Apple Event; opening a viewer tab for a tmux
-	// session, Reveal and closing a child tab this daemon opened still send their one
-	// Apple Event each. It takes effect on the next reading, without a restart.
+	// Explicit opt-in to reading and controlling iTerm2; absent is off, including
+	// existing installations.
+	ItermIntegration *bool `json:"iterm_integration"`
+
+	// Legacy polling preference inside an explicitly enabled iterm_integration. Absent
+	// means true. This preference never grants integration consent. Off, background
+	// listing and screen sampling stop; requested actions are allowed only while
+	// integration is enabled.
 	ItermScan *bool `json:"iterm_scan"`
 
 	// Existing agent and Board authoring language and voice auto fallback.
@@ -6368,12 +6370,14 @@ type SettingsSnapshot struct {
 	// does; an empty string means the person asked for none, and registers nothing.
 	Hotkey *string `json:"hotkey"`
 
-	// Whether this daemon asks iTerm2 for its sessions, their screens and their input
-	// over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
-	// setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
-	// sessions are refused before any Apple Event; opening a viewer tab for a tmux
-	// session, Reveal and closing a child tab this daemon opened still send their one
-	// Apple Event each. It takes effect on the next reading, without a restart.
+	// Explicit opt-in to reading and controlling iTerm2; absent is off, including
+	// existing installations.
+	ItermIntegration *bool `json:"iterm_integration"`
+
+	// Legacy polling preference inside an explicitly enabled iterm_integration. Absent
+	// means true. This preference never grants integration consent. Off, background
+	// listing and screen sampling stop; requested actions are allowed only while
+	// integration is enabled.
 	ItermScan *bool `json:"iterm_scan"`
 
 	// Existing agent and Board authoring language and voice auto fallback. Its stored

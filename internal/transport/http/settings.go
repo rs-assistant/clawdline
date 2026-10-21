@@ -39,7 +39,7 @@ var browserSettings = map[string]bool{
 	"orchestrator_agent_notify": true, "orchestrator_enabled": true,
 	"orchestrator_max_children": true, "orchestrator_permission": true,
 	"orchestrator_notify_root": true, "orchestrator_child_linger": true,
-	"claude_auto_compact_window": true, "iterm_scan": true, "session_auto_discovery": true,
+	"claude_auto_compact_window": true, "iterm_scan": true, "iterm_integration": true, "session_auto_discovery": true,
 }
 
 // notificationSettings is the machine-wide event policy. A device's ability
@@ -148,7 +148,9 @@ func (s *Server) settingsRoute(w http.ResponseWriter, r *http.Request) {
 		if tailscaleSettingChanged(changes) {
 			s.gate().setTailscale(v)
 		}
-		if _, changed := changes["iterm_scan"]; changed {
+		_, scanChanged := changes["iterm_scan"]
+		_, integrationChanged := changes["iterm_integration"]
+		if scanChanged || integrationChanged {
 			applyITermScan(v)
 		}
 		writeJSON(w, settingsSnapshot(f, v))
@@ -623,10 +625,11 @@ func writeSettingsFailure(w http.ResponseWriter, f *nextconfig.File, err error) 
 	}
 }
 
-// applyITermScan sets the iTerm2 scan switch from the settings file: absent,
-// or anything but false, is on. It runs once when the server is built and
-// again on every write that names the key, so the next reading follows it.
+// applyITermScan requires explicit consent even for existing installations.
+// The old scan key only controls polling after integration has been enabled.
 func applyITermScan(v nextconfig.Values) {
+	enabled, _ := v.Bool("iterm_integration")
+	terminal.SetITermIntegration(enabled)
 	on, ok := v.Bool("iterm_scan")
 	terminal.SetITermScan(!ok || on)
 }

@@ -7390,12 +7390,16 @@ export interface SettingsRequest {
   hotkey: string | null
 
   /**
-   * Whether this daemon asks iTerm2 for its sessions, their screens and their input
-   * over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
-   * setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
-   * sessions are refused before any Apple Event; opening a viewer tab for a tmux
-   * session, Reveal and closing a child tab this daemon opened still send their one
-   * Apple Event each. It takes effect on the next reading, without a restart.
+   * Explicit opt-in to reading and controlling iTerm2; absent is off, including
+   * existing installations.
+   */
+  iterm_integration: boolean | null
+
+  /**
+   * Legacy polling preference inside an explicitly enabled iterm_integration.
+   * Absent means true. This preference never grants integration consent. Off,
+   * background listing and screen sampling stop; requested actions are allowed only
+   * while integration is enabled.
    */
   iterm_scan: boolean | null
 
@@ -7705,12 +7709,16 @@ export interface SettingsSnapshot {
   hotkey: string | null
 
   /**
-   * Whether this daemon asks iTerm2 for its sessions, their screens and their input
-   * over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
-   * setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
-   * sessions are refused before any Apple Event; opening a viewer tab for a tmux
-   * session, Reveal and closing a child tab this daemon opened still send their one
-   * Apple Event each. It takes effect on the next reading, without a restart.
+   * Explicit opt-in to reading and controlling iTerm2; absent is off, including
+   * existing installations.
+   */
+  iterm_integration: boolean | null
+
+  /**
+   * Legacy polling preference inside an explicitly enabled iterm_integration.
+   * Absent means true. This preference never grants integration consent. Off,
+   * background listing and screen sampling stop; requested actions are allowed only
+   * while integration is enabled.
    */
   iterm_scan: boolean | null
 

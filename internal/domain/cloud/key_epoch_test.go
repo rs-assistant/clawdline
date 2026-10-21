@@ -3,7 +3,6 @@ package cloud
 import (
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 )
@@ -14,10 +13,7 @@ func testEpochState(t *testing.T, epoch uint64) ContentKeyState {
 	if err != nil {
 		t.Fatal(err)
 	}
-	id := "ms-1"
-	if epoch > 1 {
-		id = fmt.Sprintf("mk-%d-test", epoch)
-	}
+	id := rekeyKeyID(epoch, key.Bytes())
 	return ContentKeyState{Epoch: epoch, KeyID: id, Key: key}
 }
 
@@ -147,5 +143,46 @@ func TestContentKeyStateSendable(t *testing.T) {
 		if state.Sendable(keyID) != want {
 			t.Errorf("Sendable(%q) = %v", keyID, !want)
 		}
+	}
+}
+
+// A malformed trusted callback must not keep rows labelled with a retired ID.
+func TestKeyEpochRejectsAnIDFromAnotherKeyOrEpoch(t *testing.T) {
+	key, err := NewContentKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := ContentKeyState{Epoch: 2, KeyID: rekeyKeyID(2, key.Bytes()), Key: key}
+	for _, kind := range []string{"wrong hash", "reused ID"} {
+		t.Run(kind, func(t *testing.T) {
+			next := first
+			if kind == "wrong hash" {
+				next.KeyID = "mk-2-wrong"
+			} else {
+				next.Epoch = 3
+			}
+			if _, err := NewKeyEpoch(next); !errors.Is(err, ErrContentKeyState) {
+				t.Errorf("constructor accepted mismatched state: %v", err)
+			}
+			for _, recovery := range []bool{false, true} {
+				e, err := NewKeyEpoch(first)
+				if err != nil {
+					t.Fatal(err)
+				}
+				retired := false
+				retire := func(_, _ ContentKeyState) error { retired = true; return nil }
+				if recovery {
+					_, err = e.Recover(func() (ContentKeyState, error) { return next, nil }, retire)
+				} else {
+					_, err = e.Cutover(func(ContentKeyState) (ContentKeyState, error) { return next, nil }, retire)
+				}
+				if !errors.Is(err, ErrContentKeyState) || !errors.Is(err, ErrKeyEpochHalted) || retired {
+					t.Errorf("recovery=%v: err=%v retired=%v", recovery, err, retired)
+				}
+				if _, err := e.Current(); !errors.Is(err, ErrKeyEpochHalted) {
+					t.Errorf("invalid callback did not halt: %v", err)
+				}
+			}
+		})
 	}
 }

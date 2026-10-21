@@ -39,9 +39,11 @@ paths never go through `KeyEpoch`.
 
 1. `Cutover` takes the write lock. Go's `RWMutex` stops new `Use` callers once a
    writer waits, so no new publish or send starts.
-2. It waits for every `Use` already running. A drain write inside `Use` is
-   bounded by its socket deadline (`OpeningTimeout`), so this wait is bounded by
-   that same deadline, not by a new limit.
+2. It waits for every `Use` already running. Socket I/O has an
+   `OpeningTimeout` deadline, but acquiring the socket write mutex and finishing
+   callbacks (including `MirrorStatus`) have separate owners. The complete
+   cutover wait has no deadline here; integrated carriers must establish and
+   measure their callback and lock-wait bounds.
 3. `rotate(old)` is the durable step, normally
    `ContentKeyStore.RotateContentKey(operationID, old.Epoch, nil)`. It runs
    under the lock and must not publish.
@@ -64,8 +66,9 @@ inside `Use` and must not publish through the relay.
   cause is wrapped). Nothing is sealed, sent, re-sent or opened under the master
   key: the store may already have advanced its floor, so carrying on under the
   old key would mean sending under a retired key.
-- A rotation that answers an epoch that is not later, an invalid state or an
-  `rk-*` id is refused (`ErrKeyEpochRegress` / `ErrContentKeyState`) and halts.
+- Every adopted state must have the exact `ms-1` legacy ID or
+  `mk-<epoch>-<SHA256(key)>` ID. A higher epoch cannot reuse an old ID. A rotation
+  that answers an epoch that is not later or an invalid state is refused (`ErrKeyEpochRegress` / `ErrContentKeyState`) and halts.
 - A halted epoch refuses `Cutover`. The next step is `Recover`, not a second
   rotation.
 - `Recover(store.RecoverContentKey, spool.RetireForCutover)` adopts what the
@@ -89,8 +92,9 @@ inside `Use` and must not publish through the relay.
 ## Bounds
 
 No new bound is introduced. The fence holds no queue: waiting publishers are
-goroutines already bounded by their callers, and the cutover's wait is bounded
-by the socket write deadline. Retired rows become tombstones under the existing
+goroutines owned by their callers. The socket I/O deadline does not bound
+callback execution or mutex acquisition, so no whole-cutover latency bound is
+claimed here. Retired rows become tombstones under the existing
 `cloud.spool_receipts` cap and `TombstoneRetention`.
 
 ## Obligations of the next owner
@@ -117,3 +121,23 @@ These are not done, and the foundation is not complete until they are:
   `mk-*` ids from a paired machine is the viewer's own change.
 - Acceptance as a production rotation, including a real revocation run, has not
   been done.
+
+## Independent review follow-up
+
+The independent static review of `3fadf9a24` retained no confirmed exploitable
+finding in the inactive foundation. Its trusted-callback ID concern is hardened
+by validating the complete epoch-derived key ID on construction, cutover and
+recovery. A higher epoch returning its previous ID was accepted before this
+validation; the regression test now requires rejection and a halted epoch.
+The whole-wait deadline claim has been corrected above. Inbound decryption still
+takes a snapshot before dispatch: integration must establish a fresh active-pin
+authorization point for in-flight requests. This outbound fence alone does not
+prove immediate cancellation of all in-flight inbound work.
+
+
+The realistic epoch fixtures exposed a compatibility gap: the full epoch/hash ID
+is longer than the previous 64-byte envelope key-ID limit. The daemon's parser
+now permits 128 bytes; this is an additive reader change, not a new ID format.
+Browser and private relay readers must accept the same bound before production
+rotation is enabled. The existing short IDs remain valid. The relay reader
+upgrade and actual end-to-end acceptance remain pending.

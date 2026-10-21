@@ -6,6 +6,11 @@ package capacity
 func cloudBounds() []Entry {
 	return append(append(append(append(connectionHealthBounds(), healthJournalBounds()...), healthUploadBounds()...), healthSealedBounds()...), append(healthInvestigationBounds(), []Entry{
 		{
+			Name: "cloud.envelope_key_id", Class: Buffer, Unit: Bytes,
+			Limit: 128, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/cloud.MaxKeyIDBytes"},
+		},
+		{
 			Name: "cloud.rekey_lifetime", Class: Cache, Unit: Seconds,
 			Limit: 120, AtLimit: Expire, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/domain/cloud.RekeyLifetimeMSLimit"},

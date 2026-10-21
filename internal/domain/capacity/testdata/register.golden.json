@@ -654,6 +654,26 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.envelope_key_id",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/cloud.MaxKeyIDBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.header_read_diagnostic_rows",
     "Class": "observation",
     "Unit": "rows",

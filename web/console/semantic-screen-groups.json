@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8757,
-  "riskKeys": 3885,
-  "nonRiskCount": 4872,
+  "englishContentKeys": 8763,
+  "riskKeys": 3889,
+  "nonRiskCount": 4874,
   "groups": [
     {
       "name": "admin / other",
@@ -275,7 +275,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 252,
+      "count": 253,
       "sources": [
         null
       ],
@@ -289,6 +289,7 @@
         "capacityRow.cache.session_skills.what",
         "capacityRow.callback.per_machine.what",
         "capacityRow.cloud.content_key_epoch_record_bytes.what",
+        "capacityRow.cloud.envelope_key_id.what",
         "capacityRow.cloud.header_read_diagnostic_seconds.what",
         "capacityRow.cloud.health_capture_export_bytes.full",
         "capacityRow.cloud.health_capture_export_bytes.what",
@@ -4503,7 +4504,7 @@
     },
     {
       "name": "settings / other",
-      "count": 124,
+      "count": 125,
       "sources": [
         "src/pages/settings/window/copy.ts"
       ],
@@ -4545,6 +4546,7 @@
         "settings.settingsHooksLive",
         "settings.settingsHooksWhatHead",
         "settings.settingsHotkey",
+        "settings.settingsITermIntegration",
         "settings.settingsITermNative",
         "settings.settingsITermScan",
         "settings.settingsLanguage",

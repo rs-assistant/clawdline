@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -23,7 +24,7 @@ func epochState(t *testing.T, epoch uint64) domaincloud.ContentKeyState {
 	}
 	id := "ms-1"
 	if epoch > 1 {
-		id = fmt.Sprintf("mk-%d-test", epoch)
+		id = fmt.Sprintf("mk-%d-%x", epoch, sha256.Sum256(key.Bytes()))
 	}
 	return domaincloud.ContentKeyState{Epoch: epoch, KeyID: id, Key: key}
 }
