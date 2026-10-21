@@ -136,14 +136,14 @@ const okList = (body: unknown) => {
 
 test("a Mac with three webhooks and a Linux machine with one are two machines, each listed once", () => {
   // Cloud resolves the Mac's three hooks to its one investigation hook; the Linux machine has none bound.
-  const d = okList(listOf([row("mac_1", "Studio Mac", "ready", MAC_HOOK), row("linux_1", "Build server", "setup_required")]))
+  const d = okList(listOf([row("mac_1", "Studio", "ready", MAC_HOOK), row("linux_1", "Build server", "setup_required")]))
   assert.equal(d.machines.length, 2)
-  assert.deepEqual(d.machines.map((m) => [m.machine_name, m.state]), [["Studio Mac", "ready"], ["Build server", "setup_required"]])
+  assert.deepEqual(d.machines.map((m) => [m.machine_name, m.state]), [["Studio", "ready"], ["Build server", "setup_required"]])
   // The name is shown on its own; the webhook stays a separate field and never joins it.
-  assert.equal(d.machines[0].machine_name, "Studio Mac")
+  assert.equal(d.machines[0].machine_name, "Studio")
   assert.equal(d.machines[1].hook_id, null)
   // A list repeating one machine per hook, as the webhook list did, cannot be trusted at all.
-  assert.equal(parseDestinations(listOf([row("mac_1", "Studio Mac", "ready", MAC_HOOK), row("mac_1", "Studio Mac", "ready", "swh_other")])), null)
+  assert.equal(parseDestinations(listOf([row("mac_1", "Studio", "ready", MAC_HOOK), row("mac_1", "Studio", "ready", "swh_other")])), null)
   // Nor can two machines claiming one hook.
   assert.equal(parseDestinations(listOf([row("mac_1", "A", "ready", MAC_HOOK), row("mac_2", "B", "ready", MAC_HOOK)])), null)
 })
