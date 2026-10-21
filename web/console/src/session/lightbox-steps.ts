@@ -84,7 +84,7 @@ export function saveImageFromClick(
   return "download"
 }
 
-/** Sharing is an explicit action, separate from downloading an image. */
+/** Open the native sheet directly from the press, preserving browser activation. */
 export function shareImageFromClick(file: File, platform: Pick<Navigator, "share">): void {
   void platform.share({ files: [file] }).catch(() => {
     // Dismissing the sheet does not start a download or close the preview.
@@ -232,7 +232,7 @@ export function attachLightboxSteps(
       imageName = name
       file = null
       share.hidden = true
-      download.hidden = false
+      download.hidden = true
       download.disabled = true
       // Cloud already holds a blob URL; the local console fetches its same-origin image. Do this
       // while the preview opens so a later button press can synchronously open the native sheet.
@@ -243,7 +243,10 @@ export function attachLightboxSteps(
         if (revision !== imageRevision || !blob.size) return
         file = new File([blob], name, { type: blob.type || (name.endsWith(".jpg") ? "image/jpeg" : "image/png") })
         download.disabled = false
-        share.hidden = !(typeof navigator.share === "function" && navigator.canShare?.({ files: [file] }))
+        const canShare = typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })
+        share.hidden = !canShare
+        // Offer one action: the native sheet when available, otherwise a browser save.
+        download.hidden = !!canShare
       }).catch(() => {
         if (revision === imageRevision) download.hidden = true
       })
