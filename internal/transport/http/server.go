@@ -272,6 +272,7 @@ func New(cfg config.Config) (*Server, error) {
 			Activity: app.NewActivityReads(),
 		},
 	}
+	srv.inventory.SquadRole = srv.sessionSquadRole
 	srv.inventory.DiscoverExternal = func() bool {
 		v, err := srv.settingsFile().Read()
 		// An unreadable preference must not broaden discovery.
