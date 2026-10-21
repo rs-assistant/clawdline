@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
+	"github.com/sainteye/clawdline/internal/contract"
 	cloudtransport "github.com/sainteye/clawdline/internal/transport/cloud"
 )
 
@@ -111,7 +112,7 @@ func (s *Server) cloudStatusRoute(w http.ResponseWriter, r *http.Request) {
 		writeAuthRefusal(w, http.StatusMethodNotAllowed, "bad_request", "The cloud status is read with GET.")
 		return
 	}
-	if !requireLocal(w, r) {
+	if !requireCloudLocal(w, r) {
 		return
 	}
 	line, ok := cloudLines.Load(s.cfg.Dir)
@@ -170,7 +171,7 @@ type CloudPairingLine interface {
 // or a Cloud viewer could reach would let a reader of this Mac's sessions mint
 // itself a second, fully-paired browser.
 func (s *Server) cloudPairingRoute(w http.ResponseWriter, r *http.Request) {
-	if !requireLocal(w, r) {
+	if !requireCloudLocal(w, r) {
 		return
 	}
 	pairing, ok := s.cloudPairing(w)
@@ -181,7 +182,18 @@ func (s *Server) cloudPairingRoute(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet, http.MethodHead:
 		writeJSON(w, pairing.State())
 	case http.MethodPost:
-		state, err := pairing.Begin(r.Context())
+		var body contract.CloudPairingRequest
+		if r.Body != nil {
+			if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&body); err != nil && err != io.EOF {
+				writeAuthRefusal(w, 400, "bad_request", "That request body is not readable JSON.")
+				return
+			}
+		}
+		if body.Scope != "" && !adaptercloud.ValidViewerScope(string(body.Scope)) {
+			writeAuthRefusal(w, 400, "invalid_viewer_scope", "Choose readonly or operate.")
+			return
+		}
+		state, err := pairing.Begin(r.Context(), string(body.Scope))
 		if err != nil {
 			writeCloudPairingError(w, err)
 			return
@@ -202,7 +214,7 @@ func (s *Server) cloudPairingRoute(w http.ResponseWriter, r *http.Request) {
 // there is no camera to point at this Mac. The cryptography is the invitation
 // path's, exactly; only the way the offer arrived differs.
 func (s *Server) cloudPairingOfferRoute(w http.ResponseWriter, r *http.Request) {
-	if !requireLocal(w, r) {
+	if !requireCloudLocal(w, r) {
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -213,9 +225,7 @@ func (s *Server) cloudPairingOfferRoute(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	var body struct {
-		Offer string `json:"offer"`
-	}
+	var body contract.CloudPairingOfferRequest
 	// The bound is the Swift app's `maxOfferFragmentUTF8Bytes`: a closed offer
 	// has bounded ids and fixed-size keys, so four KiB is generous for it and
 	// still refuses attacker-sized text before any decoding.
@@ -228,7 +238,11 @@ func (s *Server) cloudPairingOfferRoute(w http.ResponseWriter, r *http.Request) 
 		writeAuthRefusal(w, http.StatusBadRequest, "bad_request", "A pairing code is 1 to 4096 characters.")
 		return
 	}
-	state, err := pairing.Complete(r.Context(), offer)
+	if body.Scope != "" && !adaptercloud.ValidViewerScope(string(body.Scope)) {
+		writeAuthRefusal(w, 400, "invalid_viewer_scope", "Choose readonly or operate.")
+		return
+	}
+	state, err := pairing.Complete(r.Context(), offer, string(body.Scope))
 	if err != nil {
 		writeCloudPairingError(w, err)
 		return
@@ -243,7 +257,7 @@ func (s *Server) cloudPairingOfferRoute(w http.ResponseWriter, r *http.Request) 
 // daemon does not have, and would in any case reach this machine only at the
 // next roster refresh.
 func (s *Server) cloudDeviceRoute(w http.ResponseWriter, r *http.Request) {
-	if !requireLocal(w, r) {
+	if !requireCloudLocal(w, r) {
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -283,7 +297,7 @@ func (s *Server) cloudDeviceRoute(w http.ResponseWriter, r *http.Request) {
 // browser that pinned the old key stops being able to verify this machine, and
 // "are you sure" is not a useful sentence unless it says which browsers.
 func (s *Server) cloudRotateRoute(w http.ResponseWriter, r *http.Request) {
-	if !requireLocal(w, r) {
+	if !requireCloudLocal(w, r) {
 		return
 	}
 	line, ok := cloudLines.Load(s.cfg.Dir)
@@ -380,4 +394,50 @@ func writeCloudPairingError(w http.ResponseWriter, err error) {
 	default:
 		writeRawAuthRefusal(w, http.StatusBadRequest, "pairing_failed", err.Error())
 	}
+}
+
+// requireCloudLocal never mistakes the router's local bearer for the viewer.
+func requireCloudLocal(w http.ResponseWriter, r *http.Request) bool {
+	if cloudtransport.ViaCloud(r.Context()) {
+		writeAuthRefusal(w, http.StatusForbidden, "forbidden", "Only this machine's own token may manage devices.")
+		return false
+	}
+	return requireLocal(w, r)
+}
+
+// cloudViewerScopeRoute is machine-local only: POST {device, scope}.
+func (s *Server) cloudViewerScopeRoute(w http.ResponseWriter, r *http.Request) {
+	if !requireCloudLocal(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeAuthRefusal(w, 405, "bad_request", "A viewer grant is changed with POST.")
+		return
+	}
+	var body contract.CloudViewerGrantRequest
+	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&body); err != nil {
+		writeAuthRefusal(w, 400, "bad_request", "That request body is not readable JSON.")
+		return
+	}
+	if strings.TrimSpace(body.Device) == "" || !adaptercloud.ValidViewerScope(string(body.Scope)) {
+		writeAuthRefusal(w, 400, "invalid_viewer_scope", "Name a pinned viewer and choose readonly or operate.")
+		return
+	}
+	pairing, ok := s.cloudPairing(w)
+	if !ok {
+		return
+	}
+	if err := pairing.SetViewerScope(body.Device, string(body.Scope)); err != nil {
+		if errors.Is(err, cloudtransport.ErrViewerScopeApplied) {
+			writeAuthRefusal(w, 503, "viewer_scope_applied_cleanup_failed", "The viewer scope was saved, but terminal leases could not be revalidated. Retry the same grant.")
+			return
+		}
+		if errors.Is(err, adaptercloud.ErrViewerNotPinned) {
+			writeAuthRefusal(w, 404, "viewer_not_pinned", "The viewer has no active local pin.")
+			return
+		}
+		writeCloudPairingError(w, err)
+		return
+	}
+	writeJSON(w, contract.CloudViewerGrantResponse{Device: body.Device, Scope: body.Scope})
 }

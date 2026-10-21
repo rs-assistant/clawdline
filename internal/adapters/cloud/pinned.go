@@ -16,9 +16,10 @@ package cloud
 //
 // Three rules worth naming:
 //
-//   - **A pin is written after delivery, never before.** A browser that never
-//     received this machine's content key cannot produce a command, so pinning
-//     first would leave a pinned viewer behind every failed handover.
+//   - **Operate pins follow delivery.** A readonly pairing first reserves its
+//     ceiling before key delivery, so a failed final write cannot admit the
+//     viewer through the legacy roster fallback as an operator. A failed
+//     readonly handover can leave a readonly reservation behind.
 //   - **Revoking is local and it is final here.** The control plane's
 //     `DELETE /v1/devices/:id` needs a browser session, which a daemon does not
 //     have; and even when the account revokes a device, "the roster no longer
@@ -50,6 +51,14 @@ const PinnedFile = "paired-devices-v1.json"
 // ErrPinnedUnreadable is a pin file that exists and is not readable as one.
 var ErrPinnedUnreadable = errors.New("the paired-device file cannot be read")
 
+const ScopeReadOnly = "readonly"
+const ScopeOperate = "operate"
+
+var ErrViewerScope = errors.New("viewer scope must be readonly or operate")
+var ErrViewerNotPinned = errors.New("the viewer has no active local pin")
+
+func ValidViewerScope(scope string) bool { return scope == ScopeReadOnly || scope == ScopeOperate }
+
 // PinnedDevice is one browser this machine paired.
 //
 // `PublicKey` is standard padded base64 of 32 bytes — the same spelling the
@@ -57,6 +66,8 @@ var ErrPinnedUnreadable = errors.New("the paired-device file cannot be read")
 // wire agree byte for byte. No private material is ever in this file: it holds
 // public keys, ids and times, which is why it is JSON a person can read.
 type PinnedDevice struct {
+	// Scope is machine-local authority. Empty preserves pre-scope grants.
+	Scope       string `json:"scope,omitempty"`
 	DeviceID    string `json:"device_id"`
 	PublicKey   string `json:"public_key"`
 	Fingerprint string `json:"fingerprint"`
@@ -73,6 +84,58 @@ type PinnedDevice struct {
 
 // Active reports whether this row still admits its device.
 func (d PinnedDevice) Active() bool { return d.RevokedAt == 0 }
+
+func (d PinnedDevice) EffectiveScope() string {
+	if d.Scope == "" {
+		return ScopeOperate
+	}
+	return d.Scope
+}
+
+// ViewerScope returns the local ceiling. Missing pins retain legacy admission;
+// malformed, revoked or future scopes fail closed rather than becoming operate.
+func (s *PinnedStore) ViewerScope(sender string) (string, error) {
+	rows, err := s.Devices()
+	if err != nil {
+		return "", err
+	}
+	for _, row := range rows {
+		if row.DeviceID == sender {
+			if !row.Active() {
+				return "", ErrViewerNotPinned
+			}
+			if !ValidViewerScope(row.EffectiveScope()) {
+				return "", ErrViewerScope
+			}
+			return row.EffectiveScope(), nil
+		}
+	}
+	return ScopeOperate, nil
+}
+
+// SetScope changes only an existing active local pin, atomically and idempotently.
+func (s *PinnedStore) SetScope(sender, scope string) error {
+	if !ValidViewerScope(scope) {
+		return ErrViewerScope
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.loadLocked(); err != nil {
+		return err
+	}
+	for i := range s.record.Devices {
+		if s.record.Devices[i].DeviceID == sender && s.record.Devices[i].Active() {
+			before := s.record.Devices[i].Scope
+			s.record.Devices[i].Scope = scope
+			if err := s.saveLocked(); err != nil {
+				s.record.Devices[i].Scope = before
+				return err
+			}
+			return nil
+		}
+	}
+	return ErrViewerNotPinned
+}
 
 // Key answers the pinned public key, and whether the row holds a usable one.
 func (d PinnedDevice) Key() (ed25519.PublicKey, bool) {
@@ -191,6 +254,9 @@ func (s *PinnedStore) Refused(sender string) (bool, error) {
 // is what "pair this browser again" means, and it is the browser's own
 // repair path when its keys drift.
 func (s *PinnedStore) Pin(accountID string, device PinnedDevice) error {
+	if device.Scope != "" && !ValidViewerScope(device.Scope) {
+		return ErrViewerScope
+	}
 	if device.DeviceID == "" {
 		return errors.New("refusing to pin a device with no id")
 	}
@@ -213,6 +279,8 @@ func (s *PinnedStore) Pin(accountID string, device PinnedDevice) error {
 		return fmt.Errorf("the paired-device file belongs to account %s, not %s",
 			s.record.AccountID, accountID)
 	}
+	before := s.record
+	before.Devices = append([]PinnedDevice(nil), s.record.Devices...)
 	s.record.Version = 1
 	if accountID != "" {
 		s.record.AccountID = accountID
@@ -227,7 +295,11 @@ func (s *PinnedStore) Pin(accountID string, device PinnedDevice) error {
 	if !replaced {
 		s.record.Devices = append(s.record.Devices, device)
 	}
-	return s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		s.record = before
+		return err
+	}
+	return nil
 }
 
 // Revoke marks a device refused. It answers whether a row changed, so that a

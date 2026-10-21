@@ -18,6 +18,7 @@ import (
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	"github.com/sainteye/clawdline/internal/domain/session"
 	"github.com/sainteye/clawdline/internal/domain/task"
+	"github.com/sainteye/clawdline/internal/transport/cloud"
 )
 
 // sessionVerb reads `/v1/sessions/{id}/{verb}` off the string the mux
@@ -86,7 +87,7 @@ func (s *Server) sessionAction(w http.ResponseWriter, r *http.Request) {
 	requestContext := r.Context()
 	// Network requests always carry the gate. In-process callers may supply a
 	// trusted verdict directly and keep their existing application contract.
-	if accessOf(r).gate != nil {
+	if accessOf(r).gate != nil && !cloud.ViaCloud(r.Context()) {
 		requestContext = app.WithOperationCheck(r.Context(), func() error {
 			a := accessOf(r)
 			if a.gate == nil || a.gate.auth == nil {
@@ -625,8 +626,10 @@ func writeActionRefusal(w http.ResponseWriter, err error) {
 
 func actionStatus(code string) int {
 	switch code {
-	case "forbidden":
+	case "forbidden", "viewer_read_only", "cloud_commands_disabled", "unknown_sender":
 		return http.StatusForbidden
+	case "command_roster_unreadable", "command_clock_uncertain":
+		return http.StatusServiceUnavailable
 	case "session_not_found":
 		return http.StatusNotFound
 	case "session_unknown", "closeability_unknown", "close_inventory_unavailable":

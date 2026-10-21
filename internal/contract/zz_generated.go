@@ -2259,6 +2259,40 @@ const (
 // CloseabilityStateValues is every value the contract allows, in contract order.
 var CloseabilityStateValues = []CloseabilityState{CloseabilityStateSafe, CloseabilityStateBlocked, CloseabilityStateNeedsAttestation, CloseabilityStateUnknown}
 
+type CloudPairingOfferRequest struct {
+	Offer string `json:"offer"`
+
+	// Selected by the machine, never by the browser's encrypted offer.
+	Scope CloudViewerScope `json:"scope,omitempty"`
+}
+
+type CloudPairingRequest struct {
+	// Omitted preserves the legacy operate default.
+	Scope CloudViewerScope `json:"scope,omitempty"`
+}
+
+type CloudViewerGrantRequest struct {
+	Device string           `json:"device"`
+	Scope  CloudViewerScope `json:"scope"`
+}
+
+type CloudViewerGrantResponse struct {
+	Device string           `json:"device"`
+	Scope  CloudViewerScope `json:"scope"`
+}
+
+// The machine-local operation ceiling; the machine commands switch and account
+// identity checks remain independent requirements.
+type CloudViewerScope string
+
+const (
+	CloudViewerScopeReadonly CloudViewerScope = "readonly"
+	CloudViewerScopeOperate  CloudViewerScope = "operate"
+)
+
+// CloudViewerScopeValues is every value the contract allows, in contract order.
+var CloudViewerScopeValues = []CloudViewerScope{CloudViewerScopeReadonly, CloudViewerScopeOperate}
+
 // GET /v1/orchestrator/completions?pending=true|false. `pending=true` (the
 // default) is every envelope not yet acknowledged, dead letters included;
 // `pending=false` adds the acknowledged ones of the last seven days.

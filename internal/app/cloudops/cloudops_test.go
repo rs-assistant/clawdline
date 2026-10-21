@@ -2,6 +2,7 @@ package cloudops
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -1267,5 +1268,59 @@ func TestPastPageCursorReachesTheLocalHistoryRoute(t *testing.T) {
 	req := r.last()
 	if req.Path != "/v1/places/project/sessions/codex" || req.Query["cursor"] != "older/+?= page" {
 		t.Fatalf("wrong request %v", req)
+	}
+}
+
+func TestViewerReadOnlyIsDistinctFromTheMachineCommandSwitch(t *testing.T) {
+	r := &router{}
+	b := open(r)
+	b.Authority = func(_ context.Context, _ string, _ ed25519.PublicKey, write bool) Authority {
+		return Authority{ClockReady: true, RosterReadable: true, RosterAllowsSender: true,
+			WriteGateAllows: true, ViewerReadOnly: write}
+	}
+	cmd := request(t, ClassCtl, map[string]any{"type": "send", "session": "%19", "text": "synthetic", "request": "readonly-test", "images": []any{}})
+	if a := b.Handle(context.Background(), cmd); a.Code != "viewer_read_only" {
+		t.Fatalf("reader: %s %s", a.Code, a.Payload)
+	}
+	if len(r.seen) != 0 {
+		t.Fatal("readonly request reached local effects")
+	}
+	b.AllowCommands = func() bool { return false }
+	if a := b.Handle(context.Background(), cmd); a.Code != "cloud_commands_disabled" {
+		t.Fatalf("switch: %s", a.Code)
+	}
+	b.AllowCommands = func() bool { return true }
+	b.Authority = func(_ context.Context, _ string, _ ed25519.PublicKey, _ bool) Authority {
+		return Authority{ClockReady: true, RosterReadable: true, RosterAllowsSender: true, WriteGateAllows: true}
+	}
+	if a := b.Handle(context.Background(), cmd); a.Status != 200 {
+		t.Fatalf("operator: %s", a.Payload)
+	}
+}
+
+func TestReadonlyViewerKeepsConversationDocumentAndImageReads(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, media string
+		fields            map[string]any
+	}{
+		{"transcript", `{}`, "application/json", map[string]any{"limit": 100}},
+		{"document", "# synthetic report", "text/markdown; charset=utf-8", map[string]any{"request": "doc-1", "scope": "project", "task": "", "path": "README.md"}},
+		{"image", "synthetic-image", "image/png", map[string]any{"id": "picture-1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &router{body: tc.body, media: tc.media}
+			b := open(r)
+			b.Authority = func(_ context.Context, _ string, _ ed25519.PublicKey, write bool) Authority {
+				return Authority{ClockReady: true, RosterReadable: true, RosterAllowsSender: true, WriteGateAllows: true, ViewerReadOnly: write}
+			}
+			b.TranscriptAuthority = func(context.Context, string, ed25519.PublicKey) Authority { return contentReadAuthority(true) }
+			body := map[string]any{"type": tc.name, "session": pane, "expected_generation": pinnedGeneration}
+			for k, v := range tc.fields {
+				body[k] = v
+			}
+			if a := b.Handle(context.Background(), contentReadRequest(t, body)); !a.OK() || len(r.seen) != 1 {
+				t.Fatalf("readonly read: %+v", a)
+			}
+		})
 	}
 }

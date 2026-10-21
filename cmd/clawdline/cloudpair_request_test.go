@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/sainteye/clawdline/internal/config"
+	cloudtransport "github.com/sainteye/clawdline/internal/transport/cloud"
 )
 
 func TestPairRequestUsesVerifiedInstalledDaemonWhenShellStateHasNoToken(t *testing.T) {
@@ -59,5 +60,19 @@ func TestPairRequestUsesVerifiedInstalledDaemonWhenShellStateHasNoToken(t *testi
 	}
 	if _, err := cloudPairRequestFor(http.MethodPost, "/v1/cloud/pairing", nil, stale, installed, selectedPort, port); err == nil {
 		t.Fatal("a reachable selected daemon must not silently select the installed daemon")
+	}
+}
+
+func TestCloudReadonlyPairingOutputNamesTheMachineGrantInBothLanguages(t *testing.T) {
+	previous := commandLanguage
+	t.Cleanup(func() { commandLanguage = previous })
+	for language, want := range map[string]string{"en": "operating this machine is disabled", "zh-Hant": "不能操作這台機器"} {
+		commandLanguage = language
+		out := captureCloudStream(t, &os.Stdout, func() {
+			printPairingState(cloudtransport.PairingState{Phase: cloudtransport.PairingPaired, Scope: "readonly", ViewerDeviceID: "synthetic-viewer"})
+		})
+		if !strings.Contains(out, want) || !strings.Contains(out, "synthetic-viewer") {
+			t.Fatalf("%s: %s", language, out)
+		}
 	}
 }
