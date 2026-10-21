@@ -1,6 +1,6 @@
 # Clawdline
 
-[繁體中文](README.zh-TW.md)
+[繁體中文](README.zh-TW.md) · [Security](https://clawdline.com/security/)
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8.svg)](go.mod)
@@ -42,6 +42,18 @@ For a paired phone, Clawdline first tries to open a direct WebRTC data channel t
 
 The machine can turn direct connections off in Settings → Remote or with `clawdline cloud direct off`. An AWS Linux host can bind ICE to one UDP port; see [the Cloud guide](docs/cloud.md#aws-linux-direct-connection) and [the full Linux procedure](docs/linux.md#let-a-cloud-browser-connect-directly-to-ec2). Fixed-port setup is currently in development builds.
 
+## Security and your data
+
+**[Read the security overview: encryption, pairing, and what Cloud can see](https://clawdline.com/security/).** It includes a data-flow diagram and links to the source behind each step.
+
+- **On your machine:** Clawdline reads existing Claude Code and Codex records, terminal screens, and project files needed by its features. Sensitive content already in a conversation or terminal can appear in the console. The daemon listens on loopback by default; local use needs no Clawdline account.
+- **With Cloud off:** the Cloud connection is off by default. Update checks can still contact GitHub or the hosted version endpoint; Cloud off does not mean all network traffic is disabled.
+- **With Cloud on:** Session snapshots are published automatically; opening conversations, files, and attachments requests content from your machine. Content is encrypted locally before transmission. This does not create a Cloud backup of your entire conversation archive. The machine and paired browsers hold the content keys; Cloud forwards ciphertext and has no content decryption key. Account, device, routing, timing, and traffic information remain visible to the service.
+- **Who can act:** directly paired browsers can read and send. Cloud has a separate machine command switch. Sending instructions or using a terminal can run code on your machine; pair only devices you trust. Revocation cannot erase content already read. Your computer, paired browsers, and the web application delivered to them remain part of the trust boundary.
+- **Your AI provider:** Claude Code and Codex still send their requests to their respective AI providers under those providers' policies. Clawdline's encrypted Cloud channel does not change that relationship.
+
+[Remote access and permissions](docs/user/remote-access.md) · [Encryption implementation](docs/cloud.md) · [Install and update trust](docs/releasing.md#what-a-release-is)
+
 ## Install
 
 On macOS 13+ or Linux, install Claude Code or Codex, then run:
@@ -50,7 +62,7 @@ On macOS 13+ or Linux, install Claude Code or Codex, then run:
 curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
 ```
 
-The installer verifies the release, starts a per-user service, and opens the console. Start a Session there or run `claude` or `codex` in tmux; the release includes tmux if needed. [Install and first run](docs/user/install.md) · [First Session](docs/user/first-session.md)
+The installer checks the archive checksum, then runs the downloaded program to verify the release signature and start a per-user service. The first install therefore trusts GitHub, HTTPS, and the installation script; subsequent updates verify signed manifests against release keys built into the installed program. It then opens the console. Start a Session there or run `claude` or `codex` in tmux; the release includes tmux if needed. [Install and first run](docs/user/install.md) · [First Session](docs/user/first-session.md)
 
 ## Availability
 

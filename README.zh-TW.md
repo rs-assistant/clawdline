@@ -1,6 +1,6 @@
 # Clawdline
 
-[English](README.md)
+[English](README.md)・[安全性](https://clawdline.com/security/)
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8.svg)](go.mod)
@@ -42,6 +42,18 @@ Clawdline 的常駐服務與主控台在你的機器上執行，管理你已使�
 
 可以在機器的「設定 → 遠端」或執行 `clawdline cloud direct off` 關閉直連。AWS Linux 可把 ICE 固定在單一 UDP 埠；請看 [Cloud 設定說明](docs/cloud.md#aws-linux-direct-connection)與[完整 Linux 步驟](docs/linux.md#let-a-cloud-browser-connect-directly-to-ec2)。固定埠設定目前提供於開發版本。
 
+## 安全性與你的資料
+
+**[查看安全性說明：加密、配對，以及 Cloud 能看見什麼](https://clawdline.com/security/)。** 頁面包含資料流圖解，以及各步驟對應的原始碼連結。
+
+- **在你的機器上：** Clawdline 會讀取既有的 Claude Code、Codex 紀錄、終端畫面，以及功能所需的專案檔案。對話或終端中已有的敏感內容可能顯示在主控台。本機服務預設只監聽 loopback；本機使用不需要 Clawdline 帳號。
+- **未啟用 Cloud：** Cloud 連線預設關閉。更新檢查仍可能連到 GitHub 或官網版本端點；關閉 Cloud 不代表停用所有網路流量。
+- **啟用 Cloud 後：** Session 快照會自動發布；開啟對話、檔案與附件時，會向你的機器請求內容。內容在本機加密後才傳送，不會因此將整份對話歷史封存備份到 Cloud。內容金鑰由機器與配對瀏覽器持有；Cloud 轉送密文，沒有內容解密金鑰。服務仍可見帳號、裝置、路由、時間與流量資訊。
+- **誰能操作：** 直接配對的瀏覽器可讀取與傳送；Cloud 另有每台機器的操作開關。傳送指示或操作終端可能在你的機器上執行程式，請只配對你信任的裝置。撤銷無法抹除已讀內容；你的電腦、配對瀏覽器及其載入的網頁程式仍是信任邊界的一部分。
+- **你的 AI 供應商：** Claude Code 與 Codex 仍會依各自供應商的政策傳送 AI 請求。Clawdline 的加密 Cloud 通道不會改變這項關係。
+
+[遠端存取與權限](docs/user/remote-access.md)・[加密實作](docs/cloud.md)・[安裝與更新的信任基礎](docs/releasing.md#what-a-release-is)
+
 ## 安裝
 
 在 macOS 13 以上或 Linux，先安裝 Claude Code 或 Codex，再執行：
@@ -50,7 +62,7 @@ Clawdline 的常駐服務與主控台在你的機器上執行，管理你已使�
 curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
 ```
 
-安裝程式會驗證發行版、啟動使用者服務並開啟主控台。你可以從主控台開 Session，或在 tmux 執行 `claude` 或 `codex`；需要時可用發行版內附的 tmux。[安裝與首次使用](docs/user/install.md)・[第一個 Session](docs/user/first-session.md)
+安裝腳本先核對壓縮檔雜湊，再執行下載的程式，由它驗證發行版簽章並啟動使用者服務。因此，首次安裝仍須信任 GitHub、HTTPS 與安裝腳本；後續更新則以已安裝程式內建的發布公鑰驗證簽署過的 manifest，完成後開啟主控台。你可以從主控台開 Session，或在 tmux 執行 `claude` 或 `codex`；需要時可用發行版內附的 tmux。[安裝與首次使用](docs/user/install.md)・[第一個 Session](docs/user/first-session.md)
 
 ## 支援範圍
 
