@@ -14,7 +14,8 @@ interface MachineCapabilityClient {
 
 /** A verified machine report can change presence on every console view. */
 export function reportsMachinePresence(event: { type: string }): boolean {
-  return event.type === "sessions" || event.type === "orchestrator" || event.type === "session_status"
+  return event.type === "sessions" || event.type === "orchestrator" || event.type === "session_status" ||
+    event.type === "machine_reachability"
 }
 
 /**
