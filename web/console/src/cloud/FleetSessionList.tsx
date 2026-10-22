@@ -408,8 +408,8 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
       onTouchEnd={() => window.setTimeout(() => { if (swipe.openId() === null) thawOrder() }, 1200)}>
       {filterSlot && createPortal(<SessionStateFilterControl value={statusFilter} onChange={setStatusFilter}
         counts={filterCounts} incomplete={filterIncomplete} onRefresh={refreshFromButton} refreshState={refreshFeedback}
-        summary={<span id="counts">{filterCounts.working ? L.fillString(L.strings.webCountWorking, { n: filterCounts.working }) :
-          filterIncomplete ? nextWord("sessionsListWaitTitle") : totalSessionWords(filterCounts.all)}</span>} />, filterSlot)}
+        summary={filterIncomplete ? null : <span id="counts">{filterCounts.working
+          ? L.fillString(L.strings.webCountWorking, { n: filterCounts.working }) : totalSessionWords(filterCounts.all)}</span>} />, filterSlot)}
       <div className="ptr" id="ptr" ref={pullPad}>
         <span id="ptr-label">{pullWord === "release" ? L.strings.webPullRelease :
           pullWord === "busy" ? L.strings.webPullBusy : L.strings.webPull}</span>
