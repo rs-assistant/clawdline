@@ -350,10 +350,10 @@ function HeaderButton({ chip, onOpen }: { chip: ReturnType<typeof setupChip>; on
 const ITEM_WORD = { app: "setupItemApp", browser: "setupItemBrowser", phone: "setupItemPhone" } as const
 
 /**
- * The wizard. Its top names every item setup is made of — the app, a browser,
+ * The wizard (exported, with its steps, for `capture.tsx`). Its top names every item setup is made of — the app, a browser,
  * a phone — so the steps inside one item are never read as the whole of it.
  */
-function Wizard({ items, current, done, skipped, onClose, children }: {
+export function Wizard({ items, current, done, skipped, onClose, children }: {
   items: readonly SetupItem[]
   current: SetupItem | null
   done: Record<SetupItem, boolean>
@@ -390,7 +390,7 @@ function Wizard({ items, current, done, skipped, onClose, children }: {
   )
 }
 
-function Welcome({ onLocal, onStart }: { onLocal: () => void; onStart: () => void }) {
+export function Welcome({ onLocal, onStart }: { onLocal: () => void; onStart: () => void }) {
   const rows: { icon: ReactNode; title: string; hint: string }[] = [
     { icon: <ListIcon />, title: nextWord("setupWelcomeSessions"), hint: nextWord("setupWelcomeSessionsHint") },
     { icon: <BubbleIcon />, title: nextWord("setupWelcomeReply"), hint: nextWord("setupWelcomeReplyHint") },
@@ -432,7 +432,7 @@ function Steps({ steps }: { steps: Step[] }) {
   )
 }
 
-function AppStep({ login, configured, lineUp, paired, running, inApp, onOpenCloud, onRun, onSignIn, onBack, onLocal, onSkip, onNext }: {
+export function AppStep({ login, configured, lineUp, paired, running, inApp, onOpenCloud, onRun, onSignIn, onBack, onLocal, onSkip, onNext }: {
   login: CloudLogin | null
   /** Open the app's invitation in its Cloud tab; null until there is one. */
   onOpenCloud: (() => void) | null
@@ -492,7 +492,7 @@ function AppStep({ login, configured, lineUp, paired, running, inApp, onOpenClou
   )
 }
 
-function BrowserStep({ pairing, opened, paired, onOpen, onBack, onLocal, onSkip }: {
+export function BrowserStep({ pairing, opened, paired, onOpen, onBack, onLocal, onSkip }: {
   pairing: CloudPairing | undefined
   opened: boolean
   paired: boolean
@@ -530,14 +530,16 @@ function BrowserStep({ pairing, opened, paired, onOpen, onBack, onLocal, onSkip 
   )
 }
 
-function PhoneStep({ pairing, onRenew, onBack, onLocal, onSkip }: {
+export function PhoneStep({ pairing, platform: initialPlatform = "apple", onRenew, onBack, onLocal, onSkip }: {
   pairing: CloudPairing | undefined
+  /** The tab shown first; the capture page (`capture.tsx`) opens either. */
+  platform?: "apple" | "android"
   onRenew: () => void
   onBack: () => void
   onLocal: () => void
   onSkip: () => void
 }) {
-  const [platform, setPlatform] = useState<"apple" | "android">("apple")
+  const [platform, setPlatform] = useState<"apple" | "android">(initialPlatform)
   const expired = pairing?.phase === "failed" || (pairing?.phase === "waiting" && !!pairing.expires_at && pairing.expires_at * 1000 < Date.now())
   const link = pairing?.phase === "waiting" && !expired ? pairing.link ?? "" : ""
   return (
@@ -593,7 +595,7 @@ function SiteLine({ word }: { word: "setupPhoneAppleOpen" | "setupPhoneAndroidOp
  * Setup is finished once every item is paired or skipped. This screen says
  * which, and takes the person back to any item that is not paired.
  */
-function Finished({ items, done, onGo, onClose }: {
+export function Finished({ items, done, onGo, onClose }: {
   items: readonly SetupItem[]
   done: Record<SetupItem, boolean>
   onGo: (item: SetupItem) => void
