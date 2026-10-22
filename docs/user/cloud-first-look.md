@@ -1,14 +1,40 @@
-# See a machine from another device
+# See Sessions in Cloud from a browser or phone
 
-Clawdline Cloud lets a paired browser see Sessions on your machines through an encrypted relay. Your machine needs to be connected for a fresh view. This walkthrough starts after [your first local Session](first-session.md) is visible.
+Use this walkthrough after [your first local Session](first-session.md) is visible. Keep Clawdline running on the machine you want to reach. You will sign in to your account, connect that machine, then pair each browser or installed web app you want to use.
 
-1. On the machine you want to reach, sign it in to Cloud and turn Cloud on: in the Mac app's own Settings window (menu bar icon → Settings → Remote), or in a terminal with `clawdline cloud login` and then `clawdline cloud on`. Both take effect at once; nothing needs restarting.
-2. In the browser or phone at app.clawdline.com, sign in to the same account and pair that browser with the machine. On a machine with a screen, the app's Settings → Remote shows a pairing QR code; on a machine you reach over SSH, `clawdline cloud pair` prints one in the terminal. On an iPhone, scan it from inside the Home Screen app, not with the Camera.
-3. Select that machine in the hosted console, then open its Session list.
+## 1. Sign in and connect the machine
 
-**Success:** the machine shows connected and its Session rows appear. Pairing lets the browser read. To send messages or act from Cloud, enable Cloud commands for that machine in its Remote settings. A read-only view is still useful when you want to check progress.
+On macOS, open Clawdline and select its **Cloud** tab. Choose **Continue with GitHub**. Sign in in your default browser and allow it to open Clawdline when asked. Return to the app's Cloud tab: it should show your account or machine list.
 
-**If the machine is offline:** the hosted console may retain an older view. Do not treat it as a fresh result. Return to the machine and restore its connection, then check the machine's connection state again. **If reading works but sending does not:** check that the selected machine is paired and Cloud commands are enabled there. [Recovery steps](recovery.md).
+If this machine is not connected yet, choose **Connect this machine**. Approve the native confirmation, complete the machine approval in your default browser with the same GitHub account, then return to Clawdline. Account sign-in and machine approval are separate: the first identifies you; the second registers this computer and connects it to Cloud.
+
+Choose **Pair this app**, then **Pair directly with this app's machine**. Approve its native confirmation, compare the fingerprints, and choose **They match — done**. **Success in the app:** this machine's Sessions appear in the Cloud tab. If this machine is already connected or the app is already paired, skip the completed step. For a machine without the app, use [the terminal connection steps](remote-access.md#connect-the-machine).
+
+## 2. Pair a new browser on this computer
+
+1. Open [app.clawdline.com](https://app.clawdline.com/) in the browser and profile you plan to use. Sign in to the same GitHub account.
+2. Open **Pair**, then choose **Show the pairing code**. You can start before selecting a machine; the app checks that the code reaches this computer.
+3. Choose **Open Clawdline to pair**. Allow the browser to open the installed app, check the machine named in its confirmation, then choose **Pair with this machine**. Keep the browser's pairing page open.
+4. Return to that browser. Compare the fingerprints shown by the pairing flow, then choose **They match — done**. The machine's Sessions should appear.
+
+The app reports **Browser paired** when its local handover finishes. The browser must also finish and show Sessions. If the app does not open, use [the code or command fallback](remote-access.md#pair-with-a-code-or-command). The app's Cloud tab and every browser profile have separate pairing keys.
+
+## 3. Pair your phone
+
+On the computer, open the app's **Cloud** tab and find **Pair a browser or phone**. If the Session list already appears, open **Settings → Workflow and control → Pair a browser or phone**. Choose **Show a pairing QR code** and approve the native confirmation. Leave the QR visible; click it to enlarge it.
+
+- **iPhone or iPad:** open app.clawdline.com in Safari, use **Share → Add to Home Screen**, then open Clawdline from its Home Screen icon. Sign in there. Choose **Pair → Scan the machine's QR** inside that app and allow the camera. Do this before pairing: Safari and the Home Screen app store separate keys.
+- **Android:** open app.clawdline.com in Chrome and sign in. If you want an installed app, install it from Chrome's menu first. In the browser profile or installed app you will keep using, choose **Pair → Scan the machine's QR** and allow the camera.
+
+On either phone, scan the computer's QR, compare the fingerprints, then choose **They match — done**. **Success on the phone:** the selected machine's Sessions appear. **Success on the computer:** the pairing block reports **Browser paired**. If live scanning fails, use **Black screen? Choose a photo of the QR** or **Choose a QR image** inside the same phone app; images are processed there. See [phone recovery](remote-access.md#pair-an-iphone-ipad-or-android-phone) for expired codes and camera permissions.
+
+These App shortcuts require a Clawdline app version that supports them. Updating only the hosted website does not update the native app. On a machine without the app, use the [terminal pairing path](remote-access.md#pair-with-a-code-or-command).
+
+## Read, act, and reconnect
+
+Pairing supplies a browser's keys. Sending also requires this machine's Cloud command switch and the browser's local grant to allow operation; see [Let paired devices act](remote-access.md#let-paired-devices-act).
+
+If the machine is offline, Cloud may retain an older view. Restore its connection before treating the view as fresh. If the machine is visible but this browser still asks to pair, check the GitHub account, browser profile, and whether you opened Safari or the Home Screen app.
 
 ## Use Sessions from another local machine
 

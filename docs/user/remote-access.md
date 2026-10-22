@@ -21,8 +21,7 @@ browser (C below). Both must allow operation before that browser can act.
 Clawdline no longer runs a Cloudflare tunnel of its own (removed on 2026-10-20; the automatically
 generated `trycloudflare.com` address went the day before). A settings file that still holds the
 old tunnel settings (`remote_tunnel`, `remote_tunnel_name`, `remote_hostname`, `cloudflared_path`)
-starts nothing, and that tunnel's hostname is no longer an address the daemon answers. The
-**Remote** tab says so once; **Got it** removes those settings from the file. Use B or C instead.
+starts nothing, and that tunnel's hostname is no longer an address the daemon answers. Use B or C instead.
 
 Labels below follow the English interface; the console also supports other languages.
 
@@ -145,41 +144,71 @@ Clawdline Cloud is off by default. When on, the machine keeps an outbound connec
 app.clawdline.com that carries only end-to-end encrypted envelopes: the service passes them along
 and cannot read your sessions. Cloud is also how you use **several machines** from one console.
 
-Cloud is a preview. The machine side has been tested against a local copy of the service.
+Cloud is a preview. The App shortcuts below require an app build that includes the matching native pairing support; a hosted-console update alone does not supply it.
 
 ### Connect the machine
 
+On macOS, use Clawdline's **Cloud** tab:
+
+1. Choose **Continue with GitHub**. Complete sign-in in your default browser and allow it to open Clawdline. Return to the Cloud tab and check that your account appears.
+2. If this machine is not connected yet, choose **Connect this machine**. Approve the native confirmation, then approve the machine in your default browser with the same GitHub account. Return to Clawdline after approval.
+3. Choose **Pair this app**, then **Pair directly with this app's machine**. Approve the native confirmation, compare the fingerprints, and choose **They match — done**. Check that this machine's Sessions appear in the Cloud tab. Skip a step that is already complete.
+
+Account sign-in, machine registration, and browser pairing are separate. Signing in proves which account you own; the local connection step registers this computer and starts its Cloud connection; pairing gives this app or browser the keys to read Sessions. Another browser must pair separately.
+
+If sign-in does not return to Clawdline, allow the browser's request to open the app, or open Clawdline and try again. Install an updated native app if the connection or pairing controls are missing; updating the website alone does not update the app.
+
+For a machine without the app, run these commands on the target machine through a terminal or SSH:
+
 ```sh
-./bin/clawdline cloud login           # prints a code and an address; approve this machine there
-./bin/clawdline cloud on              # turn the line on
-# restart `serve`: the daemon reads the Cloud switch when it starts
-./bin/clawdline cloud status          # the switch, the identity, the connection
+clawdline cloud login
+clawdline cloud on
+clawdline cloud status
 ```
 
-Sign in at app.clawdline.com with **Continue with GitHub**. `cloud login` waits up
-to ten minutes for you to approve the machine.
+`cloud login` prints an address and a code. Open the address, choose **Continue with GitHub**, sign in to the same account, and approve the machine within ten minutes. Then `cloud on` turns on the running daemon's Cloud connection without a manual restart. `cloud status` shows the identity, switch, and connection. Check that the selected machine is connected in Cloud before pairing a browser.
 
-### Pair a browser or a phone
+If the shell says `command not found: clawdline`, open a new terminal after installation. With a standard installation you can also run the executable at `~/.local/bin/clawdline` in place of `clawdline`. For a custom install, use that installation's executable. Never register a different machine as a substitute.
 
-Any one of these:
+### Pair a browser on the same computer
 
-- **From the machine:** `./bin/clawdline cloud pair` prints a one-time link. Open it in a browser
-  signed in to the same account.
-- **From the macOS app:** its settings window has **Pair browser** → **Create pairing QR code**. **On an iPhone or iPad, first add app.clawdline.com to the Home Screen
-  (Safari → Share → Add to Home Screen), open it from there, sign in, and scan from inside it.** A
-  pairing made in Safari does not carry over to the Home Screen app.
-- **From the browser, using a paired helper machine:** in the hosted console, press
-  **Pair** on the target machine's row, choose a machine this browser is already
-  paired with, then start its pairing assistant. The helper uses access it already
-  has to reach the target. The card reports progress and the fingerprints to compare.
-  The helper must be online and its Cloud command switch must be on.
-- **From the browser, manually:** the same card shows
-  `clawdline cloud pair --offer <code>` to run on the target machine if a helper is
-  unavailable or cannot reach it.
+1. In the browser and profile you want to use, open [app.clawdline.com](https://app.clawdline.com/) and sign in to the same account.
+2. Open **Pair**, then choose **Show the pairing code**. You do not need to select a machine first; the app checks that the code reaches this computer.
+3. Choose **Open Clawdline to pair**. Allow the browser to open the app. Verify the machine named in the native confirmation and choose **Pair with this machine**.
+4. Keep the browser page open. The app reports **Browser paired** after its handover. Return to the browser, compare the fingerprints, and choose **They match — done**. Its Session list is the browser's success check.
 
-Both screens show the same fingerprint when pairing finishes; compare them.
+This shortcut requires the updated macOS app. If the app does not open or the button is unavailable, use [the code or command fallback](#pair-with-a-code-or-command). A browser on another computer cannot use this shortcut to pair a remote machine.
 
-**Check:** app.clawdline.com lists the machine with its sessions.
+### Pair an iPhone, iPad, or Android phone
+
+First show a QR on the computer: in the macOS app's **Cloud** tab, find **Pair a browser or phone**. If the Session list already appears, open **Settings → Workflow and control → Pair a browser or phone**. Choose **Show a pairing QR code**, approve the native confirmation, and leave the code visible. Click the QR to enlarge it. The QR expires after about ten minutes; **Show a pairing QR code** or **Get a new QR code** creates a fresh invitation after confirmation.
+
+**iPhone or iPad:**
+
+1. Open app.clawdline.com in Safari and use **Share → Add to Home Screen**. Enable **Open as Web App** if offered, then add it.
+2. Open Clawdline from the Home Screen and sign in to the same account. Pair inside this app; Safari has separate keys.
+3. Choose **Pair → Scan the machine's QR** inside Clawdline, allow the camera, and point it at the computer's QR. Scanning with the system Camera can open Safari instead.
+4. Compare the fingerprints and choose **They match — done**. Check that this app shows the machine's Sessions.
+
+**Android:**
+
+1. Open app.clawdline.com in Chrome and sign in to the same account. If you want the installed web app, install it from Chrome's menu before pairing.
+2. In that browser profile or installed app, choose **Pair → Scan the machine's QR**, allow the camera, and scan the computer's code.
+3. Compare the fingerprints and choose **They match — done**. Check that the machine's Sessions appear; keep using this same profile or app.
+
+The computer's pairing block reports **Browser paired** when the exchange finishes. On either phone, a denied camera permission can be enabled in the device's browser/app permissions. You can also use **Black screen? Choose a photo of the QR** or **Choose a QR image** inside the pairing page; the image is processed locally in that browser/app, and still needs a readable, unexpired Clawdline invitation. A photo is a scanning fallback, not a transfer of an existing browser's keys. If neither works, use the code path below.
+
+### Pair with a code or command
+
+Use these recoveries if the app does not open, live scanning fails, or the target machine is headless:
+
+- **Paste a code locally:** in the browser or phone to pair, choose **Pair → Show the pairing code** (or **Can't scan? Use a pairing code instead**; after a camera error, choose **Use a pairing code**). Copy the entire code. On the target computer, open the macOS app's **Cloud** tab → **Settings → Workflow and control → Pair a browser or phone**, paste it into **Paste the pairing code from the browser you want to connect**, choose **Pair this browser**, and approve the native confirmation.
+- **Use a terminal on the target machine:** on the browser's pairing card, choose **Copy pairing command** and run that complete command once on the target machine. Its executable lookup also checks installed locations when `clawdline` is not on PATH. If it reports **Clawdline was not found**, install and start Clawdline on that machine, then generate a new code. Do not copy only the code into the shell.
+- **Show a QR without the app:** run `clawdline cloud pair` on the target machine. It prints a QR, a one-time link, the fingerprints, and the expiry. Scan inside the phone app you intend to use. A desktop browser can open the printed link in its intended profile.
+
+Keep the original browser page open until it finishes. Compare the machine fingerprint in the browser with the machine's fingerprint and, when printed, the browser fingerprint with the machine's `browser` line. If they differ, reject/remove that pairing. These paths still need explicit access to the target machine; signing in to the hosted website alone cannot authorize the handover.
+
+An expired invitation must be replaced on the machine. An expired browser code can be replaced with **New code** in that browser; carry the new code again. If you see **wrong_account**, sign in to the same account on both ends. Pair each browser profile, private window, and installed app separately; clearing its site storage removes its keys.
 
 ### Let paired devices act
 
@@ -200,7 +229,7 @@ when pairing again preserves its existing grant; a never-pinned browser keeps th
 ```sh
 ./bin/clawdline cloud devices
 ./bin/clawdline cloud revoke <device-id>
-./bin/clawdline cloud off             # and restart `serve`: the line goes down
+./bin/clawdline cloud off             # the running daemon disconnects; no restart
 ```
 
 ### Plans
