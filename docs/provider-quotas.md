@@ -7,9 +7,15 @@ window are hidden. A real zero is a usable reading. The footer is available from
 
 The footer reads the currently selected machine, including in the all-machines view; its detail
 names that source machine. It never adds percentages across machines, projects or Sessions.
-Switching the Cloud reader discards the previous machine's footer state. At narrow widths the
-highest used fraction from each provider is shown, and on phones the two tightest providers remain
-beside a **+N** button. Every known window remains available in the details dialog.
+Switching the Cloud reader discards the previous machine's footer state. Desktop windows show a
+progress bar, percentage and reset countdown, with middle dots between one provider's windows; smaller desktop widths show the most used window
+per provider. Every known window remains available in the details dialog. Below 900 CSS pixels,
+the mobile layout shows the two tightest providers and a **+N** details button only in the Session
+list. Session conversations and other pages unmount the footer and stop its reads, leaving no
+reserved bottom space. The mobile list reserves the full measured footer height, including its
+home-indicator clearance from `--indicator` (the console does not use `viewport-fit=cover`, so
+`env(safe-area-inset-bottom)` alone can be zero on iOS). Changing viewport size does not change
+the saved browser preference.
 
 ## Sources and ownership
 

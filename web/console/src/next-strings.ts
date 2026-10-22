@@ -14,7 +14,7 @@ import { catalogWord } from "./catalog.ts"
 const words = {
   en: {
     quotaSettingTitle: "Show provider quota bar",
-    quotaSettingHint: "On by default. Remembered in this browser. Providers without quota data stay hidden.",
+    quotaSettingHint: "On by default. Desktop shows the bar on all pages; mobile shows it only in the Session list. Remembered in this browser. Providers without data stay hidden.",
     quotaSaveFailed: "Applied for now. This browser could not save the preference.",
     quotaOn: "On",
     quotaOff: "Off",
@@ -1964,7 +1964,7 @@ const words = {
   },
   "zh-Hant": {
     quotaSettingTitle: "顯示供應商額度列",
-    quotaSettingHint: "預設開啟，顯示偏好儲存在此瀏覽器。沒有額度資料的供應商不會顯示。",
+    quotaSettingHint: "預設開啟。桌機所有頁面皆顯示，手機只在 Session 列表顯示。偏好儲存在此瀏覽器，沒有額度資料的供應商不會顯示。",
     quotaSaveFailed: "已套用，但此瀏覽器無法儲存偏好；重新開啟後可能恢復預設。",
     quotaOn: "開",
     quotaOff: "關",

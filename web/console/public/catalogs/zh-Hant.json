@@ -8816,7 +8816,7 @@
   "next.cloudReadPairingRequired": "無法讀取 {machine}：這個瀏覽器需要重新確認配對。已顯示的內容可能不是最新狀態。",
   "next.cloudReadUnknownFailure": "讀取 {machine} 失敗，顯示的內容可能尚未更新。",
   "next.quotaSettingTitle": "顯示供應商額度列",
-  "next.quotaSettingHint": "預設開啟，顯示偏好儲存在此瀏覽器。沒有額度資料的供應商不會顯示。",
+  "next.quotaSettingHint": "預設開啟。桌機所有頁面皆顯示，手機只在 Session 列表顯示。偏好儲存在此瀏覽器，沒有額度資料的供應商不會顯示。",
   "next.quotaSaveFailed": "已套用，但此瀏覽器無法儲存偏好；重新開啟後可能恢復預設。",
   "next.quotaOn": "開",
   "next.quotaOff": "關",

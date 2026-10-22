@@ -49,10 +49,13 @@ and keep the question open on the **Verify** page ([board.md](board.md)).
 
 ## The global provider quota bar
 
-A quota bar appears at the bottom of every console page. It shows Claude Code, Codex, Gemini and
+On desktop, a quota bar with progress bars appears at the bottom of every console page.
+Mobile shows it only in the Session list, with clearance above the home indicator; conversations
+and other pages have no quota footer. It shows Claude Code, Codex, Gemini and
 Grok when that machine has numeric quota data for them. Providers without data stay hidden.
-Click a provider to see all known windows, reset times, sources and the age of the reading. Narrow
-windows keep the tightest limits visible and put the remaining providers behind **+N**.
+Click a provider to see all known windows, reset times, sources and the age of the reading.
+Smaller desktop widths show the most used window for each provider. Mobile shows the two
+tightest providers, with remaining providers available through **+N**.
 
 **Settings → Browser → Show provider quota bar** is on by default. Turn it off to hide the bar in
 this browser; the choice survives reloads. It does not change the dispatch quota check. Cloud shows

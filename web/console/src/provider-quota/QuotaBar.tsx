@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import type { ProviderQuotaRow, ProviderQuotaSnapshot, ProviderQuotaWindow } from "@clawdline/contract"
 import { client } from "../client.js"
 import { nextWord } from "../next-strings.js"
@@ -39,16 +39,17 @@ function problemWord(problem: string | undefined): string {
     default: return nextWord("quotaUnavailable")
   }
 }
-const narrowQuery = "(max-width: 520px)"
-function subscribeNarrow(fn: () => void) { const query = window.matchMedia(narrowQuery); query.addEventListener("change", fn); return () => query.removeEventListener("change", fn) }
-const isNarrow = () => window.matchMedia(narrowQuery).matches
+const mobileQuery = "(max-width: 899px)"
+function subscribeMobile(fn: () => void) { const query = window.matchMedia(mobileQuery); query.addEventListener("change", fn); return () => query.removeEventListener("change", fn) }
+const isMobile = () => window.matchMedia(mobileQuery).matches
 
-export function QuotaBar({ machineName, offline = false }: { machineName?: string; offline?: boolean }) {
+export function QuotaBar({ machineName, offline = false, mobileListShown = false }: { machineName?: string; offline?: boolean; mobileListShown?: boolean }) {
   const on = useSyncExternalStore(subscribeQuotaVisible, quotaVisible)
+  const mobile = useSyncExternalStore(subscribeMobile, isMobile)
   const version = useMachineVersion()
   const [revision, setRevision] = useState(0)
   useEffect(() => onMachineChanged(() => setRevision((n) => n + 1)), [])
-  if (!on || (version.apiLevel !== undefined && version.apiLevel < 28)) return null
+  if (!on || (mobile && !mobileListShown) || (version.apiLevel !== undefined && version.apiLevel < 28)) return null
   return <QuotaReading key={revision} machineName={machineName} offline={offline} />
 }
 function QuotaReading({ machineName, offline }: { machineName?: string; offline: boolean }) {
@@ -59,8 +60,8 @@ function QuotaReading({ machineName, offline }: { machineName?: string; offline:
   }, [])
   const polling = usePoll<ProviderQuotaSnapshot>(read, 30_000)
   const rows = visibleQuotaRows(polling.data?.providers ?? [])
-  const narrow = useSyncExternalStore(subscribeNarrow, isNarrow)
-  const shown = narrow ? compactQuotaRows(rows, 2) : rows
+  const mobile = useSyncExternalStore(subscribeMobile, isMobile)
+  const shown = mobile ? compactQuotaRows(rows, 2) : rows
   const more = rows.length - shown.length
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
   useEffect(() => { const timer = window.setInterval(() => setNow(Math.floor(Date.now() / 1000)), 60_000); return () => clearInterval(timer) }, [])
@@ -90,7 +91,9 @@ function QuotaReading({ machineName, offline }: { machineName?: string; offline:
           data-stale={stale(row) || undefined} aria-label={`${row.label} · ${nextWord("quotaUsed", { percent: Math.round(tightestWindow(row).used_percent) })}`} aria-haspopup="dialog" aria-controls="provider-quota-detail"
           onClick={(e) => open(e.currentTarget)} title={`${row.label} · ${nextWord("quotaDetails")}`}>
           <Icon id={row.id} /><span className="quota-provider-name">{row.label}</span>
-          <span className="quota-full-windows">{(row.id === "claude" || row.id === "codex" ? row.windows : [tightestWindow(row)]).map((w, i) => <WindowValue key={i} window={w} now={now} />)}</span>
+          <span className="quota-full-windows">{(row.id === "claude" || row.id === "codex" ? row.windows : [tightestWindow(row)]).map((w, i) => <Fragment key={i}>
+            {i > 0 && <span className="quota-window-separator" aria-hidden="true">·</span>}<WindowValue window={w} now={now} />
+          </Fragment>)}</span>
           <span className="quota-compact-window"><WindowValue window={tightestWindow(row)} now={now} /></span>
           {stale(row) && <span className="quota-stale">{offline ? nextWord("quotaOffline") : nextWord("quotaStale")}</span>}
         </button>)}

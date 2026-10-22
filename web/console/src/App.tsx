@@ -1183,7 +1183,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
         <Component key={id} shown={page === id && knowsHere(id)} />
       ))}
       {!surveyAccount ? <SurveyCoordinator /> : null}
-      <QuotaBar key={fleetReaderMachine ?? "local"} machineName={quotaMachineName} offline={!!cloudMachineOffline} />
+      <QuotaBar mobileListShown={page === "sessions" && view === "list" && !machine} key={fleetReaderMachine ?? "local"} machineName={quotaMachineName} offline={!!cloudMachineOffline} />
       <Overlays />
       {machine ? <MachineDashboard
         sessions={dashboardSource?.sessions ?? fleet.snapshot?.sessions ?? []}

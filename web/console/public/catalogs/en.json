@@ -8816,7 +8816,7 @@
   "next.cloudReadPairingRequired": "Cannot read {machine}: this browser needs to confirm its pairing. Existing content may be out of date.",
   "next.cloudReadUnknownFailure": "Could not refresh {machine}. Displayed content may be out of date.",
   "next.quotaSettingTitle": "Show provider quota bar",
-  "next.quotaSettingHint": "On by default. Remembered in this browser. Providers without quota data stay hidden.",
+  "next.quotaSettingHint": "On by default. Desktop shows the bar on all pages; mobile shows it only in the Session list. Remembered in this browser. Providers without data stay hidden.",
   "next.quotaSaveFailed": "Applied for now. This browser could not save the preference.",
   "next.quotaOn": "On",
   "next.quotaOff": "Off",
