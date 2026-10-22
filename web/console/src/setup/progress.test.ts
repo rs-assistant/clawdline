@@ -69,3 +69,11 @@ test("a machine without the macOS app is set up by a browser and a phone", () =>
   const both = readSetup(status([chrome, phone]), false)
   assert.equal(both.kind === "known" && both.next, null)
 })
+
+test("the app is the device recorded from its own pairing, whatever name it registered under", () => {
+  const oldApp: CloudViewer = { id: "d_old_app", kind: "browser", name: "Web browser", pinned: true }
+  const unknown = readSetup(status([oldApp]))
+  assert.equal(unknown.kind === "known" && unknown.done.app, false, "without the record it is a browser")
+  const known = readSetup(status([oldApp, chrome]), true, "d_old_app")
+  assert.deepEqual(known.kind === "known" && known.done, { app: true, browser: true, phone: false })
+})

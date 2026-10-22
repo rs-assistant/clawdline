@@ -70,6 +70,10 @@ web/console/src/next-strings.ts	"To pair the Mac app, open this guide there: Hel
 web/console/src/next-strings.ts	"配對 Mac App"
 web/console/src/next-strings.ts	"Mac App 已連上 Cloud"
 web/console/src/next-strings.ts	"要配對 Mac App，請在 Mac App 裡打開這個精靈：說明 → 設定精靈…"
+web/console/public/catalogs/en.json	next.setupItemApp = "Mac app"
+web/console/public/catalogs/zh-Hant.json	next.setupItemApp = "Mac App"
+web/console/src/next-strings.ts	"Mac app"
+web/console/src/next-strings.ts	"Mac App"
 
 # What the macOS app's Cloud tab sends as its user agent, in the test that
 # holds the device name it registers to it.

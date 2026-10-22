@@ -558,6 +558,11 @@ var Settables = []Settable{
 	// 0 is not complete. The header button folds away a day after it.
 	{Name: "setup_completed_at", Kind: "int", Min: 1, Max: 1 << 40, Zero: true,
 		Refusal: "invalid_setup_completed_at", Because: "0, or Unix seconds"},
+	// The Cloud device the macOS app's own tab paired as, recorded by the
+	// setup wizard from the invitation it handed the app. An app paired
+	// before its tab named itself is still known by this.
+	{Name: "setup_app_device", Kind: "string", Check: ValidSetupDevice,
+		Refusal: "invalid_setup_app_device", Because: "empty, or a Cloud device id"},
 	{Name: "orchestrator_enabled", Kind: "bool"},
 	{Name: "orchestrator_max_children", Kind: "int", Min: 1, Max: 10},
 	{Name: "orchestrator_permission", Kind: "string", Choices: []string{"ask", "edits", "full"},
@@ -570,6 +575,20 @@ var Settables = []Settable{
 	{Name: "claude_auto_compact_window", Kind: "int", Min: 50_000, Max: 1_000_000, Zero: true,
 		Refusal: "invalid_auto_compact_window",
 		Because: "0 for none, or a whole number of tokens from 50000 to 1000000"},
+}
+
+// ValidSetupDevice is empty or a Cloud device id: letters, digits, dash and
+// underscore, at most 128 characters.
+func ValidSetupDevice(id string) bool {
+	if len(id) > 128 {
+		return false
+	}
+	for _, r := range id {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidDefaultModel is the launch policy's model-name gate, plus empty for

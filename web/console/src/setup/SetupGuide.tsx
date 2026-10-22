@@ -42,7 +42,7 @@ const OPEN_READ_MS = 2_000
 
 type Screen = "welcome" | SetupItem | "done" | "local"
 
-type Settings = { mode: string; completedAt: number }
+type Settings = { mode: string; completedAt: number; appDevice: string }
 
 const PHONE_SITE = "app.clawdline.com"
 
@@ -69,6 +69,10 @@ function Guide() {
   const [running, setRunning] = useState(false)
   const [said, setSaid] = useState("")
   const [opened, setOpened] = useState(false)
+  // The invitation made for the app's own Cloud tab. It is opened there only
+  // when the person presses for it, after this page has shown the fingerprint
+  // the Cloud tab will ask them to compare.
+  const [appPairing, setAppPairing] = useState<CloudPairing | null>(null)
   const autoOpened = useRef(false)
   const asked = useRef({ login: false, line: false, app: "", pairing: "" })
   const inApp = appBridge() !== null
@@ -79,7 +83,7 @@ function Guide() {
   useEffect(() => { void localPlatform().then(setPlatform) }, [])
   const hasApp = inApp || platform === "darwin"
   const reading: SetupReading = useMemo(() => platform === undefined && !inApp
-    ? { kind: "unknown" } : readSetup(status, hasApp), [status, hasApp, platform, inApp])
+    ? { kind: "unknown" } : readSetup(status, hasApp, settings?.appDevice ?? ""), [status, hasApp, platform, inApp, settings?.appDevice])
   const items = reading.kind === "known" ? reading.items : setupItems(hasApp)
   const after = (item: SetupItem | "welcome"): Screen => {
     const rest = item === "welcome" ? items : items.slice(items.indexOf(item) + 1)
@@ -94,10 +98,10 @@ function Guide() {
     return answer
   }, [])
 
-  const takeSettings = (snapshot: { setup_mode?: string | null; setup_completed_at?: number | null }) =>
-    setSettings({ mode: snapshot.setup_mode ?? "", completedAt: snapshot.setup_completed_at ?? 0 })
+  const takeSettings = (snapshot: { setup_mode?: string | null; setup_completed_at?: number | null; setup_app_device?: string | null }) =>
+    setSettings({ mode: snapshot.setup_mode ?? "", completedAt: snapshot.setup_completed_at ?? 0, appDevice: snapshot.setup_app_device ?? "" })
 
-  const saveSettings = useCallback((change: { setup_mode?: string; setup_completed_at?: number }) =>
+  const saveSettings = useCallback((change: { setup_mode?: string; setup_completed_at?: number; setup_app_device?: string }) =>
     writeBrowserSettings(change).then(takeSettings, (error: unknown) => setSaid(settingsFailureSentence(error))), [])
 
   // This machine's devices: once a minute behind the header, every two seconds
@@ -153,6 +157,17 @@ function Guide() {
     setScreen(null)
   }
 
+  // "Keep it local" from any step: the header then shows the quiet Local
+  // mark, and pressing it brings this guide back.
+  const keepLocal = () => {
+    setRunning(false)
+    const pairing = status && typeof status === "object" ? status.pairing : undefined
+    if (asked.current.pairing && pairing?.phase === "waiting") void cancelCloudPairing().catch(() => undefined)
+    asked.current.pairing = ""
+    void saveSettings({ setup_mode: "local" })
+    show("local")
+  }
+
   const fail = (error: unknown) => {
     setRunning(false)
     setSaid(nextWord("setupFailed", { why: settingsFailureSentence(error) }))
@@ -166,11 +181,28 @@ function Guide() {
   // The app step starts its device sign-in as soon as it is shown, so the
   // button that opens the sign-in page is a real link the press opens; a page
   // opened after an await is a popup the browser, and the app, refuse.
+  //
+  //
+  // The login route says "complete" whenever an identity is on disk; the line
+  // loads it only once it is switched on, so until then `configured` is false
+  // for a machine that is signed in. Signed in is either. A credential the
+  // control plane no longer accepts shows up on the line as `not_signed_in`
+  // or `device_not_approved`, and only then is a new sign-in asked to replace it.
+  const staleLogin = !!cloud && cloud.state !== "connected" &&
+    (cloud.last_error_kind === "not_signed_in" || cloud.last_error_kind === "device_not_approved")
+  const signedIn = (configured || login?.phase === "complete") && !staleLogin
+  const signIn = useCallback((replace: boolean) => {
+    asked.current.login = true
+    startCloudLogin(replace).then(setLogin, fail)
+  }, [])
   useEffect(() => {
     if (screen !== "app" || configured || asked.current.login || status === undefined) return
     asked.current.login = true
-    startCloudLogin(login?.phase === "failed").then(setLogin, fail)
-  }, [screen, configured, status, login?.phase])
+    readCloudLogin().then((answer) => {
+      setLogin(answer)
+      if (answer.phase !== "complete" && answer.phase !== "waiting") signIn(answer.phase === "failed")
+    }, fail)
+  }, [screen, configured, status, signIn])
 
   useEffect(() => {
     if (screen !== "app" || login?.phase !== "waiting") return
@@ -179,11 +211,14 @@ function Guide() {
   }, [screen, login?.phase])
 
   // After sign-in, the rest of the app step runs by itself: the line, then
-  // the app's own pairing, each asked for once.
+  // the app's own invitation, each asked for once.
   useEffect(() => {
     if (!running || !cloud) return
     if (done.app) { setRunning(false); return }
-    if (configured && !cloud.enabled && !asked.current.line) {
+    // Not signed in and no sign-in waiting: nothing will move by itself, so
+    // the button must be pressable again rather than read "Connecting…".
+    if (!signedIn && login?.phase !== "waiting") { setRunning(false); return }
+    if (signedIn && !cloud.enabled && !asked.current.line) {
       asked.current.line = true
       setCloudEnabled(true).then(() => setCloudCommands(true)).then(() => void refresh(), fail)
       return
@@ -195,9 +230,19 @@ function Guide() {
     beginCloudPairing().then((pairing) => {
       if (!pairing.link) throw new Error(pairing.error ?? "no pairing link")
       asked.current.app = pairing.invitation_id ?? "asked"
-      appBridge()?.postMessage({ link: pairing.link })
+      setAppPairing(pairing)
     }).catch(fail)
-  }, [running, cloud, configured, lineUp, inApp, done.app, refresh])
+  }, [running, cloud, signedIn, lineUp, inApp, done.app, refresh, login?.phase])
+
+  // The device that answered the app's invitation is the app, whatever name
+  // its Cloud tab registered under years ago (`progress.ts` deviceItem).
+  useEffect(() => {
+    const pairing = cloud?.pairing
+    const device = pairing?.viewer_device_id
+    if (!settings || pairing?.phase !== "paired" || !device || !asked.current.app) return
+    if (pairing.invitation_id !== asked.current.app || settings.appDevice === device) return
+    void saveSettings({ setup_app_device: device })
+  }, [cloud?.pairing, settings, saveSettings])
 
   // The browser and phone steps each hold one invitation while they are shown.
   useEffect(() => {
@@ -227,9 +272,9 @@ function Guide() {
       <HeaderButton chip={chip} onOpen={() => show(chip.kind === "progress" && (chip.count > 0 || settings?.mode === "cloud")
         ? chip.next : chip.kind === "done" ? "done" : "welcome")} />
       {screen && (
-        <Wizard onClose={close} step={items.indexOf(screen as SetupItem) + 1} total={items.length}>
+        <Wizard onClose={close} items={items} current={items.includes(screen as SetupItem) ? screen as SetupItem : null} done={done}>
           {screen === "welcome" && <Welcome
-            onLocal={() => { void saveSettings({ setup_mode: "local" }); show("local") }}
+            onLocal={keepLocal}
             onStart={() => { void saveSettings({ setup_mode: "cloud" }); show(firstOpen) }} />}
           {screen === "local" && <Ending title={nextWord("setupLocalTitle")} body={nextWord("setupLocalBody")} local
             primary={{ label: nextWord("setupLocalOk"), run: close }}
@@ -237,15 +282,18 @@ function Guide() {
           {screen === "done" && <Ending title={nextWord("setupDoneTitle")} body={nextWord("setupDoneBody")}
             primary={{ label: nextWord("setupDoneClose"), run: close }}
             secondary={{ label: nextWord("setupDoneAnother"), run: () => { asked.current.pairing = ""; show("phone") } }} />}
-          {screen === "app" && <AppStep login={login} configured={configured} lineUp={lineUp} paired={done.app}
+          {screen === "app" && <AppStep login={login} configured={signedIn} lineUp={lineUp} paired={done.app}
             running={running} inApp={inApp} onRun={() => { setSaid(""); setRunning(true) }}
-            onBack={() => show("welcome")} onLater={close} onNext={() => show(after("app"))} />}
+            appFingerprint={appPairing?.link ? appPairing.machine_fingerprint ?? cloud?.fingerprint ?? "" : ""}
+            onOpenCloud={appPairing?.link ? () => appBridge()?.postMessage({ link: appPairing.link }) : null}
+            onSignIn={() => { setSaid(""); signIn(login?.phase !== "idle") }}
+            onBack={() => show("welcome")} onLocal={keepLocal} onNext={() => show(after("app"))} />}
           {screen === "browser" && <BrowserStep pairing={cloud?.pairing} opened={opened} paired={done.browser}
-            onOpen={() => setOpened(true)} onBack={() => show(before("browser"))}
+            onOpen={() => setOpened(true)} onBack={() => show(before("browser"))} onLocal={keepLocal}
             onSkip={() => { asked.current.pairing = ""; show(after("browser")) }} />}
           {screen === "phone" && <PhoneStep pairing={cloud?.pairing}
             onRenew={() => { asked.current.pairing = "phone"; beginCloudPairing().then(() => void refresh(), fail) }}
-            onBack={() => { asked.current.pairing = ""; show(before("phone")) }} onLater={close} />}
+            onBack={() => { asked.current.pairing = ""; show(before("phone")) }} onLocal={keepLocal} />}
           {said && <p className="setup-said" role="alert">{said}</p>}
         </Wizard>
       )}
@@ -283,7 +331,19 @@ function HeaderButton({ chip, onOpen }: { chip: ReturnType<typeof setupChip>; on
   )
 }
 
-function Wizard({ step, total, onClose, children }: { step: number; total: number; onClose: () => void; children: ReactNode }) {
+const ITEM_WORD = { app: "setupItemApp", browser: "setupItemBrowser", phone: "setupItemPhone" } as const
+
+/**
+ * The wizard. Its top names every item setup is made of — the app, a browser,
+ * a phone — so the steps inside one item are never read as the whole of it.
+ */
+function Wizard({ items, current, done, onClose, children }: {
+  items: readonly SetupItem[]
+  current: SetupItem | null
+  done: Record<SetupItem, boolean>
+  onClose: () => void
+  children: ReactNode
+}) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     showModalWithoutChoice(dialog.current)
@@ -292,14 +352,16 @@ function Wizard({ step, total, onClose, children }: { step: number; total: numbe
     <dialog ref={dialog} className="setup-dialog" aria-label={nextWord("setupDialog")}
       onCancel={(event) => { event.preventDefault(); onClose() }}>
       <div className="setup-top">
-        {step > 0 ? (
-          <div className="setup-count">
-            <span className="setup-dots" aria-hidden="true">
-              {Array.from({ length: total }, (_, index) => index + 1).map((i) =>
-                <span key={i} data-on={i <= step ? "true" : undefined} data-current={i === step ? "true" : undefined} />)}
-            </span>
-            <span>{nextWord("setupStepOf", { step, total })}</span>
-          </div>
+        {current ? (
+          <ol className="setup-track">
+            {items.map((item) => (
+              <li key={item} data-current={item === current ? "true" : undefined} data-done={done[item] ? "true" : undefined}
+                aria-current={item === current ? "step" : undefined}>
+                {done[item] ? <CheckIcon /> : <span className="setup-track-dot" aria-hidden="true" />}
+                <span>{nextWord(ITEM_WORD[item])}</span>
+              </li>
+            ))}
+          </ol>
         ) : <span />}
         <button type="button" className="setup-x" aria-label={nextWord("setupClose")} onClick={onClose}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -329,7 +391,7 @@ function Welcome({ onLocal, onStart }: { onLocal: () => void; onStart: () => voi
         ))}
       </ul>
       <div className="setup-actions">
-        <button type="button" className="setup-quiet" onClick={onLocal}>{nextWord("setupLocalOnly")}</button>
+        <button type="button" className="setup-quiet" onClick={onLocal}>{nextWord("setupStayLocal")}</button>
         <button type="button" className="setup-primary" onClick={onStart}>{nextWord("setupStart")}</button>
       </div>
     </div>
@@ -352,16 +414,22 @@ function Steps({ steps }: { steps: Step[] }) {
   )
 }
 
-function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onBack, onLater, onNext }: {
+function AppStep({ login, configured, lineUp, paired, running, inApp, appFingerprint, onOpenCloud, onRun, onSignIn, onBack, onLocal, onNext }: {
   login: CloudLogin | null
+  /** This machine's fingerprint, once the app's invitation exists. */
+  appFingerprint: string
+  /** Open the app's invitation in its Cloud tab; null until there is one. */
+  onOpenCloud: (() => void) | null
   configured: boolean
   lineUp: boolean
   paired: boolean
   running: boolean
   inApp: boolean
   onRun: () => void
+  /** Ask the daemon for a fresh sign-in, for when none is waiting. */
+  onSignIn: () => void
   onBack: () => void
-  onLater: () => void
+  onLocal: () => void
   onNext: () => void
 }) {
   const signing = !configured && login?.phase === "waiting"
@@ -382,19 +450,23 @@ function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onB
       <h2>{nextWord("setupAppTitle")}</h2>
       <p className="setup-lede">{nextWord("setupAppBody")}</p>
       <Steps steps={steps} />
+      {!paired && onOpenCloud && appFingerprint ? <Fingerprint value={appFingerprint} /> : null}
       {paired && <p className="setup-ok">{nextWord("setupAppDone")}</p>}
       {!paired && lineUp && !inApp && <p className="setup-note">{nextWord("setupAppElsewhere")}</p>}
       <div className="setup-actions">
         <span className="setup-actions-quiet">
           <button type="button" className="setup-quiet" onClick={onBack}>{nextWord("setupBack")}</button>
-          <button type="button" className="setup-quiet" onClick={onLater}>{nextWord("setupLater")}</button>
+          <button type="button" className="setup-quiet" onClick={onLocal}>{nextWord("setupStayLocal")}</button>
         </span>
         {paired || (lineUp && !inApp) ? (
           <button type="button" className="setup-primary" onClick={onNext}>{nextWord("setupNext")}</button>
+        ) : onOpenCloud ? (
+          <button type="button" className="setup-primary" onClick={onOpenCloud}>{nextWord("setupAppOpenCloud")}</button>
         ) : startLink ? (
           <a className="setup-primary" href={startLink} target="_blank" rel="noopener noreferrer" onClick={onRun}>{nextWord("setupAppStart")}</a>
         ) : (
-          <button type="button" className="setup-primary" disabled={running || (!configured && login?.phase !== "waiting")} onClick={onRun}>
+          <button type="button" className="setup-primary" disabled={running}
+            onClick={!configured && login?.phase !== "waiting" ? onSignIn : onRun}>
             {running ? nextWord("setupAppBusy") : configured ? nextWord("setupAppContinue") : nextWord("setupAppStart")}
           </button>
         )}
@@ -403,12 +475,13 @@ function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onB
   )
 }
 
-function BrowserStep({ pairing, opened, paired, onOpen, onBack, onSkip }: {
+function BrowserStep({ pairing, opened, paired, onOpen, onBack, onLocal, onSkip }: {
   pairing: CloudPairing | undefined
   opened: boolean
   paired: boolean
   onOpen: () => void
   onBack: () => void
+  onLocal: () => void
   onSkip: () => void
 }) {
   const link = pairing?.phase === "waiting" ? pairing.link ?? "" : ""
@@ -424,10 +497,12 @@ function BrowserStep({ pairing, opened, paired, onOpen, onBack, onSkip }: {
           <span data-accent={waiting ? "true" : undefined}>{waiting ? nextWord("setupBrowserWaitingHint") : nextWord("setupBrowserIdleHint")}</span>
         </span>
       </div>
+      {link && pairing?.machine_fingerprint ? <Fingerprint value={pairing.machine_fingerprint} /> : null}
       <div className="setup-actions">
         <span className="setup-actions-quiet">
           <button type="button" className="setup-quiet" onClick={onBack}>{nextWord("setupBack")}</button>
           <button type="button" className="setup-quiet" onClick={onSkip}>{nextWord("setupSkip")}</button>
+          <button type="button" className="setup-quiet" onClick={onLocal}>{nextWord("setupStayLocal")}</button>
         </span>
         {waiting || !link ? (
           <button type="button" className="setup-primary" disabled>{nextWord("setupBrowserBusy")}</button>
@@ -439,15 +514,15 @@ function BrowserStep({ pairing, opened, paired, onOpen, onBack, onSkip }: {
   )
 }
 
-function PhoneStep({ pairing, onRenew, onBack, onLater }: {
+function PhoneStep({ pairing, onRenew, onBack, onLocal }: {
   pairing: CloudPairing | undefined
   onRenew: () => void
   onBack: () => void
-  onLater: () => void
+  onLocal: () => void
 }) {
+  const [platform, setPlatform] = useState<"apple" | "android">("apple")
   const expired = pairing?.phase === "failed" || (pairing?.phase === "waiting" && !!pairing.expires_at && pairing.expires_at * 1000 < Date.now())
   const link = pairing?.phase === "waiting" && !expired ? pairing.link ?? "" : ""
-  const comparing = pairing?.phase === "sealing" || (!!pairing?.viewer_fingerprint && pairing.phase !== "failed")
   return (
     <div className="setup-body">
       <h2>{nextWord("setupPhoneTitle")}</h2>
@@ -459,33 +534,55 @@ function PhoneStep({ pairing, onRenew, onBack, onLater }: {
               {nextWord("setupPhoneExpired")}
               <button type="button" className="setup-quiet" onClick={onRenew}>{nextWord("setupPhoneRenew")}</button>
             </span>
-          ) : comparing && pairing?.machine_fingerprint ? (
-            <span className="setup-qr-state" data-accent="true">{nextWord("setupPhoneCompare", { key: pairing.machine_fingerprint })}</span>
           ) : (
             <span className="setup-qr-state"><span className="setup-wait-dot" aria-hidden="true" />{nextWord("setupPhoneWaiting")}</span>
           )}
         </div>
-        <ol className="setup-numbered">
-          <li>
-            <PhoneOpenLine />
-            <small>{nextWord("setupPhoneOpenHint")}</small>
-          </li>
-          <li><span>{nextWord("setupPhoneSignIn")}</span></li>
-          <li><span>{nextWord("setupPhoneScan")}</span></li>
-        </ol>
+        <div className="setup-phone-steps">
+          <div className="setup-tabs" role="tablist">
+            {(["apple", "android"] as const).map((name) => (
+              <button key={name} type="button" role="tab" aria-selected={platform === name}
+                className="setup-tab" onClick={() => setPlatform(name)}>
+                {nextWord(name === "apple" ? "setupPhoneApple" : "setupPhoneAndroid")}
+              </button>
+            ))}
+          </div>
+          <ol className="setup-numbered" role="tabpanel">
+            <li><SiteLine word={platform === "apple" ? "setupPhoneAppleOpen" : "setupPhoneAndroidOpen"} /></li>
+            <li><span>{nextWord("setupPhoneSignIn")}</span></li>
+            <li><span>{nextWord("setupPhoneScan")}</span></li>
+          </ol>
+          {link && pairing?.machine_fingerprint ? <Fingerprint value={pairing.machine_fingerprint} /> : null}
+        </div>
       </div>
       <div className="setup-actions">
-        <button type="button" className="setup-quiet" onClick={onBack}>{nextWord("setupBack")}</button>
-        <button type="button" className="setup-secondary" onClick={onLater}>{nextWord("setupLater")}</button>
+        <span className="setup-actions-quiet">
+          <button type="button" className="setup-quiet" onClick={onBack}>{nextWord("setupBack")}</button>
+          <button type="button" className="setup-quiet" onClick={onLocal}>{nextWord("setupStayLocal")}</button>
+        </span>
       </div>
     </div>
   )
 }
 
-/** The site name inside the first phone line, drawn in the accent without splitting a translation. */
-function PhoneOpenLine() {
+/**
+ * This machine's fingerprint, where the person can read it while the pairing
+ * page — the Cloud tab, the browser, the phone — asks whether it matches.
+ */
+function Fingerprint({ value }: { value: string }) {
+  return (
+    <div className="setup-fingerprint">
+      <span>{nextWord("setupFingerprintLabel")}</span>
+      <code>{value}</code>
+      <small>{nextWord("setupFingerprintHint")}</small>
+    </div>
+  )
+}
+
+/** The site name inside a phone line, drawn in the accent without splitting a translation. */
+function SiteLine({ word }: { word: "setupPhoneAppleOpen" | "setupPhoneAndroidOpen" }) {
   const marker = "\u0000"
-  const [before, after] = nextWord("setupPhoneOpen", { site: marker }).split(marker)
+  const [before, after] = nextWord(word, { site: marker }).split(marker)
   return <span className="setup-phone-open">{before}<code>{PHONE_SITE}</code>{after}</span>
 }
 

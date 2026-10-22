@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8966,
-  "riskKeys": 3985,
-  "nonRiskCount": 4981,
+  "englishContentKeys": 8973,
+  "riskKeys": 3989,
+  "nonRiskCount": 4984,
   "groups": [
     {
       "name": "admin / other",
@@ -3262,7 +3262,7 @@
     },
     {
       "name": "next / other",
-      "count": 425,
+      "count": 428,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3548,17 +3548,20 @@
         "next.setupDialog",
         "next.setupDoneBody",
         "next.setupDoneTitle",
-        "next.setupLater",
+        "next.setupFingerprintLabel",
+        "next.setupItemApp",
+        "next.setupItemBrowser",
+        "next.setupItemPhone",
         "next.setupLocalCloud",
         "next.setupLocalOk",
-        "next.setupLocalOnly",
         "next.setupLocalTitle",
         "next.setupNext",
-        "next.setupPhoneCompare",
+        "next.setupPhoneAndroid",
+        "next.setupPhoneApple",
         "next.setupPhoneRenew",
         "next.setupSkip",
         "next.setupStart",
-        "next.setupStepOf",
+        "next.setupStayLocal",
         "next.setupWelcomeEyebrow",
         "next.setupWelcomePhone",
         "next.setupWelcomeReply",

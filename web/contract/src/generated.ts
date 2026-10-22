@@ -7595,6 +7595,12 @@ export interface SettingsRequest {
   session_auto_discovery: boolean | null
 
   /**
+   * The Cloud device id the macOS app's own tab paired as, recorded by the setup
+   * wizard from the invitation it handed the app. Empty or absent is not known.
+   */
+  setup_app_device: string | null
+
+  /**
    * Unix seconds when the console first saw all three setup items paired; 0 or
    * absent is not complete. The header setup button folds away one day later.
    */
@@ -7942,6 +7948,12 @@ export interface SettingsSnapshot {
    */
   scope_app: string | null
   session_auto_discovery: boolean | null
+
+  /**
+   * The Cloud device id the macOS app's own tab paired as, recorded by the setup
+   * wizard from the invitation it handed the app. Empty or absent is not known.
+   */
+  setup_app_device: string | null
 
   /**
    * Unix seconds when the console first saw all three setup items paired; 0 or
