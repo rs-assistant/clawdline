@@ -58,3 +58,5 @@
   .quota-providers { gap: 12px; }
   .quota-compact-window progress, .quota-compact-window .quota-reset { display: none; }
 }
+
+.quota-setting-toggle + .quota-setting-toggle { margin-top: 14px; }

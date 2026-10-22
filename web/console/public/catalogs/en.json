@@ -8816,7 +8816,7 @@
   "next.cloudReadPairingRequired": "Cannot read {machine}: this browser needs to confirm its pairing. Existing content may be out of date.",
   "next.cloudReadUnknownFailure": "Could not refresh {machine}. Displayed content may be out of date.",
   "next.quotaSettingTitle": "Show provider quota bar",
-  "next.quotaSettingHint": "On by default. Desktop shows the bar on all pages; mobile shows it only in the Session list. Remembered in this browser. Providers without data stay hidden.",
+  "next.quotaSettingHint": "Both are on by default and saved independently in this browser. Mobile shows quotas only in the Session list. Providers without data stay hidden.",
   "next.quotaSaveFailed": "Applied for now. This browser could not save the preference.",
   "next.quotaOn": "On",
   "next.quotaOff": "Off",
@@ -8851,5 +8851,7 @@
   "capacityRow.cache.provider_quota_refresh_seconds.what": "Sets the minimum gap between provider quota checks.",
   "capacityRow.cache.provider_quota_refresh_seconds.full": "Repeated refreshes reuse the cached result; a provider cooldown can extend the wait.",
   "capacityRow.cache.provider_quota_request_seconds.what": "Limits the total time for one provider quota refresh.",
-  "capacityRow.cache.provider_quota_request_seconds.full": "A slow check ends without blocking the interface and keeps the last reading marked outdated."
+  "capacityRow.cache.provider_quota_request_seconds.full": "A slow check ends without blocking the interface and keeps the last reading marked outdated.",
+  "next.quotaSettingDesktopTitle": "Show quota bar on desktop",
+  "next.quotaSettingMobileTitle": "Show quota bar in the mobile Session list"
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 // @ts-expect-error -- Node tests load the TypeScript source.
-import { compactQuotaRows, quotaCountdown, quotaStale, readQuotaVisible, saveQuotaVisible, visibleQuotaRows } from "./model.ts"
+import { compactQuotaRows, quotaCountdown, quotaStale, QUOTA_VISIBLE_KEY, readQuotaVisible, saveQuotaVisible, visibleQuotaRows } from "./model.ts"
 import type { ProviderQuotaRow } from "@clawdline/contract"
 const row = (id: ProviderQuotaRow["id"], percent: number): ProviderQuotaRow => ({ id, label: id, windows: [{ name: "7d", used_percent: percent }], stale: false, source: "provider_api" })
 test("providers with no number stay hidden while a real zero stays visible", () => {
@@ -32,4 +32,19 @@ test("expired reset data stays visibly stale rather than turning into a fresh ze
   assert.equal(quotaCountdown(undefined, 101), null)
   assert.equal(quotaCountdown(101 + 3660, 101), "1h 1m")
   assert.equal(visibleQuotaRows([reading])[0].windows[0].used_percent, 80)
+})
+
+test("desktop and mobile choices stay independent across reloads and legacy opt-out", () => {
+  const values = new Map<string, string>([[QUOTA_VISIBLE_KEY, "false"]])
+  const browser = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value) } }
+  assert.equal(readQuotaVisible(browser, "desktop"), false)
+  assert.equal(readQuotaVisible(browser, "mobile"), false)
+  assert.equal(saveQuotaVisible(true, browser, "desktop"), true)
+  assert.equal(readQuotaVisible(browser, "desktop"), true)
+  assert.equal(readQuotaVisible(browser, "mobile"), false)
+  assert.equal(saveQuotaVisible(true, browser, "mobile"), true)
+  assert.equal(saveQuotaVisible(false, browser, "desktop"), true)
+  assert.equal(readQuotaVisible(browser, "desktop"), false)
+  assert.equal(readQuotaVisible(browser, "mobile"), true)
+  assert.equal(readQuotaVisible({ getItem: () => null }, "mobile"), true)
 })

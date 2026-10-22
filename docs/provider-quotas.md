@@ -1,7 +1,9 @@
 # Provider quota footer
 
-The console shares one account-quota footer across its pages. **Settings → Browser → Show provider
-quota bar** is on by default and saved in that browser's local storage. Turning it off unmounts the
+The console shares one account-quota footer across its pages. **Settings → Browser** has independent
+**Show quota bar on desktop** and **Show quota bar in the mobile Session list** switches. Both
+default on and are saved separately in that browser's local storage. Existing saved visibility
+is the fallback for each switch until it is explicitly set. Turning a layout off unmounts its
 footer and stops its reads; it does not change dispatch policy. Providers without a usable numeric
 window are hidden. A real zero is a usable reading. The footer is available from API level 28.
 

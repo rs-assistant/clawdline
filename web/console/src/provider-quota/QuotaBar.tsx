@@ -44,12 +44,12 @@ function subscribeMobile(fn: () => void) { const query = window.matchMedia(mobil
 const isMobile = () => window.matchMedia(mobileQuery).matches
 
 export function QuotaBar({ machineName, offline = false, mobileListShown = false }: { machineName?: string; offline?: boolean; mobileListShown?: boolean }) {
-  const on = useSyncExternalStore(subscribeQuotaVisible, quotaVisible)
+  const preference = useSyncExternalStore(subscribeQuotaVisible, quotaVisible)
   const mobile = useSyncExternalStore(subscribeMobile, isMobile)
   const version = useMachineVersion()
   const [revision, setRevision] = useState(0)
   useEffect(() => onMachineChanged(() => setRevision((n) => n + 1)), [])
-  if (!on || (mobile && !mobileListShown) || (version.apiLevel !== undefined && version.apiLevel < 28)) return null
+  if (!(mobile ? preference.mobile : preference.desktop) || (mobile && !mobileListShown) || (version.apiLevel !== undefined && version.apiLevel < 28)) return null
   return <QuotaReading key={revision} machineName={machineName} offline={offline} />
 }
 function QuotaReading({ machineName, offline }: { machineName?: string; offline: boolean }) {

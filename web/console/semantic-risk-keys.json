@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "englishKeys": 8851,
+  "englishKeys": 8853,
   "counts": {
     "negation": 2574,
-    "state": 1447,
+    "state": 1448,
     "permission": 494,
     "deletion": 197,
     "uncertainty": 269
@@ -3740,6 +3740,7 @@
       "next.proposalResolveSummary",
       "next.quotaReauth",
       "next.quotaSaveFailed",
+      "next.quotaSettingHint",
       "next.restoreCardHint",
       "next.restoreCardTitle",
       "next.restoreCardTitleOne",

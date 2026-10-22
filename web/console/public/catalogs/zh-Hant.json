@@ -8816,7 +8816,7 @@
   "next.cloudReadPairingRequired": "無法讀取 {machine}：這個瀏覽器需要重新確認配對。已顯示的內容可能不是最新狀態。",
   "next.cloudReadUnknownFailure": "讀取 {machine} 失敗，顯示的內容可能尚未更新。",
   "next.quotaSettingTitle": "顯示供應商額度列",
-  "next.quotaSettingHint": "預設開啟。桌機所有頁面皆顯示，手機只在 Session 列表顯示。偏好儲存在此瀏覽器，沒有額度資料的供應商不會顯示。",
+  "next.quotaSettingHint": "兩項皆預設開啟，分別儲存在此瀏覽器。手機僅在 Session 列表顯示；沒有額度資料的供應商不會顯示。",
   "next.quotaSaveFailed": "已套用，但此瀏覽器無法儲存偏好；重新開啟後可能恢復預設。",
   "next.quotaOn": "開",
   "next.quotaOff": "關",
@@ -8851,5 +8851,7 @@
   "capacityRow.cache.provider_quota_refresh_seconds.what": "設定供應商額度查詢的最短間隔。",
   "capacityRow.cache.provider_quota_refresh_seconds.full": "重複更新使用快取；供應商要求的冷卻時間可延長等待。",
   "capacityRow.cache.provider_quota_request_seconds.what": "限制一家供應商單次額度更新的總時間。",
-  "capacityRow.cache.provider_quota_request_seconds.full": "緩慢查詢會結束，不阻擋介面，並保留上次讀值與舊資料標示。"
+  "capacityRow.cache.provider_quota_request_seconds.full": "緩慢查詢會結束，不阻擋介面，並保留上次讀值與舊資料標示。",
+  "next.quotaSettingDesktopTitle": "桌機顯示額度列",
+  "next.quotaSettingMobileTitle": "手機 Session 列表顯示額度列"
 }
