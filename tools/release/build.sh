@@ -208,6 +208,11 @@ go run ./tools/release manifest ${args[@]+"${args[@]}"} "$out"
 # A release carries an SBOM per archive (docs/security/release-evidence.md);
 # a dev build stays on the machine that built it and needs none.
 [ "$channel" = dev ] || tools/release/sbom.sh generate "$out"
+# DMG is a delivery container, not a new updater artifact kind. Its evidence
+# binds the unsigned manifest bytes; the workflow signs those same bytes next.
+if [ "$official_mac" = 1 ] && [ "$app" = 1 ]; then
+  bash tools/release/dmg.sh pack "$out" "$out" "$version" "$commit" "$commit" .github/workflows/release.yml
+fi
 if [ "$channel" = dev ]; then
   echo "dev build $version ($commit) built in $out"
 else

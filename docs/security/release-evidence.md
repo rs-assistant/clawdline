@@ -15,6 +15,42 @@ and what it does not prove. Cutting and publishing a release is [releasing.md](.
 Releases drafted before this evidence existed, including v2.0.0, have none of the last three. They
 are not re-described as having it, and the publication gate cannot pass them.
 
+## DMG delivery evidence
+
+An Apple Silicon DMG supplements the App tar archive; it never replaces an updater artifact or
+rewrites an already published signed manifest. Its `<image>.delivery.json` binds the image name,
+size and SHA256, the exact mounted filesystem inventory (file bytes, modes, directories and
+symlink targets), App source commit, packaging commit/workflow, and digests of the original App
+tar, signed manifest bytes and App SBOM. The manifest's signature is checked separately with
+the release's trusted keys, rather than treating JSON fields as signature evidence.
+
+`<image>.spdx.json` is SPDX 2.3: it inventories every mounted file/link and identifies the image
+digest. An external document reference binds the **original** App SBOM by namespace and digest;
+`GENERATED_FROM` identifies the input archive. Its component and source-inventory claims remain
+the original SBOM's, checked by `sbom.sh verify` against the original archive and source commit.
+The DMG does not claim to contain the tar container. Added installation instructions and the
+Applications link are included in both the image inventory and its SBOM.
+
+All three delivery assets have GitHub provenance for the **packaging** commit. The verifier accepts
+only the exact SAN of `.github/workflows/dmg.yml` or `.github/workflows/release.yml` on main in
+`sainteye/clawdline`, with GitHub-hosted runners, matching subject digest and source dependency.
+`provenance.sh <delivery-dir> --dmg` verifies those attestations; the original assets retain their
+original `release.yml` provenance at the **App source** commit. `gate.sh --packaging-commit` pins
+the expected packaging commit independently of the delivery record. The supplemental workflow
+uses a separate draft, never Actions artifacts or a direct public upload.
+
+The gate mounts the image read-only, verifies the release-team Developer ID container signature
+and timestamp, its stapled Apple ticket and Gatekeeper's `open` assessment, then verifies the
+contained App with the ordinary hardened-runtime, release-team and notarization policy. It
+compares App files, modes and links with the original archive and regenerates both sidecars from
+the actual image. Any addition, deletion or substitution fails. It scans the complete mounted
+payload and sidecars with the private word list, in addition to the original release scan.
+
+These checks establish packaging integrity, not a clean-machine installation journey. That
+journey and actual Apple submission must be recorded for the real staged DMG before attachment
+([releasing.md](../releasing.md#an-apple-silicon-dmg-from-an-already-published-app)). Local tests use
+only synthetic/ad hoc fixtures; a passing fixture does not mean a DMG has been notarized.
+
 ## What an SBOM entry claims
 
 Each package in an SBOM has `summary` set to one of two kinds, and they mean different things:
@@ -135,28 +171,29 @@ console bundle, tmux or the app, and both builds run on the same machine and too
 rebuild of every platform in two independent environments has not been run; until it has, no
 release claims to be reproducible.
 
-## macOS signing as of this change
+## Initial macOS signing rollout (2026-10-21)
 
 Observed on 2026-10-21 on a development build of this Mac, read-only: the binaries were signed by a
 Developer ID Application identity with a secure timestamp, without the hardened runtime
 (`flags=0x0(none)`), and Gatekeeper rejected the app as `Unnotarized Developer ID` with no
 stapled ticket. Official release builds now sign with `--options runtime --timestamp` and no
 entitlements, and the build fails before compiling when the notary credentials are missing.
-Whether the app behaves identically under the hardened runtime is verified only by the first
-notarized build; no build with these settings has been notarized yet.
+At that point the first notarized build was still needed to verify App behavior under the
+hardened runtime. This is a historical development-build observation, not the status of later
+published Apps or of a separately packaged DMG.
 
 The release environment needs these secrets, beside the existing code-signing and release-key
 secrets: `CLAWDLINE_NOTARY_KEY_P8_BASE64` (an App Store Connect API key with access to the notary
 service), `CLAWDLINE_NOTARY_KEY_ID` and `CLAWDLINE_NOTARY_ISSUER`. The Apple Developer Program
 membership behind them belongs to the maintainer.
 
-## What is still pending
+## Initial rollout evidence gaps (2026-10-21)
 
-- No build with the hardened runtime has been notarized, so the gate has not yet seen a release
-  pass the notarization check. Its refusal was observed on the published v2.0.0 daemon
+- At that point no build with the hardened runtime had been notarized, so the gate had not yet
+  seen a release pass the notarization check. Its refusal was observed on the published v2.0.0 daemon
   (`source=Unnotarized Developer ID`), and the online check was observed passing on an unrelated
-  notarized Developer ID command-line binary; both 2026-10-21. The first official release is the
-  acceptance.
+  notarized Developer ID command-line binary; both 2026-10-21. The first official release was
+  the required acceptance; DMG acceptance remains a separate check of the actual staged image.
 - The notary submission record (`CLAWDLINE_NOTARY_LOG`: submission id and status per archive) is
   not yet published as a release asset or included in the attestation. It would be an audit trail
   only: the gate's notarization answer comes from Apple's own record, not from it.

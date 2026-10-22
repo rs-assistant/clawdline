@@ -50,7 +50,7 @@ jobs:
     name: Build, sign and draft the release
     needs: tmux
     runs-on: macos-latest
-    # Notarization waits for Apple's verdict three times.
+    # Notarization waits for the daemon archives, App and DMG verdicts.
     timeout-minutes: 90
     # The signing key is a secret of this environment, which waits for the
     # person's approval before the job may read it.
@@ -96,6 +96,7 @@ jobs:
         run: |
           go vet ./...
           tools/test-go-ci.sh
+          bash tools/release/dmg.test.sh
           (cd web && npm ci --ignore-scripts && npm run check)
 
       - uses: actions/download-artifact@v4
@@ -173,6 +174,8 @@ jobs:
           subject-path: |
             ${{ runner.temp }}/release/*.tar.gz
             ${{ runner.temp }}/release/*.spdx.json
+            ${{ runner.temp }}/release/*.dmg
+            ${{ runner.temp }}/release/*.dmg.delivery.json
             ${{ runner.temp }}/release/manifest.json
             ${{ runner.temp }}/release/manifest.sig.json
             ${{ runner.temp }}/release/SHA256SUMS
@@ -182,7 +185,9 @@ jobs:
       - name: Verify the provenance as the gate will
         env:
           GH_TOKEN: ${{ github.token }}
-        run: tools/release/provenance.sh "$RUNNER_TEMP/release"
+        run: |
+          tools/release/provenance.sh "$RUNNER_TEMP/release"
+          tools/release/provenance.sh "$RUNNER_TEMP/release" --dmg
 
       - name: Create the draft release
         env:
@@ -195,5 +200,6 @@ jobs:
           gh release create "$VERSION" --draft --target "$GITHUB_SHA" --title "Clawdline ${VERSION#v}" \
             "${prerelease[@]}" "${notes_args[@]}" \
             "$RUNNER_TEMP"/release/*.tar.gz "$RUNNER_TEMP"/release/*.spdx.json "$RUNNER_TEMP/release/SHA256SUMS" \
+            "$RUNNER_TEMP"/release/*.dmg "$RUNNER_TEMP"/release/*.dmg.delivery.json \
             "$RUNNER_TEMP/release/manifest.json" "$RUNNER_TEMP/release/manifest.sig.json"
           echo "drafted $VERSION at $GITHUB_SHA; run the privacy gate in docs/releasing.md before publishing"

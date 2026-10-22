@@ -150,6 +150,32 @@ codesign_require_developer_id() {
     }
 }
 
+# A disk image is signed as a container, never by re-signing the App it
+# carries. Submit the DMG itself (not a zip containing it), then staple it.
+codesign_notarize_dmg() {
+  local image=$1 result status sid
+  [ -f "${CLAWDLINE_NOTARY_KEY:-}" ] && [ -n "${CLAWDLINE_NOTARY_KEY_ID:-}" ] &&
+    [ -n "${CLAWDLINE_NOTARY_ISSUER:-}" ] || { echo "DMG notarization credentials are missing" >&2; return 1; }
+  result=$(xcrun notarytool submit "$image" --key "$CLAWDLINE_NOTARY_KEY" \
+    --key-id "$CLAWDLINE_NOTARY_KEY_ID" --issuer "$CLAWDLINE_NOTARY_ISSUER" --wait --output-format json) || return 1
+  status=$(printf '%s' "$result" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).status||""))')
+  sid=$(printf '%s' "$result" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).id||""))')
+  [ "$status" = Accepted ] && [ -n "$sid" ] || { echo "DMG notarization was $status (submission $sid)" >&2; return 1; }
+  [ -z "${CLAWDLINE_NOTARY_LOG:-}" ] || printf '{"name":"%s","submission":"%s","status":"%s"}\n' "$(basename "$image")" "$sid" "$status" >>"$CLAWDLINE_NOTARY_LOG"
+  xcrun stapler staple "$image" && xcrun stapler validate "$image"
+}
+
+codesign_verify_dmg() {
+  local image=$1 info
+  codesign --verify --strict -R="$(codesign_release_requirement)" "$image" || return 1
+  info=$(codesign -dvvv "$image" 2>&1)
+  grep -q '^Authority=Developer ID Application: ' <<<"$info" && grep -q '^Timestamp=' <<<"$info" || {
+    echo "$image: DMG needs Developer ID and a secure timestamp" >&2; return 1; }
+  xcrun stapler validate "$image" || return 1
+  spctl --assess --type open --context context:primary-signature "$image" || return 1
+  echo "$image: release team, timestamp, staple and Gatekeeper verified"
+}
+
 codesign_end() {
   [ "${codesign_owner:-0}" = 1 ] || return 0
   local list=()
