@@ -27,12 +27,14 @@ export const SETUP_FOLD_AFTER_SECONDS = 24 * 60 * 60
  * Which item a device finishes, or null for one that finishes nothing.
  *
  * Only a device this machine pinned counts: a row that is only in the
- * account's roster was paired with another machine. The app is told from a
+ * account's roster was paired with another machine. A pin the account's
+ * roster no longer lists has no kind, and is a leftover that can no longer
+ * connect, so it finishes nothing either. The app is told from a
  * browser by the name its Cloud tab registers under (`cloudViewerDeviceMetadata`);
  * a device the app paired before it had that name is counted as a browser.
  */
 export function deviceItem(device: CloudViewer): SetupItem | null {
-  if (!device.pinned || device.revoked) return null
+  if (!device.pinned || device.revoked || !device.kind) return null
   if (device.kind === "ios" || device.kind === "android") return "phone"
   if ((device.name ?? "").startsWith(CLAWDLINE_APP_DEVICE_NAME)) return "app"
   return "browser"

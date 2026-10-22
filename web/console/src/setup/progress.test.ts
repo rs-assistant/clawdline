@@ -23,10 +23,13 @@ test("each item is finished by a device this machine pinned, told apart by kind 
   assert.equal(partial.kind === "known" && partial.count, 2)
 })
 
-test("a revoked device or one only in the account's roster gives its item back", () => {
-  const reading = readSetup(status([app, chrome, { ...phone, revoked: true }, { ...phone, id: "d_other", pinned: false }]))
+test("a revoked device, one only in the account's roster, or a pin the roster forgot gives its item back", () => {
+  const reading = readSetup(status([app, chrome, { ...phone, revoked: true }, { ...phone, id: "d_other", pinned: false },
+    { id: "d_forgotten", pinned: true }]))
   assert.equal(reading.kind === "known" && reading.next, "phone")
   assert.equal(reading.kind === "known" && reading.count, 2)
+  const leftovers = readSetup(status([{ id: "d_forgotten", pinned: true }]))
+  assert.equal(leftovers.kind === "known" && leftovers.count, 0, "a pin with no roster row is not a paired browser")
 })
 
 test("Cloud off counts nothing, and a list this machine cannot read is unknown, not 0/3", () => {
