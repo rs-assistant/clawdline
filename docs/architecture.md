@@ -241,6 +241,20 @@ The display states on a card ("queued", "in review", "landed") are derived from 
 they are read, never written back. [board-redesign.md](board-redesign.md) has the reasoning and the
 lifecycle of each structure.
 
+## Session reasoning effort
+
+The Session information sheet places an ordinal reasoning-effort meter immediately below
+model selection, including for read-only viewers. Its ticks show order, not percentages or
+comparable amounts of computation between providers or models. Unknown levels remain text;
+an absent reading says that the Session has not reported it yet.
+
+Codex reports `effort` from its newest `turn_context`, with its startup card as evidence before
+the first turn. A switch may therefore appear only when the next turn starts. Claude Code
+reports `perTurnEffort`, falling back to `effort`, from its newest real parent assistant record;
+sidechain and synthetic replies do not replace that reading. When the optional status-line
+cache retains Claude Code's live `effort.level`, that reading takes precedence. No machine-wide
+default is presented as a Session measurement. The same info payload crosses the Cloud relay.
+
 ## Schedules
 
 A schedule is a task template with a local wall-clock time and a catch-up window. The clock ticks

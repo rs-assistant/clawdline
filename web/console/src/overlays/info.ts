@@ -32,6 +32,7 @@ import { toast } from "./toast.js"
 import { waitingForWords } from "../session/waiting-for.js"
 import { ActionConfirm } from "./action-confirm.js"
 import { RoleDetail } from "./role-detail.js"
+import { reasoningEffortHTML } from "./reasoning-effort.js"
 import "./info-next.css"
 
 /**
@@ -244,7 +245,6 @@ function hero(s: Facts["session"], u: Facts["usage"]): string {
   const title = s.title || model || T.webInfoUnknown
   const modelMeta = s.title && model ? '<span class="dot">·</span><span class="model-name">' + esc(model) + "</span>" : ""
   const meta: string[] = []
-  if (s.effort) meta.push('<span>' + esc(nextWord("infoReasoningEffort")) + ': ' + esc(s.effort) + '</span>')
   if (s.cwd) meta.push('<span title="' + esc(T.webInfoDirectory) + '">' + esc(L.path(s.cwd)) + "</span>")
   if (s.sessionId) {
     meta.push(
@@ -533,6 +533,9 @@ function html(d: Facts): string {
   // Read-only pairings get no buttons rather than dead ones.
   if (host.writable() && (models.length || s.assistant === "codex")) {
     out += sec(++i, T.webInfoSwitchModel, "", s.assistant === "codex" ? codexModelHTML(models, current) : modelsHTML(models, current))
+  }
+  if (s.assistant === "codex" || s.assistant === "claude") {
+    out += sec(++i, nextWord("infoReasoningEffort"), "", reasoningEffortHTML(s.assistant, s.effort, nextWord, esc))
   }
   out += sec(++i, nextWord("infoContext"), "", contextHTML(d.context))
   out += sec(++i, T.webInfoUsage, "", usageHTML(u))

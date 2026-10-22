@@ -36,7 +36,7 @@ type Summary struct {
 
 // Facts is what an info read learns from the record itself.
 type Facts struct {
-	// Effort is the reasoning effort explicitly named by the newest turn context.
+	// Effort is the reasoning effort explicitly named by the newest parent turn.
 	Effort string
 	// Usage is absent when there is no honest total: a Claude transcript
 	// larger than the read limit, or a record with no counted turn at all.
@@ -175,7 +175,7 @@ func reversedLines(data []byte, fn func(line []byte) (stop bool)) {
 // Per-turn counters are not cumulative, so a partial sum would be a smaller
 // number labelled as the total.
 func claudeFacts(data []byte, complete bool) Facts {
-	out := Facts{Model: claudeStatedModel(data), Fill: claudeFill(data)}
+	out := Facts{Model: claudeStatedModel(data), Fill: claudeFill(data), Effort: claudeEffort(data)}
 	if complete {
 		out.Usage = claudeSummary(data)
 	}
@@ -183,6 +183,40 @@ func claudeFacts(data []byte, complete bool) Facts {
 		out.Model = out.Usage.Model
 	}
 	return out
+}
+
+// claudeEffort reads the newest real parent assistant turn. Older values and
+// subagent turns must not fill a missing setting in the current parent turn.
+func claudeEffort(data []byte) string {
+	effort := ""
+	reversedLines(data, func(line []byte) bool {
+		if !bytes.Contains(line, []byte(`"assistant"`)) {
+			return false
+		}
+		rec, ok := decodeObject(line)
+		if !ok {
+			return false
+		}
+		kind, _ := rec.str("type")
+		side, _ := rec.boolean("isSidechain")
+		if kind != "assistant" || side {
+			return false
+		}
+		message, ok := rec.object("message")
+		if !ok {
+			return false
+		}
+		model, _ := message.str("model")
+		if model == "" || strings.HasPrefix(model, "<") {
+			return false
+		}
+		effort, _ = rec.str("perTurnEffort")
+		if effort == "" {
+			effort, _ = rec.str("effort")
+		}
+		return true
+	})
+	return effort
 }
 
 // claudeSummary sums every assistant record's `message.usage`, as
