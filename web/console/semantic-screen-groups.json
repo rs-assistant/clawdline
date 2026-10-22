@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "englishContentKeys": 8973,
-  "riskKeys": 3989,
+  "englishContentKeys": 8974,
+  "riskKeys": 3990,
   "nonRiskCount": 4984,
   "groups": [
     {
@@ -3540,15 +3540,15 @@
         "next.setupBack",
         "next.setupBrowserIdle",
         "next.setupBrowserTitle",
-        "next.setupBrowserWaitingHint",
         "next.setupChipLocal",
         "next.setupChipLocalTip",
         "next.setupChipProgress",
         "next.setupClose",
         "next.setupDialog",
         "next.setupDoneBody",
+        "next.setupDoneSetUp",
+        "next.setupDoneSkippedBody",
         "next.setupDoneTitle",
-        "next.setupFingerprintLabel",
         "next.setupItemApp",
         "next.setupItemBrowser",
         "next.setupItemPhone",

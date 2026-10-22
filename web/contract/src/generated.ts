@@ -7614,6 +7614,12 @@ export interface SettingsRequest {
   setup_mode: string | null
 
   /**
+   * Setup items the person chose to skip, comma separated: app, browser, phone. A
+   * skipped item counts as settled.
+   */
+  setup_skipped: string | null
+
+  /**
    * Have a model write the sentence a notification carries.
    */
   smart_notifications: boolean | null
@@ -7967,6 +7973,12 @@ export interface SettingsSnapshot {
    * yet.
    */
   setup_mode: string | null
+
+  /**
+   * Setup items the person chose to skip, comma separated: app, browser, phone. A
+   * skipped item counts as settled.
+   */
+  setup_skipped: string | null
 
   /**
    * Have a model write the sentence a notification carries.

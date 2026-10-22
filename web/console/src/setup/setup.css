@@ -51,6 +51,16 @@
 .setup-track li[data-done] { color: var(--ok); }
 .setup-track-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
 .setup-track li[data-current] .setup-track-dot { background: var(--accent); }
+.setup-track li[data-skipped] { color: var(--faint); text-decoration: line-through; }
+.setup-summary { list-style: none; margin: 20px 0 0; padding: 4px 16px; width: 100%; max-width: 360px; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 12px; text-align: left; }
+.setup-summary li { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; color: var(--dim); }
+.setup-summary li + li { border-top: 1px solid var(--line); }
+.setup-summary li[data-done] { color: var(--ink); }
+.setup-summary li[data-done] svg { color: var(--ok); }
+.setup-summary li > span:nth-child(2) { flex: 1 1 auto; }
+.setup-summary-state { font-size: 13px; color: var(--ok); }
+.setup-summary .setup-quiet { color: var(--accent); font-size: 13px; min-height: 36px; }
 .setup-x {
   width: 44px; height: 44px; margin-right: -12px;
   display: flex; align-items: center; justify-content: center;
@@ -98,13 +108,6 @@
   .setup-steps li[data-state="active"] .setup-step-mark::before { animation: none; }
 }
 
-.setup-fingerprint {
-  margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
-  display: flex; flex-direction: column; gap: 4px;
-}
-.setup-fingerprint span { font-size: 12px; color: var(--dim); }
-.setup-fingerprint code { font-family: var(--mono); font-size: 22px; letter-spacing: 0.06em; color: var(--ink); }
-.setup-fingerprint small { font-size: 12px; line-height: 1.5; color: var(--dim); }
 .setup-ok { margin: 16px 0 0; font-size: 15px; font-weight: 600; color: var(--ok); }
 .setup-note { margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: var(--dim); }
 .setup-said { margin: 16px 0 0; font-size: 13px; line-height: 1.5; color: var(--warn); }

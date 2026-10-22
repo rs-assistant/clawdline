@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/relay-reader.test.ts.
-import { accessProblemAfterRead, machineAccessProblem, machineListAnswer, machineListRefusal, readProblemOffersPairing, retryReason } from "./state.ts"
+import { accessProblemAfterRead, machineAccessProblem, machineListAnswer, machineListRefusal, READ_PAIR_OFFER_AFTER_MS, readProblemOffersPairing, retryReason } from "./state.ts"
 
 test("the machine list keeps loading, authoritative empty, and refusal apart", () => {
   assert.deepEqual(machineListAnswer({ machines: [], syncing: true }), { phase: "loading" })
@@ -74,11 +74,13 @@ test("cached data and other machines do not clear a failed read", () => {
   assert.equal(accessProblemAfterRead(held,{type:"read", identity:{machine:"m"}}),null)
 })
 
-test("a machine that reports to the account but does not answer this device offers pairing again", () => {
-  assert.equal(readProblemOffersPairing("cloud_read_timeout", "current"), true, "revoked here: dropped unanswered")
-  assert.equal(readProblemOffersPairing("cloud_read_unavailable", "current"), true)
-  assert.equal(readProblemOffersPairing("cloud_read_timeout", "stale"), false, "an offline machine is not fixed by pairing")
-  assert.equal(readProblemOffersPairing("cloud_read_timeout", "unknown"), false)
-  assert.equal(readProblemOffersPairing("unknown_sender", "stale"), true, "a named pairing failure offers it anyway")
-  assert.equal(readProblemOffersPairing("socket_error", "current"), false, "this browser's own connection is not a pairing problem")
+test("only reads that keep failing at a reporting machine offer pairing again", () => {
+  const long = READ_PAIR_OFFER_AFTER_MS
+  assert.equal(readProblemOffersPairing("cloud_read_timeout", "current", long), true, "revoked here: every read dropped")
+  assert.equal(readProblemOffersPairing("cloud_read_unavailable", "current", long), true)
+  assert.equal(readProblemOffersPairing("cloud_read_timeout", "current", long - 1), false, "a busy machine answers some reads in between")
+  assert.equal(readProblemOffersPairing("cloud_read_timeout", "stale", long), false, "an offline machine is not fixed by pairing")
+  assert.equal(readProblemOffersPairing("cloud_read_timeout", "unknown", long), false)
+  assert.equal(readProblemOffersPairing("unknown_sender", "stale", 0), true, "a named pairing failure offers it at once")
+  assert.equal(readProblemOffersPairing("socket_error", "current", long), false, "this browser's own connection is not a pairing problem")
 })

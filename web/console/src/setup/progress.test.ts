@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { CloudStatus, CloudViewer } from "../pages/settings/cloud.js"
 // @ts-expect-error -- Node's strip-types test runner needs the source extension.
-import { completionChange, readSetup, setupChip, SETUP_FOLD_AFTER_SECONDS, SETUP_ITEMS } from "./progress.ts"
+import { completionChange, parseSkipped, readSetup, setupChip, SETUP_FOLD_AFTER_SECONDS, SETUP_ITEMS } from "./progress.ts"
 
 const status = (devices: CloudViewer[], extra: Partial<CloudStatus> = {}): CloudStatus => ({
   enabled: true, commands: false, terminal_direct: true, configured: true, state: "connected",
@@ -17,7 +17,8 @@ const phone: CloudViewer = { id: "d_phone", kind: "ios", name: "iPhone", pinned:
 
 test("each item is finished by a device this machine pinned, told apart by kind and name", () => {
   const reading = readSetup(status([app, chrome, phone]))
-  assert.deepEqual(reading, { kind: "known", cloud: true, done: { app: true, browser: true, phone: true }, items: SETUP_ITEMS, count: 3, next: null })
+  assert.deepEqual(reading, { kind: "known", cloud: true, done: { app: true, browser: true, phone: true },
+    skipped: { app: false, browser: false, phone: false }, items: SETUP_ITEMS, count: 3, next: null })
   const partial = readSetup(status([chrome, { ...phone, kind: "android", name: "Android device" }]))
   assert.equal(partial.kind === "known" && partial.next, "app")
   assert.equal(partial.kind === "known" && partial.count, 2)
@@ -76,4 +77,17 @@ test("the app is the device recorded from its own pairing, whatever name it regi
   assert.equal(unknown.kind === "known" && unknown.done.app, false, "without the record it is a browser")
   const known = readSetup(status([oldApp, chrome]), true, "d_old_app")
   assert.deepEqual(known.kind === "known" && known.done, { app: true, browser: true, phone: false })
+})
+
+test("a skipped item counts as settled, so setup can finish without it, and pairing it later still shows as paired", () => {
+  const skipped = parseSkipped("browser,phone,bogus")
+  assert.deepEqual(skipped, ["browser", "phone"])
+  const reading = readSetup(status([app]), true, "", skipped)
+  assert.equal(reading.kind === "known" && reading.next, null)
+  assert.equal(reading.kind === "known" && reading.count, 3)
+  assert.deepEqual(setupChip(reading, "", 0, 0), { kind: "done" })
+  const later = readSetup(status([app, phone]), true, "", skipped)
+  assert.deepEqual(later.kind === "known" && later.skipped, { app: false, browser: true, phone: false })
+  const partial = readSetup(status([]), true, "", ["browser"])
+  assert.equal(partial.kind === "known" && partial.next, "app", "skipping one item does not settle the others")
 })
