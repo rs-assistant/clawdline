@@ -230,7 +230,7 @@ type Publisher struct {
 	// audience is the viewer devices this publisher has stated its channels to
 	// since this socket came up. It is bounded by the account's paired devices
 	// (`devices.list` in internal/domain/capacity): a sender only reaches Seen
-	// once the transport has found it in the roster and checked its signature
+	// once the transport has found its pin and checked its signature
 	// (`internal/adapters/cloud.(*Transport).handleEnvelope`), so a stranger
 	// cannot put a name in here.
 	audience map[string]bool

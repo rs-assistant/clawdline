@@ -114,6 +114,13 @@ type Pairing struct {
 	// OnRevoke clears a legacy grant record and the active Cloud connection
 	// after the pin has been refused. A failure is reported as partial revoke.
 	OnRevoke func(string) error
+	// ReplaceSecret replaces this machine's content key after a revocation,
+	// and brings the line back on the new one. A revoked browser still holds
+	// the old key, so without this it could go on reading everything this
+	// machine seals, whatever the pin file says. Nil refuses the revocation
+	// before anything is written: a revocation that cannot replace the key
+	// would claim more than it did.
+	ReplaceSecret func() (SecretReplacement, error)
 
 	mu         sync.Mutex
 	state      PairingState
@@ -400,6 +407,37 @@ func (p *Pairing) deliver(ctx context.Context, offer domaincloud.PairingOffer) (
 	return state, nil
 }
 
+// RevokeOutcome is what a revocation did, as the revoke route answers it.
+type RevokeOutcome struct {
+	Device string `json:"device"`
+	// Revoked is whether a pin changed. False means there was no active pin
+	// for that device, so nothing was refused and no key was replaced.
+	Revoked bool `json:"revoked"`
+	// SecretReplaced says this machine's content key (the account master
+	// secret it hands browsers at pairing) was replaced, so the revoked
+	// browser cannot open anything sealed from now on.
+	SecretReplaced bool `json:"secret_replaced"`
+	// Repair names the browsers still paired here. They hold the replaced key
+	// and must each be paired again before they can read or send.
+	Repair []string `json:"repair,omitempty"`
+	// Reconnected is whether the live line was taken down and brought back on
+	// the new key. False means the line was not running; it will start on the
+	// new key.
+	Reconnected bool `json:"reconnected"`
+}
+
+// SecretReplacement is what replacing the content key did.
+type SecretReplacement struct {
+	Repair      []string
+	Reconnected bool
+}
+
+// ErrSecretNotReplaced is a revocation whose pin was written but whose content
+// key could not be replaced. The browser is refused as a sender; it may still
+// be able to read until the key is replaced, which is why this is an error
+// and not a success with a footnote.
+var ErrSecretNotReplaced = errors.New("the browser was revoked here, but this machine's content key could not be replaced, so it may still read what this machine sends")
+
 // Revoke throws a pinned viewer out of this machine.
 //
 // It is local and it is immediate. The control plane's own revocation needs a
@@ -407,20 +445,40 @@ func (p *Pairing) deliver(ctx context.Context, offer domaincloud.PairingOffer) (
 // revokes a device, this machine learns it at the next roster refresh. A
 // refusal written here stops that sender at its next envelope and keeps
 // stopping it whatever the roster later says.
-func (p *Pairing) Revoke(deviceID string) (bool, error) {
-	if p == nil || p.Pinned == nil {
-		return false, ErrPairingUnavailable
+//
+// **It also replaces the content key.** Every browser paired with this machine
+// was handed the same 32-byte secret, and a pin refusal stops a browser
+// sending but not reading: whatever this machine seals under the old secret,
+// a revoked browser that kept it still opens. So the secret is replaced, the
+// line comes back on the new one, and every browser still paired here has to
+// be paired again — the outcome names them. A device that had no active pin
+// changes nothing and replaces nothing.
+func (p *Pairing) Revoke(deviceID string) (RevokeOutcome, error) {
+	outcome := RevokeOutcome{Device: deviceID}
+	if p == nil || p.Pinned == nil || p.ReplaceSecret == nil {
+		return outcome, ErrPairingUnavailable
 	}
 	changed, err := p.Pinned.Revoke(deviceID, p.now())
-	if err == nil && changed {
-		p.logf("cloud: viewer %s is no longer allowed on this machine", deviceID)
-		if p.OnRevoke != nil {
-			if dropErr := p.OnRevoke(deviceID); dropErr != nil {
-				return true, fmt.Errorf("the viewer pin was revoked but its terminal grant could not be removed: %w", dropErr)
-			}
+	if err != nil || !changed {
+		return outcome, err
+	}
+	outcome.Revoked = true
+	p.logf("cloud: viewer %s is no longer allowed on this machine", deviceID)
+	var partial error
+	if p.OnRevoke != nil {
+		if dropErr := p.OnRevoke(deviceID); dropErr != nil {
+			partial = fmt.Errorf("the viewer pin was revoked but its terminal grant could not be removed: %w", dropErr)
 		}
 	}
-	return changed, err
+	replaced, err := p.ReplaceSecret()
+	if err != nil {
+		return outcome, fmt.Errorf("%w: %v", ErrSecretNotReplaced, err)
+	}
+	outcome.SecretReplaced = true
+	outcome.Repair, outcome.Reconnected = replaced.Repair, replaced.Reconnected
+	p.logf("cloud: the content key was replaced after revoking %s; %d paired browser(s) must pair again",
+		deviceID, len(replaced.Repair))
+	return outcome, partial
 }
 
 func (p *Pairing) setPhase(phase string) {

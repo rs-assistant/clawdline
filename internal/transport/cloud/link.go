@@ -147,9 +147,10 @@ type Viewer struct {
 	Caps        []string `json:"caps,omitempty"`
 	Fingerprint string   `json:"fingerprint,omitempty"`
 	// Pinned is whether this machine itself handed that device the account
-	// key. A row that is only in the account's roster is listed too, because
-	// it is still admitted — but the two are different amounts of evidence and
-	// the settings page says which is which.
+	// key. Only a pinned row is admitted. A row that is only in the account's
+	// roster is listed too, so that a browser paired with another machine is
+	// visible here, but it can neither send nor read until it pairs with this
+	// one; the settings page says which is which.
 	Pinned bool `json:"pinned"`
 	// PairedAt is when this machine pinned it, Unix seconds.
 	PairedAt int64 `json:"paired_at,omitempty"`
@@ -253,6 +254,13 @@ type Link struct {
 	status    *adaptercloud.StatusRecorder
 	service   Service
 
+	// replay is the inbound replay window and replayJournal its copy on disk.
+	// Both belong to the link, not to one wire(): a rotation rebuilds the
+	// transport, and a transport that brought its own empty window would
+	// accept again whatever the one before it had accepted.
+	replay        *domaincloud.ReplayWindow
+	replayJournal *adaptercloud.ReplayJournal
+
 	mu        sync.Mutex
 	state     string
 	lastErr   string
@@ -275,6 +283,8 @@ type Link struct {
 	// stopRun cancels the socket currently up, and rotated says the next
 	// `Run` iteration should rebuild rather than return. They are one pair:
 	// a cancel with no flag is a shutdown, a cancel with it is a rotation.
+	// rotated is also read before a socket starts, so a key replaced in the
+	// moment between two sockets is not carried into the next one.
 	stopRun context.CancelFunc
 	rotated bool
 
@@ -352,13 +362,13 @@ const (
 	// the answer could not be read. Terminal rights fail closed, but the
 	// answer is retryable (terminal_busy), never a revocation.
 	TerminalUnverified TerminalVerdict = iota
-	// TerminalAllowed means a roster read fresh within
-	// CloudTerminalRosterRefreshLimit names the viewer, unrevoked, with
-	// the same key this machine verifies its envelopes with.
+	// TerminalAllowed means this machine pinned the viewer and a roster read
+	// fresh within CloudTerminalRosterRefreshLimit still names it,
+	// unrevoked, with the pinned key.
 	TerminalAllowed
 	// TerminalDenied means a fact this machine holds says no: Cloud or Cloud
-	// commands are off here, this machine revoked the device, or a fresh
-	// roster lacks the device, marks it revoked or names a
+	// commands are off here, this machine revoked or never paired the
+	// device, or a fresh roster lacks the device, marks it revoked or names a
 	// different key than the pin.
 	TerminalDenied
 )
@@ -414,9 +424,9 @@ func (l *Link) TerminalViewerAllowed(device string) bool {
 // is only the Cloud-side prerequisite for a relay connection registration:
 // the grant is checked again after that registration, so a locally refused
 // viewer can receive a keyed refusal. With withKey it uses the same locally
-// revoked, pin-first sender key as Cloud commands, plus a fresh roster. A
-// viewer without a local pin must have reached this point through an
-// authenticated, decrypted terminal envelope carrying this machine's content key.
+// revoked, pin-only sender key as Cloud commands, plus a fresh roster that may
+// deny but never admit: a viewer without a local pin is denied, whatever the
+// roster or an earlier terminal envelope says.
 func (l *Link) terminalAuthority(device string, withKey bool) (TerminalVerdict, string) {
 	if !l.settings.Enabled {
 		return TerminalDenied, "Cloud is off on this machine"
@@ -449,12 +459,18 @@ func (l *Link) terminalAuthority(device string, withKey bool) (TerminalVerdict, 
 			pinnedKey = key
 		}
 	}
-	if withKey && pinnedKey == nil {
+	if withKey {
+		// Only a pin admits. A key an authenticated terminal envelope carried
+		// is kept as a second fact, not as a substitute: a connection opened
+		// under a key that is no longer the pinned one does not continue.
+		if pinnedKey == nil {
+			return TerminalDenied, "this machine has not paired the device"
+		}
 		l.terminalMu.Lock()
 		authenticatedKey = l.terminalAuthenticated[device]
 		l.terminalMu.Unlock()
-		if authenticatedKey == nil {
-			return TerminalDenied, "this device has not authenticated a terminal envelope for this machine"
+		if authenticatedKey != nil && !bytes.Equal(authenticatedKey, pinnedKey) {
+			return TerminalDenied, "the device's terminal envelopes were verified with a key that is not its pin"
 		}
 	}
 	if l.roster == nil {
@@ -645,6 +661,14 @@ func Open(opts LinkOptions) (*Link, error) {
 	}
 	link.identity = identity
 	link.pinned = adaptercloud.NewPinnedStore(keys.Dir())
+	// The replay window is seeded from disk before the first socket can
+	// deliver anything. A journal that cannot be read stops the line, for the
+	// reason an unreadable pin file does: reading it as empty is the replay.
+	link.replay = domaincloud.NewReplayWindow(0)
+	if link.replayJournal, err = adaptercloud.OpenReplayJournal(keys.Dir(), opts.Now, link.replay); err != nil {
+		link.fail(err)
+		return link, nil
+	}
 	link.pairing = &Pairing{
 		AccountID:  identity.AccountID,
 		MachineID:  identity.MachineID,
@@ -654,11 +678,12 @@ func Open(opts LinkOptions) (*Link, error) {
 		// Read from the store rather than captured, so that a rotation
 		// between two pairings cannot hand the second browser the first
 		// browser's key.
-		Keys:     link.pairingKeys,
-		Pinned:   link.pinned,
-		OnRevoke: link.revokeTerminalViewer,
-		Now:      opts.Now,
-		Log:      opts.Log,
+		Keys:          link.pairingKeys,
+		Pinned:        link.pinned,
+		OnRevoke:      link.revokeTerminalViewer,
+		ReplaceSecret: link.replaceContentKey,
+		Now:           opts.Now,
+		Log:           opts.Log,
 	}
 	if err := link.wire(); err != nil {
 		link.fail(err)
@@ -745,7 +770,8 @@ func (l *Link) wire() error {
 		Signer:               key,
 		Spool:                spool,
 		Status:               status,
-		Replay:               domaincloud.NewReplayWindow(0),
+		Replay:               l.replay,
+		ReplayJournal:        l.replayJournal,
 		Inbound:              l.relay.Deliver,
 		DirectInbound:        l.relay.DeliverDirect,
 		PeerInbound:          l.enqueuePeer,
@@ -918,6 +944,21 @@ func (l *Link) Run(ctx context.Context) error {
 		}
 		inner, stop := context.WithCancel(ctx)
 		l.mu.Lock()
+		if l.rotated {
+			// A key was replaced while no socket was up to take down. Building
+			// the socket from what wire() captured before would seal with the
+			// replaced key, so rebuild first. The flag is read and stopRun set
+			// under one lock, so a rotation is either seen here or sees a
+			// socket it can stop.
+			l.rotated = false
+			l.mu.Unlock()
+			stop()
+			if err := l.wire(); err != nil {
+				l.fail(err)
+				return err
+			}
+			continue
+		}
 		l.stopRun = stop
 		l.mu.Unlock()
 		err := l.runOnce(inner)
@@ -1219,38 +1260,38 @@ func (l *Link) operationAccess() (bool, bool) {
 //  1. **A device this machine threw out is refused**, whatever anything else
 //     says. A local revocation that the account's roster could undo would not
 //     be a revocation.
-//  2. **A pin wins.** The key came out of a sealed offer this machine opened
-//     itself; the control plane never saw it in the clear and so cannot
-//     substitute one.
-//  3. **The roster is the fallback**, for a viewer paired before the pin file
-//     existed. It is the fourth wave's behaviour, kept rather than removed so
-//     that a browser that already works does not stop working — and it is the
-//     weaker answer, which is why the settings page marks which rows are pins.
+//  2. **Only a pin supplies a key.** The key came out of a sealed offer this
+//     machine opened itself; the control plane never saw it in the clear and
+//     so cannot substitute one.
+//  3. **The roster never supplies a key.** It used to be the fallback, for a
+//     viewer paired before the pin file existed, which meant a key the
+//     operator's roster named was trusted here: whoever could add a roster row
+//     and held an old copy of this machine's content key could send. The
+//     roster can still take a pinned device away (`authority`,
+//     `terminalAuthority`), but it cannot add one. A browser that was only
+//     ever on the roster is paired with `clawdline cloud pair`.
 //
 // An unreadable pin file refuses everybody rather than falling through, for
 // the reason `pinned.go` gives: falling through is exactly the substitution
 // the pins exist against.
 func (l *Link) publicKeyFor(sender string) (ed25519.PublicKey, bool) {
-	if l.pinned != nil {
-		refused, err := l.pinned.Refused(sender)
-		if err != nil {
-			l.logf("cloud: the paired-device file cannot be read, so no sender is admitted: %v", err)
-			return nil, false
-		}
-		if refused {
-			return nil, false
-		}
-		if key, ok, err := l.pinned.PublicKeyFor(sender); err != nil {
-			l.logf("cloud: the paired-device file cannot be read, so no sender is admitted: %v", err)
-			return nil, false
-		} else if ok {
-			return key, true
-		}
-	}
-	if l.roster == nil {
+	if l.pinned == nil {
 		return nil, false
 	}
-	return l.roster.PublicKeyFor(sender)
+	refused, err := l.pinned.Refused(sender)
+	if err != nil {
+		l.logf("cloud: the paired-device file cannot be read, so no sender is admitted: %v", err)
+		return nil, false
+	}
+	if refused {
+		return nil, false
+	}
+	key, ok, err := l.pinned.PublicKeyFor(sender)
+	if err != nil {
+		l.logf("cloud: the paired-device file cannot be read, so no sender is admitted: %v", err)
+		return nil, false
+	}
+	return key, ok
 }
 
 // Pairing is the handover this link drives, for the routes that start one.
@@ -1272,33 +1313,44 @@ func (l *Link) pairingKeys() (domaincloud.DeviceKey, domaincloud.ContentKey, err
 	return key, secret, nil
 }
 
-// authority is cloudops' re-read at the point of no return.
+// authority is cloudops' re-read at the point of no return, for commands and,
+// since reads are re-checked too, for ctl/ reads.
 //
-// The roster is the account's, not this machine's: a device the person removed
-// in the hosted console stops being able to act here at the next refresh.
-// Every active viewer that can authenticate and decrypt this machine's
-// envelope may send while Cloud commands are enabled. The transport already
-// verified both before calling the bridge. A local pin, when present, still
-// overrides the roster key; a local revocation always denies the viewer.
+// Two sources, with different powers. **The pin admits**: only a device this
+// machine paired itself, still unrevoked, and whose pinned key is the key the
+// envelope was verified with, may act or read here. **The roster can only
+// deny**: it is the account's, not this machine's, so a device the person
+// removed in the hosted console stops being able to act here at the next
+// refresh — but a roster row for a device this machine never pinned admits
+// nothing, and a roster key never stands in for a pin. A local revocation
+// always denies the viewer, before the roster is consulted.
 func (l *Link) authority(ctx context.Context, sender string, verifiedKey ed25519.PublicKey, requiresWriteGate bool) cloudops.Authority {
-	readable, _ := l.roster.Readable()
-	var pairedKey ed25519.PublicKey
-	if l.pinned != nil {
-		if refused, err := l.pinned.Refused(sender); err != nil || refused {
-			// A device this machine threw out, or a pin file it cannot read.
-			// Either way the answer is no, and it is no before the roster is
-			// consulted: the roster is the thing a revocation has to beat.
-			return cloudops.Authority{ClockReady: true, RosterReadable: readable}
-		}
-		if key, ok, err := l.pinned.PublicKeyFor(sender); err == nil && ok {
-			pairedKey = key
-		}
+	var readable bool
+	if l.roster != nil {
+		readable, _ = l.roster.Readable()
+	}
+	if l.pinned == nil {
+		return cloudops.Authority{ClockReady: true, RosterReadable: readable}
+	}
+	if refused, err := l.pinned.Refused(sender); err != nil || refused {
+		// A device this machine threw out, or a pin file it cannot read.
+		// Either way the answer is no, and it is no before the roster is
+		// consulted: the roster is the thing a revocation has to beat.
+		return cloudops.Authority{ClockReady: true, RosterReadable: readable}
+	}
+	pairedKey, pinned, err := l.pinned.PublicKeyFor(sender)
+	if err != nil || !pinned || !bytes.Equal(pairedKey, verifiedKey) {
+		// Not paired with this machine, or paired under a different key than
+		// the one this envelope was verified with: the roster cannot make up
+		// for either.
+		return cloudops.Authority{ClockReady: true, RosterReadable: readable}
 	}
 	a := cloudops.Authority{
-		// The clock guard is not wired yet; the transport admits on the relay's
-		// own timestamp window today. Saying `true` here is reporting what is
-		// actually checked rather than claiming a check that does not run —
-		// see docs/records/cloud-wire-implementation-2026-09.md §16.4.
+		// The clock guard is not wired yet; the transport admits on its own
+		// copy of the relay's timestamp window (MaxTimestampSkew around this
+		// machine's clock). Saying `true` here is reporting what is actually
+		// checked rather than claiming a check that does not run — see
+		// docs/records/cloud-wire-implementation-2026-09.md §16.4.
 		ClockReady:     true,
 		RosterReadable: readable,
 	}
@@ -1314,9 +1366,10 @@ func (l *Link) authority(ctx context.Context, sender string, verifiedKey ed25519
 		}
 		if requiresWriteGate {
 			rosterKey, err := base64.StdEncoding.DecodeString(device.PublicKey)
+			// The pin already equals verifiedKey; a roster naming another key
+			// for the same device is a disagreement, and a disagreement denies.
 			if err != nil || len(rosterKey) != ed25519.PublicKeySize ||
-				!bytes.Equal(rosterKey, verifiedKey) ||
-				(pairedKey != nil && !bytes.Equal(rosterKey, pairedKey)) {
+				!bytes.Equal(rosterKey, pairedKey) {
 				return a
 			}
 		}
@@ -1364,7 +1417,9 @@ func (l *Link) transcriptAuthority(ctx context.Context, sender string, verifiedK
 		}
 		if l.pinned != nil {
 			pinned, ok, err := l.pinned.PublicKeyFor(sender)
-			if err != nil || ok && !bytes.Equal(pinned, key) {
+			// authority already required the pin; asked again here because
+			// the file may have changed while the roster was being read.
+			if err != nil || !ok || !bytes.Equal(pinned, key) {
 				a.RosterAllowsSender = false
 				return a
 			}
@@ -1412,6 +1467,18 @@ func (l *Link) SpoolChannelReadings() (channelBytes, receipts capacity.Reading, 
 	return channelBytes, receipts, true
 }
 
+// ReplayJournalReadings are the replay journal's `cloud.replay_journal_rows`
+// and `cloud.replay_journal_bytes`. ok is false when this link has no
+// journal: the switch is off, the machine is not enrolled, or the journal
+// could not be read (which stops the line, and LastError says why).
+func (l *Link) ReplayJournalReadings() (rows, bytes capacity.Reading, ok bool) {
+	if l.replayJournal == nil {
+		return capacity.Reading{}, capacity.Reading{}, false
+	}
+	return capacity.Reading{Known: true, Used: int64(l.replayJournal.Rows())},
+		capacity.Reading{Known: true, Used: l.replayJournal.Size()}, true
+}
+
 // SpoolRefusalReading is the same spool's `cloud.spool_refusals`.
 func (l *Link) SpoolRefusalReading() (capacity.Reading, bool) {
 	if l.relay == nil || l.relay.Spool == nil {
@@ -1450,10 +1517,10 @@ func (l *Link) Status() Status {
 	if l.relay != nil {
 		out.QueueRefused, out.QueueUnanswered = l.relay.Refusals()
 	}
-	// The viewer list is the two sources joined, in the order that decides
-	// admission: this machine's own pins, then the account's roster for
-	// anything it has never pinned. A row that is only in the roster is shown
-	// as such rather than silently equated with a pin.
+	// The viewer list is the two sources joined: this machine's own pins,
+	// which are what admits, then the account's roster for anything it has
+	// never pinned. A row that is only in the roster is shown as such rather
+	// than silently equated with a pin — it is not admitted here.
 	seen := map[string]int{}
 	if l.pinned != nil {
 		devices, err := l.pinned.Devices()
@@ -1750,17 +1817,56 @@ func (l *Link) RotateSigningKey(ctx context.Context, confirm bool) (RotationOutc
 		IdentityEpoch: rotated.IdentityEpoch,
 		Repair:        cost,
 	}
+	outcome.Reconnected = l.rewire()
+	return outcome, nil
+}
+
+// rewire asks Run to rebuild the line on whatever the key store now holds,
+// and takes down the socket that is up, if one is. It answers whether one was.
+//
+// The flag is set whether or not a socket is up: a Run that is between two
+// sockets reads it before it starts the next (see Run), so no socket is ever
+// built from keys captured before the change.
+func (l *Link) rewire() bool {
 	l.mu.Lock()
+	l.rotated = true
 	stop := l.stopRun
-	if stop != nil {
-		l.rotated = true
-	}
 	l.mu.Unlock()
 	if stop != nil {
-		outcome.Reconnected = true
 		stop()
 	}
-	return outcome, nil
+	return stop != nil
+}
+
+// replaceContentKey replaces this machine's content key — the account master
+// secret every paired browser was handed — and brings the line back on it.
+// It is Pairing.ReplaceSecret: what a revocation does after the pin.
+//
+// **Every browser still paired here has to pair again.** They all hold the
+// one secret the revoked browser holds, so there is no way to keep them and
+// lock it out; the outcome names them. Content this machine already sealed
+// stays readable to whoever kept the old key: what changes is everything
+// sealed from here on, which the relay, the spool and every carrier now get
+// under the new key, because wire() rebuilds all of them.
+//
+// The new key is written before the line is rebuilt, and the rebuild reads
+// the store, so there is no window in which the rebuilt line seals with the
+// old key. pairingKeys reads the store too, so the next pairing hands out the
+// new one.
+func (l *Link) replaceContentKey() (SecretReplacement, error) {
+	if l.keys == nil {
+		return SecretReplacement{}, ErrPairingUnavailable
+	}
+	fresh, err := domaincloud.NewContentKey(rand.Reader)
+	if err != nil {
+		return SecretReplacement{}, err
+	}
+	if err := l.keys.SaveMasterSecret(fresh); err != nil {
+		return SecretReplacement{}, err
+	}
+	l.logf("cloud: this machine's content key was replaced; every browser paired here must pair again")
+	repair := l.RotationCost()
+	return SecretReplacement{Repair: repair, Reconnected: l.rewire()}, nil
 }
 
 // setState records the line's own word for what it is doing.

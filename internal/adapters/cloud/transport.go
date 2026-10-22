@@ -50,6 +50,12 @@ type Options struct {
 	// Replay is the shared inbound replay window. A nil one is refused:
 	// starting a transport with no window means accepting every replay.
 	Replay *cloud.ReplayWindow
+	// ReplayJournal, when set, is where every accepted claim is written
+	// before its envelope is opened, so the window outlasts this transport and
+	// this process (replay_journal.go). A claim it cannot write refuses the
+	// envelope. The machine's link always sets it; a nil one keeps the window
+	// in memory only, which is what a viewer and a test fixture have.
+	ReplayJournal ReplayRecorder
 	// Inbound is called for every envelope that passed decoding, the channel
 	// check, signature verification and the replay window. It must not block.
 	Inbound func(cloud.Envelope, []byte, ed25519.PublicKey)
@@ -630,6 +636,12 @@ func (t *Transport) handlePublishError(data []byte) {
 // signature, and **only then** the replay claim. Claiming first would let an
 // unauthenticated envelope spend a sequence number that the real sender then
 // could not use (`CloudTransport.swift:2371-2374`).
+//
+// Between the signature and the claim, a machine checks the envelope's `ts`
+// against its own clock (cloud.MaxTimestampSkew, the relay's own window). The
+// viewer stamps and signs `ts`, so the relay cannot move it; without this
+// check the only thing standing between a held envelope and a second answer
+// was an in-memory window that a reconnect emptied.
 func (t *Transport) handleEnvelope(data []byte) {
 	var frame EnvelopeFrame
 	if err := json.Unmarshal(data, &frame); err != nil || len(frame.Envelope) == 0 {
@@ -717,6 +729,15 @@ func (t *Transport) admitEnvelope(raw []byte, directViewer string) bool {
 		return false
 	}
 
+	// A viewer's envelope to a machine is a request, and a request is only
+	// as fresh as its signed ts. A viewer does not check what it reads this
+	// way: a status row the relay retained and realigns is old on purpose.
+	if t.opts.Role != "viewer" && !cloud.TimestampWithinSkew(envelope.Ts, t.now()) {
+		t.opts.Status.Dropped(DropClockSkew)
+		t.logf("cloud dropped an envelope reason=%s sender=%s seq=%d ts=%d", DropClockSkew, envelope.Sender, envelope.Seq, envelope.Ts)
+		return false
+	}
+
 	switch t.opts.Replay.Claim(envelope.Sender, envelope.Seq) {
 	case cloud.ReplayRefused:
 		t.opts.Status.Dropped(DropReplay)
@@ -726,6 +747,22 @@ func (t *Transport) admitEnvelope(raw []byte, directViewer string) bool {
 		t.opts.Status.Dropped(DropReplayWindowFull)
 		t.logf("cloud dropped an envelope reason=%s sender=%s", DropReplayWindowFull, envelope.Sender)
 		return false
+	}
+	// The claim is on disk before the envelope is opened, let alone acted
+	// on. One the journal cannot keep is refused: answering it would be
+	// answering something a restart could make this machine answer again.
+	// The in-memory claim is not given back, for the reason the decrypt
+	// failure below gives.
+	if t.opts.ReplayJournal != nil {
+		if err := t.opts.ReplayJournal.Record(envelope.Sender, envelope.Seq, envelope.Ts); err != nil {
+			reason := DropReplayUnrecorded
+			if errors.Is(err, ErrReplayJournalFull) {
+				reason = DropReplayWindowFull
+			}
+			t.opts.Status.Dropped(reason)
+			t.logf("cloud dropped an envelope reason=%s sender=%s seq=%d detail=%v", reason, envelope.Sender, envelope.Seq, err)
+			return false
+		}
 	}
 
 	var plaintext []byte
@@ -761,6 +798,15 @@ func (t *Transport) admitEnvelope(raw []byte, directViewer string) bool {
 		t.opts.Inbound(envelope, plaintext, verifiedKey)
 	}
 	return true
+}
+
+// now is the transport's clock. New always sets one; a transport built by
+// hand in a test may not, and reads the wall clock.
+func (t *Transport) now() time.Time {
+	if t.opts.Now == nil {
+		return time.Now()
+	}
+	return t.opts.Now()
 }
 
 // deliverable reports whether this machine is the intended reader of a

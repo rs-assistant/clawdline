@@ -207,6 +207,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `secret_handoff_target_changed` | `internal/transport/http/secret_handoff.go` |
 | `secret_handoff_unavailable` | `internal/transport/http/secret_handoff.go` |
 | `secret_handoffs_full` | `internal/transport/http/secret_handoff.go` |
+| `secret_not_replaced` | `internal/transport/http/cloud.go` |
 | `secret_too_large` | `internal/transport/http/secret_handoff.go` |
 | `send_required` | `internal/transport/http/projects.go` |
 | `session_actor_required` | `internal/transport/http/squad_actor.go`, `internal/transport/http/squad_events.go` |

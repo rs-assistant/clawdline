@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -414,16 +415,44 @@ func TestRevokingIsLocalAndImmediate(t *testing.T) {
 	if _, err := h.pairing.Complete(context.Background(), h.viewer.offer.Fragment()); err != nil {
 		t.Fatalf("pairing: %v", err)
 	}
-	changed, err := h.pairing.Revoke(h.viewer.deviceID)
-	if err != nil || !changed {
-		t.Fatalf("revoking: %v %v", changed, err)
+	replaced := 0
+	h.pairing.ReplaceSecret = func() (SecretReplacement, error) {
+		replaced++
+		return SecretReplacement{Repair: []string{"dev_other (ABCD)"}, Reconnected: true}, nil
+	}
+	outcome, err := h.pairing.Revoke(h.viewer.deviceID)
+	if err != nil || !outcome.Revoked || !outcome.SecretReplaced || replaced != 1 ||
+		len(outcome.Repair) != 1 || !outcome.Reconnected {
+		t.Fatalf("revoking: %+v %v (replaced %d)", outcome, err, replaced)
 	}
 	refused, err := h.pinned.Refused(h.viewer.deviceID)
 	if err != nil || !refused {
 		t.Fatalf("the revoked browser is not refused: %v %v", refused, err)
 	}
-	if changed, err := h.pairing.Revoke("dev_nobody"); err != nil || changed {
-		t.Fatalf("revoking an unknown device reported a change: %v %v", changed, err)
+	if outcome, err := h.pairing.Revoke("dev_nobody"); err != nil || outcome.Revoked || outcome.SecretReplaced || replaced != 1 {
+		t.Fatalf("revoking an unknown device reported a change: %+v %v", outcome, err)
+	}
+}
+
+// A revocation that cannot replace the content key says so as a failure: the
+// browser is refused as a sender, but it may still read, and a 200 would
+// tell the person otherwise. With no way to replace the key at all, nothing is
+// revoked.
+func TestARevocationThatCannotReplaceTheKeyIsNotASuccess(t *testing.T) {
+	h := newPairingHarness(t)
+	if _, err := h.pairing.Complete(context.Background(), h.viewer.offer.Fragment()); err != nil {
+		t.Fatalf("pairing: %v", err)
+	}
+	if _, err := h.pairing.Revoke(h.viewer.deviceID); !errors.Is(err, ErrPairingUnavailable) {
+		t.Fatalf("a pairing with no key replacement revoked anyway: %v", err)
+	}
+	if refused, _ := h.pinned.Refused(h.viewer.deviceID); refused {
+		t.Fatal("a revocation that could not replace the key wrote the refusal anyway")
+	}
+	h.pairing.ReplaceSecret = func() (SecretReplacement, error) { return SecretReplacement{}, errors.New("disk full") }
+	outcome, err := h.pairing.Revoke(h.viewer.deviceID)
+	if !errors.Is(err, ErrSecretNotReplaced) || !outcome.Revoked || outcome.SecretReplaced {
+		t.Fatalf("a failed key replacement answered %+v %v", outcome, err)
 	}
 }
 

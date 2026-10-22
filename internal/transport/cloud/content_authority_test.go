@@ -37,7 +37,8 @@ func TestContentAuthorityRefreshesCapabilityKeyAndRevocation(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"devices": []adaptercloud.RosterDevice{row}})
 	}))
 	defer server.Close()
-	l := &Link{opts: LinkOptions{Now: clock}, roster: adaptercloud.NewRoster(server.URL, "credential", clock)}
+	l := &Link{opts: LinkOptions{Now: clock}, roster: adaptercloud.NewRoster(server.URL, "credential", clock),
+		pinned: pinnedViewer(t, public)}
 	check := func(wantSender, wantCap bool) {
 		t.Helper()
 		a := l.transcriptAuthority(context.Background(), "viewer", public)
@@ -90,7 +91,8 @@ func TestASessionReadInsideTheRosterWindowCostsNoDeviceRead(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"devices": []adaptercloud.RosterDevice{row}})
 	}))
 	defer server.Close()
-	l := &Link{opts: LinkOptions{Now: clock}, roster: adaptercloud.NewRoster(server.URL, "credential", clock)}
+	l := &Link{opts: LinkOptions{Now: clock}, roster: adaptercloud.NewRoster(server.URL, "credential", clock),
+		pinned: pinnedViewer(t, public)}
 	read := func() {
 		t.Helper()
 		a := l.transcriptAuthority(context.Background(), "viewer", public)
@@ -142,4 +144,16 @@ func TestASessionReadInsideTheRosterWindowCostsNoDeviceRead(t *testing.T) {
 	if after != 2 {
 		t.Fatalf("a read past the window made %d device reads in all, want two", after)
 	}
+}
+
+// pinnedViewer is a pin file holding "viewer" under key: only a device this
+// machine paired is admitted, so every authority fixture starts from one.
+func pinnedViewer(t *testing.T, key ed25519.PublicKey) *adaptercloud.PinnedStore {
+	t.Helper()
+	pinned := adaptercloud.NewPinnedStore(t.TempDir())
+	if err := pinned.Pin("account", adaptercloud.PinnedDevice{DeviceID: "viewer",
+		PublicKey: base64.StdEncoding.EncodeToString(key)}); err != nil {
+		t.Fatal(err)
+	}
+	return pinned
 }

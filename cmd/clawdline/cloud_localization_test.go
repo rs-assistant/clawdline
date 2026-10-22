@@ -36,12 +36,12 @@ func captureCloudStream(t *testing.T, stream **os.File, fn func()) string {
 func TestCloudCatalogKeepsBaselineAndReportsNewFallbacks(t *testing.T) {
 	for _, language := range []string{"en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"} {
 		translated, total := cliCatalogCoverage("cloud", language)
-		want := 94
+		want := 93
 		if language == "en" || language == "zh-Hant" {
-			want = 102
+			want = 108
 		}
-		if total != 102 || translated != want {
-			t.Errorf("cloud coverage %s = %d/%d, want %d/102", language, translated, total, want)
+		if total != 108 || translated != want {
+			t.Errorf("cloud coverage %s = %d/%d, want %d/108", language, translated, total, want)
 		}
 	}
 }

@@ -122,6 +122,7 @@ internal/adapters/cloud.maxFailureCodeBytes # admission: one word the relay or t
 internal/adapters/cloud.maxFrameBytes # admission: one WebSocket frame from the relay
 internal/adapters/cloud.MaximumBackoff # parameter: the reconnect wait's ceiling
 internal/adapters/cloud.maxRelayURLBytes # admission: the relay URL setting
+internal/adapters/cloud.replayLineBytesLimit # derived: the longest valid replay journal row (= domain/cloud.MaxSegmentBytes + 43), the read slack past cloud.replay_journal_bytes
 internal/adapters/cloud.maxResponseBytes # read: one control-plane answer
 internal/adapters/cloudkeys.secretLimit # read: one key file
 internal/adapters/devices.auditFieldLimit # admission: one audit value, cut to 256 bytes (limits N12's silent cut, C3; C2 split the audit from the journal)
@@ -220,7 +221,7 @@ internal/domain/cloud.maxPairingIDBytes # admission: an id in a pairing document
 internal/domain/cloud.MaxSafeInteger # parameter: the largest integer JSON carries exactly
 internal/domain/cloud.MaxSegmentBytes # admission: one channel segment
 internal/domain/cloud.MaxServerWallDifference # parameter: how far a server clock sample may be
-internal/domain/cloud.MaxTimestampSkew # parameter: the relay's clock skew window
+internal/domain/cloud.MaxTimestampSkew # parameter: the relay's clock skew window, which inbound admission also enforces against this machine's clock
 internal/domain/cloud.MaxTrackedSenders # store: the replay window's senders, refuses new ones until restart (limits N21, a): C3
 internal/domain/icon.SplashLimit # admission: a launch image's size
 internal/domain/schedule.MaxCatchUpHours # parameter: how far back a schedule catches up
