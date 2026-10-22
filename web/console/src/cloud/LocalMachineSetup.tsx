@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { catalogWord } from "../catalog.js"
 import { nativePairing, nativePairingAvailable, type NativePairingReply } from "./native-pairing.js"
-import { BrowserPairingBlock } from "../pages/settings/BrowserPairingBlock.js"
 
 const word = (key: string) => catalogWord("browserPairing", key)
 
 /** The native owner can connect an unregistered machine before this viewer has a key. */
-export function LocalMachineSetup({ onPair }: { onPair: (machine: { id: string; name: string }) => void }) {
+export function LocalMachineSetup({ onPair, children }: { onPair: (machine: { id: string; name: string }) => void; children?: ReactNode }) {
   const [status, setStatus] = useState<NativePairingReply | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
@@ -33,7 +32,7 @@ export function LocalMachineSetup({ onPair }: { onPair: (machine: { id: string; 
     const timer = setInterval(read, 2000)
     return () => { live = false; clearInterval(timer) }
   }, [waiting])
-  if (!available) return null
+  if (!available) return children ?? null
   if (!status) return error ? <div role="region" aria-label={word("connect")}>
     <p role="status">{word("connectFailed")} ({error})</p>
     <button type="button" className="chip" disabled={busy} onClick={() => {
@@ -42,7 +41,7 @@ export function LocalMachineSetup({ onPair }: { onPair: (machine: { id: string; 
         reason => setError(String(reason?.code || "connection_failed"))).finally(() => setBusy(false))
     }}>{word("retry")}</button>
   </div> : null
-  if (!status.native_setup) return null
+  if (!status.native_setup) return children ?? null
   const ready = !!status.configured && !!status.enabled && !!status.machine_id
   async function connect() {
     if (busy) return
@@ -65,7 +64,7 @@ export function LocalMachineSetup({ onPair }: { onPair: (machine: { id: string; 
     </> : !ready ? <button className="go" type="button" disabled={busy} onClick={() => void connect()}>{word("connect")}</button> : <>
       <p>{status.machine_name}</p>
       <button className="go" type="button" onClick={() => onPair({ id: status.machine_id!, name: status.machine_name || status.machine_id! })}>{word("pairApp")}</button>
-      <BrowserPairingBlock shown />
+      {children}
     </>}
     {status.connection?.phase === "failed" && <p role="status">{word("connectFailed")} ({status.connection.code})</p>}
     {error && <p role="status">{word("connectFailed")} ({error})</p>}

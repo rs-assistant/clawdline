@@ -1,3 +1,5 @@
+import { LocalMachineSetup } from "../../cloud/LocalMachineSetup.js"
+import { machineManager } from "../../cloud/machine-manager.js"
 import { useEffect, useState } from "react"
 import type { WorkflowSettingsSnapshot } from "@clawdline/contract"
 import { catalogFormat, catalogWord } from "../../catalog.js"
@@ -71,6 +73,8 @@ export function WorkflowSettingsBlock({ shown }: { shown: boolean }) {
     })}
     <p className="said" role="status" aria-live="polite">{said}</p>
     {!snapshot && !busy && <button type="button" className="chip" onClick={() => setRetry(value => value + 1)}>{word("retry")}</button>}
-    <BrowserPairingBlock shown={shown} />
+    {shown && <LocalMachineSetup onPair={machine => machineManager()?.pair(machine.id)}>
+      <BrowserPairingBlock shown={shown} />
+    </LocalMachineSetup>}
   </div>
 }

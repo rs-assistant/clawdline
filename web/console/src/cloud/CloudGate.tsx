@@ -1,3 +1,4 @@
+import { BrowserPairingBlock } from "../pages/settings/BrowserPairingBlock.js"
 import { LocalMachineSetup } from "./LocalMachineSetup.js"
 import { accessProblemAfterRead } from "./state.js"
 import { CloudReadProblem } from "./CloudReadProblem.js"
@@ -2491,7 +2492,7 @@ function GateCard(props: {
           <>
             <p className="lede">{nextWord("cloudConnectLede")}</p>
             <p className="fine">{nextWord("cloudConnectFine")}</p>
-            <LocalMachineSetup onPair={onPair} />
+            <LocalMachineSetup onPair={onPair}><BrowserPairingBlock shown /></LocalMachineSetup>
             <button className="go" type="button" id="cloud-pair-start" onClick={() => onPair(null)}>
               {nextWord("cloudPairStart")}
             </button>
@@ -2730,7 +2731,7 @@ function GateCard(props: {
             {machineList.phase === "empty_authoritative" && (
               <>
                 <p className="fine">{nextWord("cloudConnectFine")}</p>
-            <LocalMachineSetup onPair={onPair} />
+            <LocalMachineSetup onPair={onPair}><BrowserPairingBlock shown /></LocalMachineSetup>
                 <button className="go" type="button" id="cloud-machines-pair" onClick={() => onPair(null)}>
                   {nextWord("cloudPairStart")}
                 </button>
