@@ -422,6 +422,34 @@ func (a *Authority) BeginPairing(name string) (Started, error) {
 	return Started{ID: entry.ID, Expires: entry.Expires}, nil
 }
 
+// ResetPairing reopens pairing that wrong codes or requests closed, and ends
+// any pairing that is open. Only the person at this machine asks for it (the
+// local token, `clawdline pair --reset`).
+//
+// It exists because the counts are global: nobody pairing through a tunnel
+// can be told apart from anybody else — every request comes from 127.0.0.1 —
+// so whoever can reach the pairing route can spend PairingGuesses on a pairing
+// of their own and keep pairing closed for everybody for PairingGuessWindow.
+// The person who wants to pair is the one who can see this machine, and this
+// is the door they have that the asker does not. Brute force stays where it
+// was: each reset is a person's deliberate act and buys at most
+// PairingGuesses more guesses, and every one is in the audit with what it
+// cleared.
+func (a *Authority) ResetPairing() (wrongCodes, requests int) {
+	now := a.now()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	wrongCodes = len(recent(a.pairingMisses, now, PairingGuessWindow))
+	requests = len(recent(a.pairingTimes, now, PairingWindow))
+	a.pairingMisses = nil
+	a.pairingTimes = nil
+	a.pending = nil
+	a.store.Audit("pair.reset", map[string]string{
+		"wrong_codes": fmt.Sprint(wrongCodes), "requests": fmt.Sprint(requests),
+	})
+	return wrongCodes, requests
+}
+
 // ConfirmPairing checks a code. The wrong ones are counted on the authority,
 // not on the pairing and not on a connection, so neither asking again nor
 // retrying from somewhere else hands out more: the fifth wrong code in a

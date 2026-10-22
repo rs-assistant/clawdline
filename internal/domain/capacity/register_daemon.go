@@ -41,6 +41,27 @@ func daemonBounds() []Entry {
 			Sources:   []string{"internal/adapters/devices.storeLimit"},
 		},
 		{
+			// How long the one-time code in a `clawdline open` address may
+			// still be traded for the browser's cookie. The address is on a
+			// command line every user of the machine can read, so it carries
+			// this code and never the token; one not traded in time expires
+			// and the person runs `clawdline open` again.
+			Name: DevicesOpenCodeSeconds, Class: Idempotency, Unit: Seconds,
+			Limit: 5 * 60, AtLimit: Expire,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.MaxOpenCodeSeconds"},
+		},
+		{
+			// The `clawdline open` addresses waiting to be opened. Each
+			// stands for a device already added, so past the limit `open` is
+			// refused with 429 rate_limited and no device is added; expired
+			// codes leave by themselves.
+			Name: DevicesOpenCodesPending, Class: Buffer, Unit: Rows,
+			Limit: 16, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.MaxOpenCodesPending"},
+		},
+		{
 			// push/subscriptions.json (limits N14). A person's standing
 			// request to be told, one row per device: at the limit a new
 			// subscription is refused with 507 subscriptions_full rather

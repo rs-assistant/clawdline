@@ -269,5 +269,9 @@
   "image.failed": "clawdline image send:",
   "image.whoami_no_terminal": "clawdline image send: whoami answered without a terminal id. Nothing was sent.",
   "image.stored_shown": "Stored %d picture(s) for Session %s. They appear under the first reply this Session records after them, usually the message that ran this command; nothing has to be written into it.\n",
-  "image.check": "Stored is not seen: GET /v1/transcript?session=%s lists them in that reply's artifacts once it is written.\n"
+  "image.check": "Stored is not seen: GET /v1/transcript?session=%s lists them in that reply's artifacts once it is written.\n",
+  "listener.other_user": "%s is held by a process of another user (uid %d), not by your Clawdline daemon (uid %d), so no credential was sent there. Stop whatever holds that port, or run your daemon on another one (CLAWDLINE_NEXT_PORT)",
+  "listener.unknown": "could not tell which user is listening on %s (%v), so no credential was sent there",
+  "pair.reset_done": "Pairing is open again: %d wrong codes and %d requests were forgotten. If you did not type those codes, somebody else who can reach this machine did.\n",
+  "pair.reset_help": "open pairing again after wrong codes closed it, then exit"
 }

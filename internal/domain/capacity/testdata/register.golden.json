@@ -2291,6 +2291,46 @@
   },
   {
     "Register": "daemon",
+    "Name": "devices.open_code_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 300,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaxOpenCodeSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "devices.open_codes_pending",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaxOpenCodesPending"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "diagnostics.route_latency_samples",
     "Class": "observation",
     "Unit": "rows",

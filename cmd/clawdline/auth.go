@@ -199,7 +199,12 @@ func openURL(u string) error {
 func pairCommand(args []string) {
 	fs := flag.NewFlagSet("pair", flag.ExitOnError)
 	watch := fs.Bool("watch", false, cliCopy("core", "auth.watch_help", "keep printing codes until interrupted"))
+	reset := fs.Bool("reset", false, cliCopy("misc", "pair.reset_help", "open pairing again after wrong codes closed it, then exit"))
 	_ = fs.Parse(args)
+	if *reset {
+		resetPairing()
+		return
+	}
 
 	req, err := daemonRequest(http.MethodGet, "/v1/auth/pairings", nil)
 	if err != nil {
@@ -249,6 +254,31 @@ func pairCommand(args []string) {
 			fail(errors.New(cliCopy("core", "auth.pairing_stream_no_request", "the pairing stream ended before anybody asked")))
 		}
 	}
+}
+
+// resetPairing is `clawdline pair --reset`. Five wrong codes close pairing for
+// a day for everybody, and anybody who can reach the pairing route can type
+// them; this, with this machine's own token, opens it again.
+func resetPairing() {
+	req, err := daemonRequest(http.MethodPost, "/v1/auth/pairings/reset", struct{}{})
+	if err != nil {
+		fail(err)
+	}
+	res, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		fail(fmt.Errorf(cliCopy("core", "auth.daemon_unreachable", "the daemon did not answer: %w"), err))
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		fail(errors.New(refusalText(res)))
+	}
+	var out contract.PairingReset
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		fail(err)
+	}
+	fmt.Printf(cliCopy("misc", "pair.reset_done",
+		"Pairing is open again: %d wrong codes and %d requests were forgotten. If you did not type those codes, "+
+			"somebody else who can reach this machine did.\n"), out.WrongCodes, out.Requests)
 }
 
 func printPairing(n contract.PairingNotice) {

@@ -110,15 +110,32 @@ Not fixed, and why:
   receipt, such as `work-gate-settings-update` (`internal/adapters/cloud/transport.go`,
   `internal/transport/cloud/link.go`). Cloud only.
 - Medium: the session cookie is not port-scoped. This is the browser cookie model; see the
-  operating policy above.
+  operating policy above. On Linux a cookie replayed by another user's process is now refused
+  (below); a service of the person's own user, and macOS and Windows, are not covered.
 - Medium: Secret Handoff does not stop a prompt-injected agent from running
   `secret run -- curl` (`cmd/clawdline/secret.go`). This is a design limit.
 - Disputed: `ctl/` reads skip re-authorization (`internal/app/cloudops/cloudops.go`
   `serveRead`). Codex rated it High and Claude Low; it was assessed Medium because every paired
   device already gets Read and Send. Cloud only.
-- Low: on multi-user Linux, another user can squat port 7727, `clawdline open` puts the token in
-  argv, and the global 24 h pairing lockout can be used to deny pairing. Downgrades can be forced
-  and manifests do not expire (release updater, unused here).
+- Low: downgrades can be forced and manifests do not expire (release updater, unused here).
+
+Fixed on this branch on 2026-10-22, second round (branch `security-loopback-peer-fixes`), each
+with a test that failed before the fix:
+
+- The cookie, a bearer, the orchestrator token, a task secret or a token handed to
+  `/v1/auth/adopt` from a loopback socket another uid owns is refused 403 (Linux,
+  `/proc/net/tcp{,6}`; `internal/transport/http/peer.go`, `internal/adapters/sockowner`). An
+  unreadable `/proc` refuses every local credential and logs why. In-process Cloud requests have
+  no connection and are judged as before.
+- Every CLI call checks that the far end of its loopback connection is its own uid's socket
+  before writing, so a squatter on 7727 gets no token (Linux; `cmd/clawdline/listenerowner.go`,
+  on `http.DefaultTransport`).
+- `clawdline open` puts a one-time code (five minutes, sixteen waiting at most; register rows
+  `devices.open_code_seconds`, `devices.open_codes_pending`) on the browser's command line
+  instead of the device's token (`internal/transport/http/open_code.go`).
+- `clawdline pair --reset` (local token only) reopens pairing that five wrong codes closed for a
+  day, and audits `pair.reset`. An attacker who keeps guessing can close it again; each reset
+  buys at most five guesses.
 
 Found sound: no telemetry, analytics or crash SDKs; local HTTP has CSRF, Origin and Host checks;
 no exploitable XSS; no `sh -c` injection; the release updater verifies the ed25519 signature
