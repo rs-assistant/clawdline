@@ -1,5 +1,6 @@
-# Open items only. Decisions, operating policy, dependency changes and the security
-# review record live in AGENTS.md, section "This fork: rs-assistant/clawdline".
+# Open items only. Decisions, operating policy, dependency changes, the security
+# review record and the 2026-10-22 smoke and e2e results live in AGENTS.md,
+# section "This fork: rs-assistant/clawdline".
 
 pointers:
   repository: https://github.com/rs-assistant/clawdline
@@ -8,10 +9,11 @@ pointers:
   fix_commits: [e496fa9, 8d4bf41, 5c8ca6c, d8b1cf2, 125bb2d, cbc74e4, 181ab79]
 
 next:
-  - Run the console's browser end-to-end tests (web/console/src/session/human-interventions.e2e.ts)
-    on a machine with a browser; they were updated for Secret Handoff commands but not run.
-  - Nothing in this round ran on a Mac. Before relying on install.sh's signature check or the
-    daemon there, build and run it on macOS.
+  - Nothing in this round ran on a Mac. Before relying on the daemon, install.sh's signature
+    check or the console e2e tests there, build and run them on macOS.
+  - Upstream sainteye/clawdline main is 550 commits past 418bac7 (fetched 2026-10-22). Merging
+    it needs a review of that diff and a govulncheck run first; the person has not decided
+    whether to follow upstream.
 
 deferred:
   - A LaunchAgent or systemd user unit for the daemon. The person said not yet (2026-10-22).

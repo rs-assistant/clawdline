@@ -140,6 +140,13 @@ a revocation every other browser stops decrypting until it pairs again, with no 
 stamped more than 5 min off are dropped silently; `ctl/` reads fail while the roster is
 unreadable; a hosted console built before `d8b1cf2` cannot hand off a Secret Handoff value.
 
+Smoke test on 2026-10-22 (`d946f01`, Linux container, empty `CLAWDLINE_NEXT_DIR`, port 7791,
+Cloud and the update check off): the console loads and signs in through `clawdline open --print`
+in Chromium; the one-time code works once; another uid's process is refused with the local token;
+a squatter on another port receives nothing from the CLI; a revoked device's `/v1/events` closes
+within one tick. `/v1/skill` answers 403 to a browser device and one hero image is missing from
+`dist`; both are the same at `b6976cf`.
+
 Still open:
 
 - High: the hosted console JS from `app.clawdline.com` holds the keys and cannot be verified
@@ -157,8 +164,13 @@ Still open:
   cannot use `install.sh` until a newer release exists. Stable releases must follow each other
   within 180 days. The beta channel's tag list is unsigned. `clawdline setup` from an older
   unpacked release, and `--force`, still downgrade on an explicit ask. Not run on macOS.
-- Browser end-to-end tests for the Secret Handoff console were updated but not run (no browser in
-  the container).
+- Console browser e2e tests (`web/console/src/**/*.e2e.ts`) default to a Mac Chrome path. In a
+  Linux cloud container they run with `CHROME` set to a wrapper that adds `--no-sandbox` to
+  `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (root needs it). On 2026-10-22 the Secret
+  Handoff test passed there, but many tests failed in the same way at `b6976cf` and `d946f01`
+  (address, list-gestures, unify, squad, write-path, background-strip, restore, resume-role, and
+  "Documents all nine catalogs"); the files whose results differed were flaky on both commits.
+  They have not been run on a Mac.
 
 Found sound: no telemetry, analytics or crash SDKs; local HTTP has CSRF, Origin and Host checks;
 no exploitable XSS; no `sh -c` injection; the release updater verifies the ed25519 signature
