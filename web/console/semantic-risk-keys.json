@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8969,
+  "englishKeys": 8971,
   "counts": {
     "negation": 2587,
     "state": 1472,
-    "permission": 532,
+    "permission": 534,
     "deletion": 199,
     "uncertainty": 271
   },
-  "unionCount": 3985,
+  "unionCount": 3987,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -4485,6 +4485,7 @@
       "next.sessionPairToSend",
       "next.setupAppBody",
       "next.setupAppElsewhere",
+      "next.setupAppOpenCloud",
       "next.setupAppPair",
       "next.setupAppSignIn",
       "next.setupBrowserBody",
@@ -4493,6 +4494,7 @@
       "next.setupChipDoneTip",
       "next.setupChipProgressTip",
       "next.setupDoneAnother",
+      "next.setupFingerprintHint",
       "next.setupPhoneQr",
       "next.setupPhoneScan",
       "next.setupPhoneSignIn",
@@ -8394,6 +8396,7 @@
     "next.sessionsMachineOfflineLine",
     "next.setupAppBody",
     "next.setupAppElsewhere",
+    "next.setupAppOpenCloud",
     "next.setupAppPair",
     "next.setupAppSignIn",
     "next.setupBrowserBody",
@@ -8407,6 +8410,7 @@
     "next.setupDoneAnother",
     "next.setupDoneClose",
     "next.setupFailed",
+    "next.setupFingerprintHint",
     "next.setupLocalBody",
     "next.setupPhoneAndroidOpen",
     "next.setupPhoneAppleOpen",

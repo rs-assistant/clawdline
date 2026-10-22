@@ -29,13 +29,18 @@ export const SETUP_FOLD_AFTER_SECONDS = 24 * 60 * 60
  * Only a device this machine pinned counts: a row that is only in the
  * account's roster was paired with another machine. A pin the account's
  * roster no longer lists has no kind, and is a leftover that can no longer
- * connect, so it finishes nothing either. The app is told from a
- * browser by the name its Cloud tab registers under (`cloudViewerDeviceMetadata`);
- * a device the app paired before it had that name is counted as a browser.
+ * connect, so it finishes nothing either.
+ *
+ * The app is the device the wizard saw the app's own tab pair as
+ * (`setup_app_device`). A Cloud tab registers its device once and keeps it,
+ * so one registered before the tab named itself is "Web browser" for good;
+ * the name the tab registers under now (`cloudViewerDeviceMetadata`) is the
+ * fallback for an app paired without the wizard.
  */
-export function deviceItem(device: CloudViewer): SetupItem | null {
+export function deviceItem(device: CloudViewer, appDevice = ""): SetupItem | null {
   if (!device.pinned || device.revoked || !device.kind) return null
   if (device.kind === "ios" || device.kind === "android") return "phone"
+  if (appDevice && device.id === appDevice) return "app"
   if ((device.name ?? "").startsWith(CLAWDLINE_APP_DEVICE_NAME)) return "app"
   return "browser"
 }
@@ -45,14 +50,14 @@ export type SetupReading =
   | { kind: "unknown" }
   | { kind: "known"; cloud: boolean; done: Record<SetupItem, boolean>; items: readonly SetupItem[]; count: number; next: SetupItem | null }
 
-export function readSetup(status: CloudStatus | MachineOnly | null | undefined, hasApp = true): SetupReading {
+export function readSetup(status: CloudStatus | MachineOnly | null | undefined, hasApp = true, appDevice = ""): SetupReading {
   if (!status || typeof status !== "object") return { kind: "unknown" }
   const cloud = status.enabled && status.configured
   if (cloud && status.pinned_readable === false) return { kind: "unknown" }
   const done = { app: false, browser: false, phone: false }
   if (cloud) {
     for (const device of status.devices ?? []) {
-      const item = deviceItem(device)
+      const item = deviceItem(device, appDevice)
       if (item) done[item] = true
     }
   }

@@ -98,6 +98,13 @@
   .setup-steps li[data-state="active"] .setup-step-mark::before { animation: none; }
 }
 
+.setup-fingerprint {
+  margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.setup-fingerprint span { font-size: 12px; color: var(--dim); }
+.setup-fingerprint code { font-family: var(--mono); font-size: 22px; letter-spacing: 0.06em; color: var(--ink); }
+.setup-fingerprint small { font-size: 12px; line-height: 1.5; color: var(--dim); }
 .setup-ok { margin: 16px 0 0; font-size: 15px; font-weight: 600; color: var(--ok); }
 .setup-note { margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: var(--dim); }
 .setup-said { margin: 16px 0 0; font-size: 13px; line-height: 1.5; color: var(--warn); }

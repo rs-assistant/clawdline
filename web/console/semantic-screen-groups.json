@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "englishContentKeys": 8969,
-  "riskKeys": 3985,
+  "englishContentKeys": 8971,
+  "riskKeys": 3987,
   "nonRiskCount": 4984,
   "groups": [
     {
@@ -3548,6 +3548,7 @@
         "next.setupDialog",
         "next.setupDoneBody",
         "next.setupDoneTitle",
+        "next.setupFingerprintLabel",
         "next.setupItemApp",
         "next.setupItemBrowser",
         "next.setupItemPhone",
@@ -3557,7 +3558,6 @@
         "next.setupNext",
         "next.setupPhoneAndroid",
         "next.setupPhoneApple",
-        "next.setupPhoneCompare",
         "next.setupPhoneRenew",
         "next.setupSkip",
         "next.setupStart",
