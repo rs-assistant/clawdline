@@ -44,19 +44,13 @@ The machine can turn direct connections off in Settings → Remote or with `claw
 
 ## Security and your data
 
-**[Read the security overview: encryption, pairing, and what Cloud can see](https://clawdline.com/security/).** It includes a data-flow diagram and links to the source behind each step.
+Clawdline reads your Claude Code and Codex conversations, terminals and project files on your own machine. Local use needs no account, and Cloud stays off until you turn it on.
 
-**Local reading and Cloud upload are different:** Clawdline reads conversations on your machine. When Cloud is enabled, content is encrypted on your machine before transmission; Cloud forwards ciphertext without the content decryption keys. Your machine and authorized paired browsers can read the content.
+With Cloud on, content is encrypted on your machine before it leaves. Cloud relays ciphertext without the keys to decrypt it; only your machine and the browsers you pair can read it. Cloud still sees account, device and traffic metadata.
 
-Compare Claude Code and Codex reviews of Clawdline, Herdr, T3 Code and Orca in the [AI security review comparison](https://clawdline.com/ai-review/): two English questions, pinned source versions, and complete original responses.
+A paired browser can send instructions and use your terminal, so pair only devices you trust. Claude Code and Codex still send requests to their AI providers under those providers' policies.
 
-- **On your machine:** Clawdline reads existing Claude Code and Codex records, terminal screens, and project files needed by its features. Sensitive content already in a conversation or terminal can appear in the console. The daemon listens on loopback by default; local use needs no Clawdline account.
-- **With Cloud off:** the Cloud connection is off by default. Update checks can still contact GitHub or the hosted version endpoint; Cloud off does not mean all network traffic is disabled.
-- **With Cloud on:** Session snapshots are published automatically; opening conversations, files, and attachments requests content from your machine. Content is encrypted locally before transmission. This does not create a Cloud backup of your entire conversation archive. The machine and paired browsers hold the content keys; Cloud forwards ciphertext and has no content decryption key. Account, device, routing, timing, and traffic information remain visible to the service.
-- **Who can act:** directly paired browsers can read and send. Cloud has a separate machine command switch. Sending instructions or using a terminal can run code on your machine; pair only devices you trust. Revocation cannot erase content already read. Your computer, paired browsers, and the web application delivered to them remain part of the trust boundary.
-- **Your AI provider:** Claude Code and Codex still send their requests to their respective AI providers under those providers' policies. Clawdline's encrypted Cloud channel does not change that relationship.
-
-[Remote access and permissions](docs/user/remote-access.md) · [Encryption implementation](docs/cloud.md) · [Install and update trust](docs/releasing.md#what-a-release-is)
+[How it works, with diagrams and source links](https://clawdline.com/security/) · [AI security review comparison](https://clawdline.com/ai-review/)
 
 ## Install
 
