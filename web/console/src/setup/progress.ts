@@ -2,9 +2,10 @@ import type { CloudStatus, CloudViewer, MachineOnly } from "../pages/settings/cl
 import { CLAWDLINE_APP_DEVICE_NAME } from "../legacy/js/net/cloud-onboarding.js"
 
 /**
- * The three things setup is finished by, in the order the wizard asks for them:
- * the macOS app's Cloud tab, a browser on this machine, and a phone, each
- * paired with this machine.
+ * The things setup is finished by, in the order the wizard asks for them: the
+ * macOS app's Cloud tab, a browser on this machine, and a phone, each paired
+ * with this machine. A daemon on another platform has no app, so there setup
+ * is the browser and the phone.
  *
  * Every one is read from this machine's own device list (`GET /v1/cloud/status`
  * → `devices`), so the count is what this machine accepts, not what the
@@ -13,6 +14,11 @@ import { CLAWDLINE_APP_DEVICE_NAME } from "../legacy/js/net/cloud-onboarding.js"
 export type SetupItem = "app" | "browser" | "phone"
 
 export const SETUP_ITEMS: readonly SetupItem[] = ["app", "browser", "phone"]
+
+/** The items this machine's setup is made of: the app only where it runs. */
+export function setupItems(hasApp: boolean): readonly SetupItem[] {
+  return hasApp ? SETUP_ITEMS : SETUP_ITEMS.filter((item) => item !== "app")
+}
 
 /** How long the finished button stays in the header before it folds away. */
 export const SETUP_FOLD_AFTER_SECONDS = 24 * 60 * 60
@@ -35,9 +41,9 @@ export function deviceItem(device: CloudViewer): SetupItem | null {
 export type SetupReading =
   /** This machine did not say. Unknown is never drawn as 0/3. */
   | { kind: "unknown" }
-  | { kind: "known"; cloud: boolean; done: Record<SetupItem, boolean>; count: number; next: SetupItem | null }
+  | { kind: "known"; cloud: boolean; done: Record<SetupItem, boolean>; items: readonly SetupItem[]; count: number; next: SetupItem | null }
 
-export function readSetup(status: CloudStatus | MachineOnly | null | undefined): SetupReading {
+export function readSetup(status: CloudStatus | MachineOnly | null | undefined, hasApp = true): SetupReading {
   if (!status || typeof status !== "object") return { kind: "unknown" }
   const cloud = status.enabled && status.configured
   if (cloud && status.pinned_readable === false) return { kind: "unknown" }
@@ -48,15 +54,16 @@ export function readSetup(status: CloudStatus | MachineOnly | null | undefined):
       if (item) done[item] = true
     }
   }
-  const count = SETUP_ITEMS.filter((item) => done[item]).length
-  return { kind: "known", cloud, done, count, next: SETUP_ITEMS.find((item) => !done[item]) ?? null }
+  const items = setupItems(hasApp)
+  const count = items.filter((item) => done[item]).length
+  return { kind: "known", cloud, done, items, count, next: items.find((item) => !done[item]) ?? null }
 }
 
 export type SetupChip =
   | { kind: "hidden" }
   /** The person chose this machine only: a quiet mark, never an unfinished count. */
   | { kind: "local" }
-  | { kind: "progress"; count: number; next: SetupItem }
+  | { kind: "progress"; count: number; total: number; next: SetupItem }
   | { kind: "done" }
 
 /** What the header shows, from the reading and the two settings (`setup_mode`, `setup_completed_at`). */
@@ -68,7 +75,7 @@ export function setupChip(reading: SetupReading, mode: string | null | undefined
     return at > 0 && nowSeconds - at >= SETUP_FOLD_AFTER_SECONDS ? { kind: "hidden" } : { kind: "done" }
   }
   if (mode === "local") return { kind: "local" }
-  return { kind: "progress", count: reading.count, next: reading.next }
+  return { kind: "progress", count: reading.count, total: reading.items.length, next: reading.next }
 }
 
 /**

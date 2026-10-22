@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8969,
+  "englishContentKeys": 8966,
   "riskKeys": 3985,
-  "nonRiskCount": 4984,
+  "nonRiskCount": 4981,
   "groups": [
     {
       "name": "admin / other",
@@ -3262,7 +3262,7 @@
     },
     {
       "name": "next / other",
-      "count": 428,
+      "count": 425,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3548,9 +3548,6 @@
         "next.setupDialog",
         "next.setupDoneBody",
         "next.setupDoneTitle",
-        "next.setupItemApp",
-        "next.setupItemBrowser",
-        "next.setupItemPhone",
         "next.setupLater",
         "next.setupLocalCloud",
         "next.setupLocalOk",

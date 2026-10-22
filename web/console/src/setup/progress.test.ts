@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { CloudStatus, CloudViewer } from "../pages/settings/cloud.js"
 // @ts-expect-error -- Node's strip-types test runner needs the source extension.
-import { completionChange, readSetup, setupChip, SETUP_FOLD_AFTER_SECONDS } from "./progress.ts"
+import { completionChange, readSetup, setupChip, SETUP_FOLD_AFTER_SECONDS, SETUP_ITEMS } from "./progress.ts"
 
 const status = (devices: CloudViewer[], extra: Partial<CloudStatus> = {}): CloudStatus => ({
   enabled: true, commands: false, terminal_direct: true, configured: true, state: "connected",
@@ -17,7 +17,7 @@ const phone: CloudViewer = { id: "d_phone", kind: "ios", name: "iPhone", pinned:
 
 test("each item is finished by a device this machine pinned, told apart by kind and name", () => {
   const reading = readSetup(status([app, chrome, phone]))
-  assert.deepEqual(reading, { kind: "known", cloud: true, done: { app: true, browser: true, phone: true }, count: 3, next: null })
+  assert.deepEqual(reading, { kind: "known", cloud: true, done: { app: true, browser: true, phone: true }, items: SETUP_ITEMS, count: 3, next: null })
   const partial = readSetup(status([chrome, { ...phone, kind: "android", name: "Android device" }]))
   assert.equal(partial.kind === "known" && partial.next, "app")
   assert.equal(partial.kind === "known" && partial.count, 2)
@@ -40,7 +40,7 @@ test("Cloud off counts nothing, and a list this machine cannot read is unknown, 
 test("the header shows progress, a quiet local mark, or done until a day after completion", () => {
   const now = 2_000_000_000
   const partial = readSetup(status([app]))
-  assert.deepEqual(setupChip(partial, "", 0, now), { kind: "progress", count: 1, next: "browser" })
+  assert.deepEqual(setupChip(partial, "", 0, now), { kind: "progress", count: 1, total: 3, next: "browser" })
   assert.deepEqual(setupChip(partial, "local", 0, now), { kind: "local" })
   const all = readSetup(status([app, chrome, phone]))
   assert.deepEqual(setupChip(all, "local", 0, now), { kind: "done" })
@@ -57,4 +57,12 @@ test("completion is stamped once and cleared when something is unpaired", () => 
   assert.equal(completionChange(partial, now - 5, now), 0)
   assert.equal(completionChange(partial, 0, now), null)
   assert.equal(completionChange(readSetup(null), now - 5, now), null, "unknown never clears a recorded completion")
+})
+
+test("a machine without the macOS app is set up by a browser and a phone", () => {
+  const reading = readSetup(status([chrome]), false)
+  assert.equal(reading.kind === "known" && reading.next, "phone")
+  assert.deepEqual(setupChip(reading, "", 0, 0), { kind: "progress", count: 1, total: 2, next: "phone" })
+  const both = readSetup(status([chrome, phone]), false)
+  assert.equal(both.kind === "known" && both.next, null)
 })

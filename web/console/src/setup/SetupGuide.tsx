@@ -17,7 +17,8 @@ import {
 import { settingsFailureSentence } from "../pages/settings/window/failure.js"
 import { QR_QUIET, encodeQr, qrPath } from "../pages/settings/window/qr.js"
 import { showModalWithoutChoice } from "../modal-focus.js"
-import { completionChange, readSetup, setupChip, type SetupItem, type SetupReading } from "./progress.js"
+import { localPlatform } from "../legacy/devices-bridge.js"
+import { completionChange, readSetup, setupChip, setupItems, type SetupItem, type SetupReading } from "./progress.js"
 import "./setup.css"
 
 /**
@@ -70,8 +71,21 @@ function Guide() {
   const [opened, setOpened] = useState(false)
   const autoOpened = useRef(false)
   const asked = useRef({ login: false, line: false, app: "", pairing: "" })
-  const reading: SetupReading = useMemo(() => readSetup(status), [status])
   const inApp = appBridge() !== null
+  // Whether this machine runs the macOS app, and so whether the app is one of
+  // the items. Until the daemon says, nothing is counted: a reading without the
+  // app would stamp a completion that the app's item then takes back.
+  const [platform, setPlatform] = useState<string | null | undefined>(undefined)
+  useEffect(() => { void localPlatform().then(setPlatform) }, [])
+  const hasApp = inApp || platform === "darwin"
+  const reading: SetupReading = useMemo(() => platform === undefined && !inApp
+    ? { kind: "unknown" } : readSetup(status, hasApp), [status, hasApp, platform, inApp])
+  const items = reading.kind === "known" ? reading.items : setupItems(hasApp)
+  const after = (item: SetupItem | "welcome"): Screen => {
+    const rest = item === "welcome" ? items : items.slice(items.indexOf(item) + 1)
+    return rest.find((next) => !(reading.kind === "known" && reading.done[next])) ?? "done"
+  }
+  const before = (item: SetupItem): Screen => items[items.indexOf(item) - 1] ?? "welcome"
   const open = screen !== null
 
   const refresh = useCallback(async () => {
@@ -126,7 +140,7 @@ function Guide() {
     if (settings.mode === "" && !reading.cloud && reading.count === 0) show("welcome")
   }, [settings, reading, show])
 
-  const firstOpen: Screen = reading.kind === "known" ? reading.next ?? "done" : "app"
+  const firstOpen: Screen = after("welcome")
 
   const close = () => {
     setRunning(false)
@@ -198,7 +212,7 @@ function Guide() {
   useEffect(() => {
     if (screen === "browser" && done.browser && opened) {
       asked.current.pairing = ""
-      show(reading.kind === "known" && reading.next && reading.next !== "app" ? reading.next : "done")
+      show(after("browser"))
     }
     if (screen === "phone" && done.phone && asked.current.pairing === "phone") {
       asked.current.pairing = ""
@@ -213,7 +227,7 @@ function Guide() {
       <HeaderButton chip={chip} onOpen={() => show(chip.kind === "progress" && (chip.count > 0 || settings?.mode === "cloud")
         ? chip.next : chip.kind === "done" ? "done" : "welcome")} />
       {screen && (
-        <Wizard onClose={close} step={screen === "app" ? 1 : screen === "browser" ? 2 : screen === "phone" ? 3 : 0}>
+        <Wizard onClose={close} step={items.indexOf(screen as SetupItem) + 1} total={items.length}>
           {screen === "welcome" && <Welcome
             onLocal={() => { void saveSettings({ setup_mode: "local" }); show("local") }}
             onStart={() => { void saveSettings({ setup_mode: "cloud" }); show(firstOpen) }} />}
@@ -225,13 +239,13 @@ function Guide() {
             secondary={{ label: nextWord("setupDoneAnother"), run: () => { asked.current.pairing = ""; show("phone") } }} />}
           {screen === "app" && <AppStep login={login} configured={configured} lineUp={lineUp} paired={done.app}
             running={running} inApp={inApp} onRun={() => { setSaid(""); setRunning(true) }}
-            onBack={() => show("welcome")} onLater={close} onNext={() => show(done.browser ? (done.phone ? "done" : "phone") : "browser")} />}
+            onBack={() => show("welcome")} onLater={close} onNext={() => show(after("app"))} />}
           {screen === "browser" && <BrowserStep pairing={cloud?.pairing} opened={opened} paired={done.browser}
-            onOpen={() => setOpened(true)} onBack={() => show("app")}
-            onSkip={() => { asked.current.pairing = ""; show(done.phone ? "done" : "phone") }} />}
+            onOpen={() => setOpened(true)} onBack={() => show(before("browser"))}
+            onSkip={() => { asked.current.pairing = ""; show(after("browser")) }} />}
           {screen === "phone" && <PhoneStep pairing={cloud?.pairing}
             onRenew={() => { asked.current.pairing = "phone"; beginCloudPairing().then(() => void refresh(), fail) }}
-            onBack={() => { asked.current.pairing = ""; show("browser") }} onLater={close} />}
+            onBack={() => { asked.current.pairing = ""; show(before("phone")) }} onLater={close} />}
           {said && <p className="setup-said" role="alert">{said}</p>}
         </Wizard>
       )}
@@ -260,16 +274,16 @@ function HeaderButton({ chip, onOpen }: { chip: ReturnType<typeof setupChip>; on
   }
   return (
     <button type="button" className="setup-chip" data-kind="progress"
-      title={nextWord("setupChipProgressTip", { count: chip.count })} onClick={onOpen}>
+      title={nextWord("setupChipProgressTip", { count: chip.count, total: chip.total })} onClick={onOpen}>
       <span className="setup-pips" aria-hidden="true">
-        {[0, 1, 2].map((i) => <span key={i} data-on={i < chip.count ? "true" : undefined} />)}
+        {Array.from({ length: chip.total }, (_, i) => <span key={i} data-on={i < chip.count ? "true" : undefined} />)}
       </span>
-      <span>{nextWord("setupChipProgress", { count: chip.count })}</span>
+      <span>{nextWord("setupChipProgress", { count: chip.count, total: chip.total })}</span>
     </button>
   )
 }
 
-function Wizard({ step, onClose, children }: { step: number; onClose: () => void; children: ReactNode }) {
+function Wizard({ step, total, onClose, children }: { step: number; total: number; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     showModalWithoutChoice(dialog.current)
@@ -281,9 +295,10 @@ function Wizard({ step, onClose, children }: { step: number; onClose: () => void
         {step > 0 ? (
           <div className="setup-count">
             <span className="setup-dots" aria-hidden="true">
-              {[1, 2, 3].map((i) => <span key={i} data-on={i <= step ? "true" : undefined} data-current={i === step ? "true" : undefined} />)}
+              {Array.from({ length: total }, (_, index) => index + 1).map((i) =>
+                <span key={i} data-on={i <= step ? "true" : undefined} data-current={i === step ? "true" : undefined} />)}
             </span>
-            <span>{nextWord("setupStepOf", { step })}</span>
+            <span>{nextWord("setupStepOf", { step, total })}</span>
           </div>
         ) : <span />}
         <button type="button" className="setup-x" aria-label={nextWord("setupClose")} onClick={onClose}>
