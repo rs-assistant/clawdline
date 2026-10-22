@@ -85,6 +85,7 @@
   "next.setupAppOpenCloud": "Pair in the Cloud tab",
   "next.cloudReadNeedsPairing": "{machine} is online but is not answering this device. Pair again to reconnect.",
   "next.cloudReadPairAgain": "Scan to pair",
+  "next.cloudPairDoneToast": "Paired with {machine}",
   "capacityRow.console.transcript_fill_pages.what": "Earlier history pages read automatically while the conversation does not fill the screen. This bounds work on large raw records.",
   "capacityRow.console.transcript_fill_pages.full": "Automatic loading pauses at the limit. Choose Load earlier messages to continue.",
   "capacityRow.session.codex_past_page.what": "How many Codex history records are requested for one page, so opening the picker does not wait for the whole project history.",

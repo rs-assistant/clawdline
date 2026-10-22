@@ -1,6 +1,7 @@
 import { BrowserPairingBlock } from "../pages/settings/BrowserPairingBlock.js"
 import { LocalMachineSetup } from "./LocalMachineSetup.js"
 import { accessProblemAfterRead, readProblemOffersPairing } from "./state.js"
+import { toast } from "../overlays/toast.js"
 import { CloudReadProblem } from "./CloudReadProblem.js"
 import { dashboardFetch } from "./dashboard-reader.js"
 import { readMachineUsage } from "../machine/read.js"
@@ -1040,6 +1041,21 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     setPairState({ phase: "idle" })
     recoverPairing()
   }, [pairRequest, recoverPairing])
+
+  // A pairing from the machine's own QR or link needs no comparison
+  // afterwards. The invitation's secret travelled only in the fragment, the
+  // offer went back sealed with it, and the handover is sealed to this
+  // browser's ephemeral key inside that offer, so Cloud could neither read nor
+  // replace either side: the machine key that arrived is the machine's. The
+  // fingerprint screen would compare that key with itself. A pairing from a
+  // code this browser showed (`offer`) keeps the comparison.
+  useEffect(() => {
+    if (pairRequest?.mode !== "invitation" || pairState.phase !== "paired") return
+    const id = pairState.machineID
+    const name = machinesRef.current?.find((machine) => machine.id === id)?.label ?? names.get(id)?.name ?? id
+    closePairing()
+    toast(nextWord("cloudPairDoneToast", { machine: name }))
+  }, [pairRequest?.mode, pairState, closePairing, names])
 
   /**
    * A machine's pairing link, when this page was opened from one — at boot,
