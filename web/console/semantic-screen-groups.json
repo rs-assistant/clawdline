@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8803,
-  "riskKeys": 3913,
-  "nonRiskCount": 4890,
+  "englishContentKeys": 8814,
+  "riskKeys": 3916,
+  "nonRiskCount": 4898,
   "groups": [
     {
       "name": "admin / other",
@@ -3227,7 +3227,7 @@
     },
     {
       "name": "next / other",
-      "count": 357,
+      "count": 365,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3284,6 +3284,14 @@
         "next.handoverTitle",
         "next.infoContext",
         "next.infoContextUsed",
+        "next.infoEffortHigh",
+        "next.infoEffortLastTurn",
+        "next.infoEffortLow",
+        "next.infoEffortMax",
+        "next.infoEffortMedium",
+        "next.infoEffortMinimal",
+        "next.infoEffortUltra",
+        "next.infoEffortXhigh",
         "next.infoReasoningEffort",
         "next.infoResetsInMinutes",
         "next.machineDiskFree",

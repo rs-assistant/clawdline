@@ -463,6 +463,9 @@ func (s *Server) sessionInfoRoute(w http.ResponseWriter, r *http.Request, id str
 			info.Context = wireSessionContext(facts, item.Assistant, status)
 		}
 	}
+	if item.Assistant == session.AssistantClaude && status.Effort != "" {
+		info.Session.Effort = status.Effort
+	}
 	// Before the first turn Codex may have no record naming its model yet.
 	// Its startup card is direct evidence; machine defaults are not.
 	if info.Session.Model == "" && item.Assistant == session.AssistantCodex && s.inventory.Screen != nil {

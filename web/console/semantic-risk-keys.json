@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8803,
+  "englishKeys": 8814,
   "counts": {
-    "negation": 2562,
+    "negation": 2565,
     "state": 1444,
     "permission": 491,
     "deletion": 197,
     "uncertainty": 269
   },
-  "unionCount": 3913,
+  "unionCount": 3916,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -2026,6 +2026,9 @@
       "next.handoverFailOther",
       "next.handoverFailUnavailable",
       "next.handoverLocalDenied",
+      "next.infoEffortNone",
+      "next.infoEffortOrdinal",
+      "next.infoEffortUnknown",
       "next.linksDeployNoFile",
       "next.linksDeployNoPage",
       "next.linksDeployNoRun",
@@ -7988,6 +7991,9 @@
     "next.handoverWorking",
     "next.imageMarkupDone",
     "next.imageMarkupUndo",
+    "next.infoEffortNone",
+    "next.infoEffortOrdinal",
+    "next.infoEffortUnknown",
     "next.infoOpenModelPicker",
     "next.linksDeployNoFile",
     "next.linksDeployNoPage",
