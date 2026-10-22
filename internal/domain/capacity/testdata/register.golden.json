@@ -4564,6 +4564,46 @@
   },
   {
     "Register": "daemon",
+    "Name": "session.secret_handoff_command_args",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.MaxSecretHandoffCommandArgs"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.secret_handoff_command_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 2048,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.MaxSecretHandoffCommandBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "session.secret_handoff_delivery_seconds",
     "Class": "buffer",
     "Unit": "seconds",

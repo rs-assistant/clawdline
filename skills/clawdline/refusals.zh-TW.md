@@ -200,6 +200,9 @@
 | `scope_mismatch` | `internal/transport/http/squad.go` |
 | `secret_empty` | `internal/transport/http/secret_handoff.go` |
 | `secret_handoff_callback_invalid` | `internal/transport/http/secret_handoff.go` |
+| `secret_handoff_command_mismatch` | `internal/transport/http/secret_handoff.go` |
+| `secret_handoff_command_missing` | `internal/transport/http/secret_handoff.go` |
+| `secret_handoff_command_unconfirmed` | `internal/transport/http/secret_handoff.go` |
 | `secret_handoff_delivery_failed` | `internal/transport/http/secret_handoff.go` |
 | `secret_handoff_target_changed` | `internal/transport/http/secret_handoff.go` |
 | `secret_handoff_unavailable` | `internal/transport/http/secret_handoff.go` |

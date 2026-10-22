@@ -20,6 +20,7 @@ import { samePageTarget } from "../same-page-links.js"
 import { hasDocumentIntent } from "../legacy/documents-bridge.js"
 import { requestPage } from "../overlays/index.js"
 import { catalogLabel, clauseSeparator, labelled } from "../punctuation.js"
+import { secretHandoffDestination } from "./secret-command.js"
 import "./interventions.css"
 
 /** Keep the attention entry in the todo header while its panel stays independent. */
@@ -253,6 +254,8 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
 
   const handoff = async (note: HumanInterventionV2, value: string) => {
     if (note.kind !== "secret" || readError || busyRef.current || !sameInterventionTarget(destination, latest.current) || pageKey !== key) return
+    // Only a Note whose receiving command the card showed can be handed off.
+    if (!note.command || secretHandoffDestination(note.command) === null) return
     if (receiptTimer.current) clearTimeout(receiptTimer.current)
     if (collapseTimer.current) clearTimeout(collapseTimer.current)
     receiptTimer.current = null
@@ -263,7 +266,7 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
     setBusy(note.id); setActionError(""); setActionStatus(""); setSecretReceipt({ id: note.id, phase: "sending" })
     let received = false
     try {
-      await submitSecretHandoffV2(destination.conversation, note.id, value)
+      await submitSecretHandoffV2(destination.conversation, note.id, value, note.command)
       received = true
       if (sameInterventionTarget(destination, latest.current)) {
         setSecretReceipt({ id: note.id, phase: "received" })
@@ -406,18 +409,30 @@ function SecretHandoffForm({ note, disabled, sending, onHandoff }: {
   onHandoff: (note: HumanInterventionV2, value: string) => void
 }) {
   const field = useRef<HTMLTextAreaElement | null>(null)
+  // The program the value goes to, shown before the person pastes anything.
+  // It is a text node: React escapes it, and it is never parsed as markup.
+  const receiver = secretHandoffDestination(note.command)
+  const blocked = disabled || receiver === null
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const value = field.current?.value ?? ""
-    if (!value || disabled || sending) return
+    if (!value || blocked || sending) return
     if (field.current) field.current.value = ""
     onHandoff(note, value)
   }
+  const destinationID = `secret-handoff-destination-${note.id}`
   return <form className="secret-handoff-form" onSubmit={submit} aria-busy={sending}>
     <label htmlFor={`secret-handoff-${note.id}`}>{note.summary || nextWord("secretHandoffLabel")}</label>
-    <textarea ref={field} id={`secret-handoff-${note.id}`} rows={5} required disabled={disabled}
+    {receiver === null
+      ? <p className="secret-handoff-destination is-missing" id={destinationID} role="alert">{nextWord("secretHandoffNoCommand")}</p>
+      : <div className="secret-handoff-destination" id={destinationID}>
+        <span>{nextWord("secretHandoffDestination")}</span>
+        <code translate="no">{receiver}</code>
+        <p>{nextWord("secretHandoffDestinationCheck")}</p>
+      </div>}
+    <textarea ref={field} id={`secret-handoff-${note.id}`} rows={5} required disabled={blocked} aria-describedby={destinationID}
       placeholder={nextWord("secretHandoffPlaceholder")} autoComplete="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="" data-lpignore="true" data-bwignore="" />
     <p>{nextWord("secretHandoffPrivacy")}</p>
-    <button type="submit" disabled={disabled || sending}>{sending ? <><span className="human-interventions-spinner" aria-hidden="true" />{nextWord("secretHandoffSending")}</> : nextWord("secretHandoffSubmit")}</button>
+    <button type="submit" disabled={blocked || sending}>{sending ? <><span className="human-interventions-spinner" aria-hidden="true" />{nextWord("secretHandoffSending")}</> : nextWord("secretHandoffSubmit")}</button>
   </form>
 }

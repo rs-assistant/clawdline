@@ -108,6 +108,7 @@
   "note.clawdline_note_create_s_nothing_was.ee552e3c": "clawdline note create: %s Nothing was changed.\n",
   "note.clawdline_note_create_whoami_answer.884f8396": "clawdline note create: whoami answered without a terminal id. Nothing was changed.",
   "note.the_body_names_kind_title_summary_a.642cb1ab": "  the body names kind, title, summary, action, reason and optional detail, options, document_url",
+  "note.secret_command_not_found": "clawdline note create: the Secret Handoff command %q was not found on this machine. Nothing was changed.\n",
   "note.to_retry_the_same_note_clawdline_no.8d1b2aa3": "To retry the same note: clawdline note create --key %s …\n",
   "note.usage_clawdline_note_create_body_fi.688dbfca": "usage: clawdline note create --body-file <JSON path|-> [--target <terminal id>] [--from <conversation id>] [--key k] [--port n]",
   "note.usage_with_requested_by_person": "usage: clawdline note create --body-file <JSON path|-> [--requested-by-person] [--target <terminal id>] [--from <conversation id>] [--key k] [--port n]",

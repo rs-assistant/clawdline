@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"time"
 
@@ -23,7 +24,8 @@ import (
 var secretHandoffNoteID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 // secret run keeps the value out of this command's arguments, terminal
-// output and the agent's transcript. The chosen tool receives it on stdin.
+// output and the agent's transcript. The tool receives it on stdin, and only
+// if its argv is exactly the one the Secret Handoff Note declared.
 func secretCommand(args []string) {
 	if len(args) == 0 || args[0] != "run" {
 		secretUsage()
@@ -61,10 +63,14 @@ func runSecret(stdout, stderr io.Writer, b *broker, noteID string, argv []string
 		fmt.Fprintln(stderr, cliCopy("misc", "secret.note_invalid", "The Secret Handoff Note ID is invalid."))
 		return 2
 	}
-	if _, err := exec.LookPath(argv[0]); err != nil {
+	executable, err := resolveSecretCommand(argv[0])
+	if err != nil {
 		fmt.Fprintln(stderr, cliCopy("misc", "secret.command_unavailable", "The command was not found. The secret was not claimed."))
 		return 2
 	}
+	// The daemon compares this argv with the Note's and refuses any other.
+	// What runs below is this same resolved argv, not a second PATH lookup.
+	argv = append([]string{executable}, argv[1:]...)
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		fmt.Fprintln(stderr, cliCopy("misc", "secret.receiver_failed", "The local Secret Handoff receiver could not start. The value was not claimed."))
@@ -78,7 +84,7 @@ func runSecret(stdout, stderr io.Writer, b *broker, noteID string, argv []string
 	}
 	arrived := make(chan []byte, 1)
 	go receiveSecretHandoff(listener.(*net.TCPListener), nonce, arrived)
-	body, _ := json.Marshal(map[string]any{"conversation_id": conversation,
+	body, _ := json.Marshal(map[string]any{"conversation_id": conversation, "command": argv,
 		"callback_port": listener.Addr().(*net.TCPAddr).Port, "nonce": base64.RawURLEncoding.EncodeToString(nonce)})
 	req, err := http.NewRequest(http.MethodPost, b.base+"/v1/work/v2/agent/human-interventions/"+noteID+"/claim", bytes.NewReader(body))
 	if err != nil {
@@ -133,6 +139,27 @@ func runSecret(stdout, stderr io.Writer, b *broker, noteID string, argv []string
 	}
 	fmt.Fprintln(stdout, cliCopy("misc", "secret.command_succeeded", "The tool completed with the one-time Secret Handoff."))
 	return 0
+}
+
+// resolveSecretCommand names the executable a Secret Handoff gives its value
+// to as an absolute path, resolved with exec.LookPath in this (the Agent's)
+// environment. note create resolves the declared argv[0] this way before the
+// Note is written, and secret run resolves the presented one the same way
+// before it claims, so the person reads the path of the binary that will run
+// and the daemon's exact comparison sees through `gh` versus `/usr/bin/gh`
+// while refusing a PATH that now sends `gh` to a different file. Symbolic
+// links are kept as written: the path shown is the path executed, and
+// replacing what a link points at needs write access to that place, the same
+// power as replacing the binary, which this boundary does not claim to stop.
+func resolveSecretCommand(name string) (string, error) {
+	found, err := exec.LookPath(name)
+	if err != nil {
+		return "", err
+	}
+	if filepath.IsAbs(found) {
+		return filepath.Clean(found), nil
+	}
+	return filepath.Abs(found)
 }
 
 // The daemon writes only to this short-lived loopback listener, authenticated
