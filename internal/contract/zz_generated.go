@@ -6315,6 +6315,10 @@ type SettingsRequest struct {
 	// yet.
 	SetupMode *string `json:"setup_mode"`
 
+	// Setup items the person chose to skip, comma separated: app, browser, phone. A
+	// skipped item counts as settled.
+	SetupSkipped *string `json:"setup_skipped"`
+
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
 
@@ -6542,6 +6546,10 @@ type SettingsSnapshot struct {
 	// the header from showing unfinished Cloud setup. Empty or absent is not chosen
 	// yet.
 	SetupMode *string `json:"setup_mode"`
+
+	// Setup items the person chose to skip, comma separated: app, browser, phone. A
+	// skipped item counts as settled.
+	SetupSkipped *string `json:"setup_skipped"`
 
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`

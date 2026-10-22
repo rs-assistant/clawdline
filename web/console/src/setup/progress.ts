@@ -48,9 +48,27 @@ export function deviceItem(device: CloudViewer, appDevice = ""): SetupItem | nul
 export type SetupReading =
   /** This machine did not say. Unknown is never drawn as 0/3. */
   | { kind: "unknown" }
-  | { kind: "known"; cloud: boolean; done: Record<SetupItem, boolean>; items: readonly SetupItem[]; count: number; next: SetupItem | null }
+  | {
+    kind: "known"
+    cloud: boolean
+    /** Paired, read from this machine's device list. */
+    done: Record<SetupItem, boolean>
+    /** Not paired, and the person chose to skip it (`setup_skipped`). */
+    skipped: Record<SetupItem, boolean>
+    items: readonly SetupItem[]
+    /** Items settled: paired or skipped. */
+    count: number
+    /** The first item neither paired nor skipped; null when setup is finished. */
+    next: SetupItem | null
+  }
 
-export function readSetup(status: CloudStatus | MachineOnly | null | undefined, hasApp = true, appDevice = ""): SetupReading {
+/** `setup_skipped` as the daemon stores it: items separated by commas. */
+export function parseSkipped(list: string | null | undefined): SetupItem[] {
+  return (list ?? "").split(",").filter((item): item is SetupItem => (SETUP_ITEMS as readonly string[]).includes(item))
+}
+
+export function readSetup(status: CloudStatus | MachineOnly | null | undefined, hasApp = true, appDevice = "",
+  skippedItems: readonly SetupItem[] = []): SetupReading {
   if (!status || typeof status !== "object") return { kind: "unknown" }
   const cloud = status.enabled && status.configured
   if (cloud && status.pinned_readable === false) return { kind: "unknown" }
@@ -62,8 +80,11 @@ export function readSetup(status: CloudStatus | MachineOnly | null | undefined, 
     }
   }
   const items = setupItems(hasApp)
-  const count = items.filter((item) => done[item]).length
-  return { kind: "known", cloud, done, items, count, next: items.find((item) => !done[item]) ?? null }
+  const skipped = { app: false, browser: false, phone: false }
+  for (const item of skippedItems) skipped[item] = !done[item]
+  const settled = (item: SetupItem) => done[item] || skipped[item]
+  const count = items.filter(settled).length
+  return { kind: "known", cloud, done, skipped, items, count, next: items.find((item) => !settled(item)) ?? null }
 }
 
 export type SetupChip =
