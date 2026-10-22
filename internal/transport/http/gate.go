@@ -233,6 +233,18 @@ type access struct {
 	// question about the door (health's `password`) asks the authority that
 	// made this verdict and no other.
 	gate *gate
+	// still is whether the device credential that let this request in would
+	// be let in now; nil when no device credential is what let it in. A
+	// response that outlives one read (the event stream) asks it on its own
+	// clock, so a revoked device stops reading through a stream it opened
+	// before the revocation.
+	still func() bool
+}
+
+// stillAdmitted is accessOf(r).still, true when there is nothing to ask.
+func stillAdmitted(r *http.Request) bool {
+	a := accessOf(r)
+	return a.still == nil || a.still()
 }
 
 type accessKey struct{}
@@ -320,8 +332,13 @@ func (g *gate) wrap(next http.Handler) http.Handler {
 		// The credential stops here. Nothing behind the gate needs it, and the
 		// proxy behind it would otherwise hand this daemon's token to the Swift
 		// app.
+		var still func() bool
+		if verdict.Allowed && !machine {
+			presented := bearer(r)
+			still = func() bool { return g.auth != nil && g.auth.Verify(presented).Allowed }
+		}
 		stripCredentials(r)
-		ctx := context.WithValue(r.Context(), accessKey{}, access{machine: machine, verdict: verdict, gate: g})
+		ctx := context.WithValue(r.Context(), accessKey{}, access{machine: machine, verdict: verdict, gate: g, still: still})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

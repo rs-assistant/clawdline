@@ -137,20 +137,22 @@ func (s *Server) documentsRoute(w http.ResponseWriter, r *http.Request) {
 // containsProjectRoot is whether `<session cwd>/artifacts -> elsewhere` must
 // stay inside the session's own directory (documents.ProjectRoot).
 //
-// Off by default, which is the behaviour of the app being replicated and the
-// one this machine's own checkouts rely on; on, a project root that leaves the
-// session's directory is no root at all. Read per request rather than at
-// startup, so turning it on is a file edit and not a restart. It is this
-// daemon's setting and not the console's: the wire carries no such field in
-// the app being replicated, and a switch over what a paired device may read
-// should not be reachable from a paired device.
+// On unless the file says `false`: a dispatched agent can create the symlink in
+// the directory it works in, and a followed root would then hand a paired
+// device that may only read whatever that symlink names. A checkout whose
+// `artifacts` really lives in a sibling repository opts out with
+// `documents_contain_project_root: false`; a file that cannot be read keeps
+// the containment. Read per request rather than at startup, so changing it is
+// a file edit and not a restart. It is this daemon's setting and not the
+// console's: a switch over what a paired device may read should not be
+// reachable from a paired device.
 func (s *Server) containsProjectRoot() bool {
 	v, err := nextconfig.Open(s.cfg.Dir).Read()
 	if err != nil {
-		return false
+		return true
 	}
 	on, ok := v.Bool("documents_contain_project_root")
-	return ok && on
+	return !ok || on
 }
 
 // decodeSegment percent-decodes one path segment, keeping the spelling as

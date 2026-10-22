@@ -275,9 +275,11 @@ func (b *Broker) admit(id string, d draft, scheduled, detached bool) (Record, er
 	if isolation != IsolationNone && isolation != IsolationWorktree {
 		return bad("isolation must be one of: none, worktree")
 	}
+	// No mode named is `ask`: `full` is bypassPermissions / --ask-for-approval
+	// never, which a caller has to ask for by name.
 	permission := d.PermissionMode
 	if permission == "" {
-		permission = "full"
+		permission = "ask"
 	}
 	switch permission {
 	case "ask", "edits", "full":

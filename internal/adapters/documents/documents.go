@@ -155,9 +155,8 @@ func IsInside(path, base string) bool {
 //
 // `contain` is the stricter rule — the enclosure `TaskRoot` applies, where the
 // resolved root must still be inside the directory it was named from — and it
-// is what `documents_contain_project_root: true` in this daemon's own
-// `config.json` asks for, on a machine that would rather lose the symlink than
-// trust it.
+// is what this daemon asks for unless its own `config.json` says
+// `documents_contain_project_root: false` (transport/http containsProjectRoot).
 func ProjectRoot(directory string, contain bool) string {
 	if contain {
 		return root(directory, directory)

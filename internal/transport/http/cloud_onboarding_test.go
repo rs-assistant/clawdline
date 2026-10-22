@@ -60,6 +60,32 @@ func TestCloudOnboardingSwitchesRequireTheMachineAndAnApprovedIdentity(t *testin
 	}
 }
 
+// `clawdline cloud off` writes the file before it calls the route, so the route
+// finds the file already off while the relay line it started is still up.
+func TestCloudOffStopsALiveLineWhenTheFileIsAlreadyOff(t *testing.T) {
+	dir := t.TempDir()
+	file := nextconfig.Open(dir)
+	if _, err := file.Set(map[string]any{adaptercloud.KeyEnabled: false}); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{cfg: config.Config{Dir: dir}}
+	SetCloudLine(dir, pairingOnlyLine{})
+	t.Cleanup(func() { SetCloudLine(dir, nil) })
+	reloads := 0
+	s.SetCloudReload(func() error { reloads++; SetCloudLine(dir, nil); return nil })
+	for i := 0; i < 2; i++ {
+		if rec := onboardingRequest(t, s, s.cloudEnabledRoute, http.MethodPost, "/v1/cloud/enabled", `{"enabled":false}`, true); rec.Code != http.StatusOK {
+			t.Fatalf("off %d: %d %s", i, rec.Code, rec.Body)
+		}
+	}
+	if reloads != 1 {
+		t.Fatalf("a live line needs one reload to stop, and a stopped one none: reloads=%d", reloads)
+	}
+	if _, present := cloudLines.Load(dir); present {
+		t.Fatal("the relay line is still registered after cloud off")
+	}
+}
+
 func TestCloudDirectSwitchReloadsAnEnabledLineAndKeepsOtherSettings(t *testing.T) {
 	dir := t.TempDir()
 	file := nextconfig.Open(dir)

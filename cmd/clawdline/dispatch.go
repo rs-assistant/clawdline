@@ -107,7 +107,7 @@ func dispatchCommand(args []string) {
 	fs.StringVar(&o.ProjectDir, "project-dir", "", "the repository (default: this directory's git top-level)")
 	fs.StringVar(&o.Assistant, "assistant", "", "claude or codex (default: the one running this command)")
 	fs.StringVar(&o.Isolation, "isolation", "none", "none or worktree")
-	fs.StringVar(&o.PermissionMode, "permission-mode", "full", "ask, edits or full")
+	fs.StringVar(&o.PermissionMode, "permission-mode", "ask", "ask, edits or full")
 	fs.IntVar(&o.Timeout, "timeout", 30, "minutes, 1–240")
 	fs.StringVar(&o.Kind, "kind", "", "optional")
 	fs.Var(&deliverables, "deliverable", "a path the child delivers; repeatable")

@@ -37,7 +37,29 @@ func ParseVersion(s string) (Version, error) {
 	if strings.Contains(s, "-") && pre == "" {
 		return bad()
 	}
+	// A version names directories and files (install.Layout.ReleaseDir),
+	// so its pre-release is semver's identifiers and nothing that can be a
+	// path: no `/`, no `\`, no `..`.
+	if pre != "" && !preRelease(pre) {
+		return bad()
+	}
 	return Version{Major: n[0], Minor: n[1], Patch: n[2], Pre: pre}, nil
+}
+
+// preRelease is whether pre is dot-separated, non-empty identifiers of
+// ASCII letters, digits and hyphens.
+func preRelease(pre string) bool {
+	for _, field := range strings.Split(pre, ".") {
+		if field == "" {
+			return false
+		}
+		for _, c := range field {
+			if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '-') {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // Compare is -1, 0 or 1 as a is older than, the same as, or newer than b. A

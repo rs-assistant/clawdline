@@ -30,7 +30,11 @@ have() { command -v "$1" >/dev/null 2>&1; }
 # yet" can be told from a network failure.
 fetch() {
   if have curl; then
-    code=$(curl -sSL --proto '=https,http' --retry 2 -o "$2" -w '%{http_code}' "$1") || return 1
+    # https only, redirects included; plain http only for a test server named
+    # by CLAWDLINE_INSTALL_BASE_URL.
+    proto='=https'
+    case ${CLAWDLINE_INSTALL_BASE_URL:-} in http://*) proto='=https,http' ;; esac
+    code=$(curl -sSL --proto "$proto" --proto-redir "$proto" --retry 2 -o "$2" -w '%{http_code}' "$1") || return 1
     [ "$code" = 200 ] && return 0
     [ "$code" = 404 ] && return 22
     return 1
