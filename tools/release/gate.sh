@@ -5,6 +5,7 @@
 #
 # usage: tools/release/gate.sh <version> [--publish] [--dir <local release dir>]
 #          [--bundle-dir D --trusted-root F]
+#          [--dmg-dir D --packaging-commit FULL_SHA]
 #
 # 1. downloads the draft's assets (or reads --dir, for a local test release),
 # 2. verifies manifest.sig.json with the keys compiled into this checkout and
@@ -29,11 +30,13 @@ cd "$(dirname "$0")/../.."
 
 [ "$#" -ge 1 ] || { echo "usage: tools/release/gate.sh <version> [--publish] [--dir D]" >&2; exit 2; }
 version=$1; shift
-publish=0 dir="" offline=()
+publish=0 dir="" offline=() dmg_dir="" packaging_commit=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --publish) publish=1 ;;
     --dir) dir=${2:?}; shift ;;
+    --dmg-dir) dmg_dir=${2:?}; shift ;;
+    --packaging-commit) packaging_commit=${2:?}; shift ;;
     --bundle-dir|--trusted-root) offline+=("$1" "${2:?}"); shift ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
@@ -59,6 +62,30 @@ if [ -z "$dir" ]; then
   dir="$work/assets"
 fi
 
+# Canonical paths prevent --dmg-dir from hiding an unchecked image in the
+# source draft behind an independently valid delivery in another directory.
+dir=$(cd "$dir" && pwd -P)
+if [ -n "$dmg_dir" ]; then dmg_dir=$(cd "$dmg_dir" && pwd -P); fi
+# A standard release carries its DMG beside the archives. A historical App
+# is packaged in a separate draft and passed explicitly with --dmg-dir.
+if [ -z "$dmg_dir" ] && [ -e "$dir/Clawdline-${version}-macos-arm64.dmg" ]; then dmg_dir=$dir; fi
+if [ -e "$dir/Clawdline-${version}-macos-arm64.dmg" ] && [ "$dmg_dir" != "$dir" ]; then
+  echo "gate: source already carries a DMG; verify that delivery, not a separate directory" >&2; exit 1
+fi
+if [ "$publish" = 1 ] && [ -n "$dmg_dir" ] && [ "$dmg_dir" != "$dir" ]; then
+  echo "gate: attach the accepted DMG assets before publishing a standard draft" >&2; exit 1
+fi
+source_commit=$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1])).commit' "$dir/manifest.json")
+if [ -n "$dmg_dir" ]; then
+  [ "$test_release" = 0 ] || { echo "fixture DMGs cannot pass the publication gate" >&2; exit 1; }
+  if [ -z "$packaging_commit" ]; then
+    [ "$dmg_dir" = "$dir" ] || { echo "a separate DMG draft requires --packaging-commit" >&2; exit 1; }
+    packaging_commit=$source_commit
+  fi
+elif [ -n "$packaging_commit" ]; then
+  echo "gate: --packaging-commit requires a DMG delivery" >&2; exit 1
+fi
+
 extra=()
 [ "$test_release" = 0 ] || extra=(-pub "${CLAWDLINE_TEST_RELEASE_PUB:?a -test release is verified with CLAWDLINE_TEST_RELEASE_PUB}")
 go run ./tools/release verify ${extra[@]+"${extra[@]}"} "$dir"
@@ -73,6 +100,9 @@ const m = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json")));
 if (m.version !== version) { console.error(`gate: manifest.json is ${m.version}, not ${version}`); process.exit(1); }
 const known = new Set(["manifest.json", "manifest.sig.json", "SHA256SUMS"]);
 for (const a of m.artifacts) { known.add(a.name); known.add(a.name + ".spdx.json"); }
+const dmg = `Clawdline-${version}-macos-arm64.dmg`;
+// Only this delivery set is recognized; all three are verified below.
+if (fs.existsSync(path.join(dir, dmg))) for (const suffix of ["", ".spdx.json", ".delivery.json"]) known.add(dmg + suffix);
 const extra = fs.readdirSync(dir).filter((f) => !known.has(f));
 if (extra.length) { console.error(`gate: assets the manifest does not account for: ${extra.join(", ")}`); process.exit(1); }
 JS
@@ -106,6 +136,21 @@ else
   done
   [ "${#mac[@]}" -gt 0 ] || { echo "the release holds no macOS binary to check" >&2; exit 1; }
   codesign_verify_release ${mac[@]+"${mac[@]}"}
+fi
+
+if [ -n "$dmg_dir" ]; then
+  image="$dmg_dir/Clawdline-${version}-macos-arm64.dmg"
+  workflow=$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1])).packaging_workflow' "$image.delivery.json")
+  if [ "$dmg_dir" != "$dir" ]; then
+    python3 - "$dmg_dir" "$(basename "$image")" <<'PY'
+import os, sys
+directory, image = sys.argv[1:]
+if sorted(os.listdir(directory)) != sorted([image, image + '.spdx.json', image + '.delivery.json']):
+    raise SystemExit('gate: unexpected or missing DMG draft assets')
+PY
+  fi
+  tools/release/provenance.sh "$dmg_dir" --dmg ${offline[@]+"${offline[@]}"}
+  bash tools/release/dmg.sh verify "$dir" "$dmg_dir" "$version" "$source_commit" "$packaging_commit" "$workflow"
 fi
 
 set +e

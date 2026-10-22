@@ -90,6 +90,122 @@ may be newer than the program release; do not present them as the same source tr
 Release notes come from `docs/release-notes/<version>.md` when that file exists, otherwise from
 GitHub's generated notes.
 
+## An Apple Silicon DMG from an already published App
+
+The DMG is a delivery container, not a new updater artifact kind. Keep the published App tar,
+`manifest.json`, `manifest.sig.json`, `SHA256SUMS` and their original attestations unchanged.
+The three additional assets are `Clawdline-<version>-macos-arm64.dmg`, its `.delivery.json`, and
+its `.spdx.json`. The delivery record names both the **App source commit** and the **packaging
+workflow commit**. The latter does not claim to be the source of the App. No Intel App is offered.
+See [release-evidence.md](security/release-evidence.md#dmg-delivery-evidence) for the evidence chain.
+
+For v2.1.2 the App source is `239adc8ad4020f31509bff017bd4e5a3ff913197` and the input is
+`Clawdline-v2.1.2-macos-arm64.tar.gz`. `.github/workflows/dmg.yml` downloads the published archives
+and their evidence, verifies the trusted manifest, original SBOMs and original release provenance,
+and packages the existing App. It verifies the App before and after packaging and never re-signs
+or rebuilds it. It signs the DMG with Developer ID, submits the DMG itself to Apple, staples and
+validates it, and checks Gatekeeper before generating and attesting the final bytes.
+
+The workflow uses the existing `release` environment and existing certificate/notary secrets;
+the environment reviewer owns that approval. It has no Ed25519 release-key input and cannot
+rewrite the original manifest through this procedure. Its only Release write is a **separate
+draft prerelease**, `dmg-<version>-<run-id>-<run-attempt>`, targeted at the packaging commit.
+It never uploads this repository's output to Actions artifacts, publishes that draft or changes
+the existing public release. Attestations disclose digests and build metadata as the ordinary
+Release workflow already does; the unreviewed delivery bytes stay in the draft.
+
+Root owns integration, workflow dispatch/approval, local acceptance, attachment and rollback.
+After the packaging change has landed on main, from a clean checkout of that commit:
+
+```sh
+version=v2.1.2
+source_commit=239adc8ad4020f31509bff017bd4e5a3ff913197
+gh workflow run dmg.yml --repo sainteye/clawdline --ref main \
+  -f version="$version" -f source_commit="$source_commit"
+gh run list --repo sainteye/clawdline --workflow dmg.yml --limit 5
+# Select the run just dispatched; approve its release environment in GitHub.
+run=RUN_ID_FROM_THE_LIST_ABOVE
+gh run watch "$run" --repo sainteye/clawdline --exit-status
+packaging_commit=$(gh run view "$run" --repo sainteye/clawdline --json headSha -q .headSha)
+attempt=$(gh api "repos/sainteye/clawdline/actions/runs/$run" --jq .run_attempt)
+stage="dmg-${version}-${run}-${attempt}"
+[ "$(gh release view "$stage" --repo sainteye/clawdline --json isDraft -q .isDraft)" = true ]
+```
+
+The job is bounded by its 90-minute workflow timeout, including Apple's wait. A rejected,
+unreachable or timed-out notary submission, invalid staple, signature or provenance stops the
+job; there is no warning-only publication path. Investigate a failure before explicitly starting
+a new run. An interrupted job can leave no draft or an incomplete draft; never publish it.
+Cancel a wrong-input or unapproved run with `gh run cancel "$run" --repo sainteye/clawdline`.
+
+On a Mac with the private word list and Go, Node and Python 3.11+ installed, fetch the source
+commit if needed and download into fresh task-owned directories. Nothing below installs or starts
+the App on the maintainer's running machine:
+
+```sh
+review=$(mktemp -d)
+mkdir "$review/source" "$review/dmg"
+gh release download "$version" --repo sainteye/clawdline --dir "$review/source" \
+  --pattern '*.tar.gz' --pattern '*.tar.gz.spdx.json' \
+  --pattern manifest.json --pattern manifest.sig.json --pattern SHA256SUMS
+gh release download "$stage" --repo sainteye/clawdline --dir "$review/dmg"
+python3 tools/release/dmg-evidence.py source "$review/source" "$version" "$source_commit"
+tools/release/gate.sh "$version" --dir "$review/source" \
+  --dmg-dir "$review/dmg" --packaging-commit "$packaging_commit"
+```
+
+The gate verifies **all original release evidence**, the original macOS binaries, the exact DMG
+contents, source App equivalence, Developer ID team, timestamp, staple, Gatekeeper, the DMG SBOM,
+the three delivery attestations and both privacy scans. A missing private word list is unknown
+and fails. `fixture=true` evidence and ad hoc signatures cannot pass. For offline attestation
+verification, the gate's existing `--bundle-dir` / `--trusted-root` also cover the delivery set;
+Apple signature/notarization checks still require their normal access.
+
+Before attachment, root must exercise the user journey in a disposable Mac account or VM:
+download the staged DMG through a browser, open it normally, drag the App to Applications and
+open that copy. Verify its version, console and existing-session behavior there, and capture the
+Gatekeeper/stapler output for **the downloaded image and copied App**. Do not replace the
+maintainer's running installation just to test packaging. Synthetic fixtures cannot establish
+this acceptance. A local fixture test is `bash tools/release/dmg.test.sh`; it uses no private
+key or Apple API. A sandbox that cannot create or mount disk images must report that gap and
+have root rerun the same test outside that sandbox.
+
+Only after all checks and the installation acceptance pass, attach the three accepted files.
+This mutates the existing public Release, but never its tag, tar archives, checksums or manifest:
+
+```sh
+name="Clawdline-${version}-macos-arm64.dmg"
+# Stop if any of these names already exists. Do not use --clobber.
+gh release view "$version" --repo sainteye/clawdline --json assets -q '.assets[].name'
+gh release upload "$version" --repo sainteye/clawdline \
+  "$review/dmg/$name" "$review/dmg/$name.spdx.json" "$review/dmg/$name.delivery.json"
+mkdir "$review/public-dmg"
+gh release download "$version" --repo sainteye/clawdline --dir "$review/public-dmg" \
+  --pattern "$name" --pattern "$name.spdx.json" --pattern "$name.delivery.json"
+cmp "$review/dmg/$name" "$review/public-dmg/$name"
+cmp "$review/dmg/$name.spdx.json" "$review/public-dmg/$name.spdx.json"
+cmp "$review/dmg/$name.delivery.json" "$review/public-dmg/$name.delivery.json"
+tools/release/gate.sh "$version" --dir "$review/source" \
+  --dmg-dir "$review/public-dmg" --packaging-commit "$packaging_commit"
+```
+
+The final gate is the post-upload health check. On failure stop distribution/link promotion,
+inspect partial uploads, and remove **only newly added assets whose bytes were verified as this
+run's output**, using `gh release delete-asset "$version" <asset-name> --repo sainteye/clawdline
+--yes` for each of the three. Never delete or overwrite a pre-existing/unknown asset. The original
+App tar and updater remain available throughout. Report the failure to the release owner and
+retain local evidence. After success, root may delete the staging draft with `gh release delete
+"$stage" --repo sainteye/clawdline --yes`; do not publish it or delete the program's version tag.
+Root records the run, both commits, asset digests and acceptance outputs before cleaning its
+task-owned review directory.
+
+Future ordinary Releases create the same DMG inside `build.sh`, using `release.yml` and the same
+source/packaging commit. The ordinary Release workflow attests and drafts all three extra assets;
+`gate.sh` recognizes only that exact delivery set and verifies it before publication. The updater
+manifest and `SHA256SUMS` continue to describe the tar archives; DMG digest verification uses its
+independently attested delivery record. A historical supplementary DMG passed to a later local
+gate requires its actual `--packaging-commit`, not the old App source commit.
+
 ## A local test release
 
 For testing the installer and the updater without the real key:

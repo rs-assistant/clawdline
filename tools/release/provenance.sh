@@ -3,7 +3,9 @@
 # workflow from the commit its manifest names
 # (docs/security/release-evidence.md).
 #
-# usage: tools/release/provenance.sh <release-dir> [--bundle-dir D --trusted-root F]
+# usage: tools/release/provenance.sh <release-dir> [--dmg] [--bundle-dir D --trusted-root F]
+# --dmg verifies only the three delivery assets at their packaging commit;
+# gate.sh independently pins that commit and verifies original release evidence.
 #
 # Each asset (every archive, its SBOM, manifest.json, manifest.sig.json and
 # SHA256SUMS) must carry a GitHub artifact attestation (SLSA provenance, signed
@@ -31,9 +33,10 @@ set -euo pipefail
 
 [ "$#" -ge 1 ] || { echo "usage: tools/release/provenance.sh <release-dir> [--bundle-dir D --trusted-root F]" >&2; exit 2; }
 dir=$1; shift
-bundle_dir="" trusted_root=""
+bundle_dir="" trusted_root="" dmg=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --dmg) dmg=1 ;;
     --bundle-dir) bundle_dir=${2:?}; shift ;;
     --trusted-root) trusted_root=${2:?}; shift ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
@@ -46,10 +49,19 @@ gh=${CLAWDLINE_GH:-gh}
 repo=sainteye/clawdline
 workflow=.github/workflows/release.yml
 ref=refs/heads/main
+if [ "$dmg" = 1 ]; then
+  # Only the two checked-in packaging workflows may attest delivery assets.
+  # gate.sh independently checks this metadata against the expected commit.
+  metadata=("$dir"/*.dmg.delivery.json)
+  [ "${#metadata[@]}" = 1 ] && [ -f "${metadata[0]}" ] || { echo "provenance: expected one DMG delivery record" >&2; exit 1; }
+  commit=$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1])).packaging_commit' "${metadata[0]}")
+  workflow=$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1])).packaging_workflow' "${metadata[0]}")
+  case "$workflow" in .github/workflows/dmg.yml|.github/workflows/release.yml) ;; *) echo "provenance: untrusted DMG workflow" >&2; exit 1 ;; esac
+else
+  [ -f "$dir/manifest.json" ] || { echo "provenance: $dir has no manifest.json" >&2; exit 1; }
+  commit=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1])).commit||"")' "$dir/manifest.json")
+fi
 identity="https://github.com/$repo/$workflow@$ref"
-
-[ -f "$dir/manifest.json" ] || { echo "provenance: $dir has no manifest.json" >&2; exit 1; }
-commit=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1])).commit||"")' "$dir/manifest.json")
 [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "provenance: manifest.json names no commit" >&2; exit 1; }
 
 work=$(mktemp -d)
@@ -57,7 +69,13 @@ finished=0
 trap 's=$?; rm -rf -- "$work"; if [ "$finished" != 1 ] && [ "$s" = 0 ]; then exit 1; fi' EXIT
 
 assets=()
-for f in "$dir"/*.tar.gz "$dir"/*.spdx.json "$dir/manifest.json" "$dir/manifest.sig.json" "$dir/SHA256SUMS"; do
+if [ "$dmg" = 1 ]; then
+  candidates=("$dir"/*.dmg "$dir"/*.dmg.spdx.json "$dir"/*.dmg.delivery.json)
+else
+  candidates=("$dir"/*.tar.gz "$dir"/*.spdx.json "$dir/manifest.json" "$dir/manifest.sig.json" "$dir/SHA256SUMS")
+fi
+for f in ${candidates[@]+"${candidates[@]}"}; do
+  [ "$dmg" != 0 ] || [[ "$f" != *.dmg.spdx.json ]] || continue
   [ -e "$f" ] || { echo "provenance: $(basename "$f") is missing from $dir" >&2; exit 1; }
   assets+=("$f")
 done
