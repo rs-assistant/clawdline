@@ -1,6 +1,6 @@
 import { BrowserPairingBlock } from "../pages/settings/BrowserPairingBlock.js"
 import { LocalMachineSetup } from "./LocalMachineSetup.js"
-import { accessProblemAfterRead, readProblemOffersPairing } from "./state.js"
+import { accessProblemAfterRead, READ_PAIR_OFFER_AFTER_MS, readProblemOffersPairing } from "./state.js"
 import { toast } from "../overlays/toast.js"
 import { CloudReadProblem } from "./CloudReadProblem.js"
 import { dashboardFetch } from "./dashboard-reader.js"
@@ -336,14 +336,19 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // The banner shows a read problem only once it has lasted. A daemon restart
   // or a phone waking from the background loses a read or two and recovers on
   // the next one; drawing those as "reading failed" flashed a failure at a
-  // device that was fine. A problem that is still there after this long is
-  // drawn; one cleared by a successful read before then never is.
-  const [shownProblem, setShownProblem] = useState<AccessProblem | null>(null)
+  // device that was fine. The clock runs from the first failure of one
+  // machine and code: later failures of the same kind replace the problem
+  // object but must not start it again, or a machine failing every few
+  // seconds would never be shown. Any successful read clears the problem.
+  const problemKey = problem ? problem.machine + ":" + problem.code : ""
+  const [problemHeldMs, setProblemHeldMs] = useState(0)
   useEffect(() => {
-    if (!problem) { setShownProblem(null); return }
-    const timer = setTimeout(() => setShownProblem(problem), READ_PROBLEM_SHOW_AFTER_MS)
-    return () => clearTimeout(timer)
-  }, [problem])
+    setProblemHeldMs(0)
+    if (!problemKey) return
+    const shown = setTimeout(() => setProblemHeldMs(READ_PROBLEM_SHOW_AFTER_MS), READ_PROBLEM_SHOW_AFTER_MS)
+    const pair = setTimeout(() => setProblemHeldMs(READ_PAIR_OFFER_AFTER_MS), READ_PAIR_OFFER_AFTER_MS)
+    return () => { clearTimeout(shown); clearTimeout(pair) }
+  }, [problemKey])
   const [chosen, setChosen] = useState<CloudMachine | null>(null)
   const [fleetScope, setFleetScope] = useState(() => location.hash === "#all-machines" || !!destinationFromFragment(location.hash))
   const fleetScopeRef = useRef(fleetScope)
@@ -1987,10 +1992,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   return (
     <>
       <IdentityHandoverDialog relay={screen.at === "pairing" ? "pairing_required" : "connected"} />
-      {shownProblem && problem && (screen.at === "console" || screen.at === "machines") && (() => {
+      {problem && problemHeldMs >= READ_PROBLEM_SHOW_AFTER_MS && (screen.at === "console" || screen.at === "machines") && (() => {
         const row = machinesRef.current?.find((machine) => machine.id === problem.machine)
         const name = row?.label ?? problem.machine
-        const pair = readProblemOffersPairing(problem.code, row?.freshness)
+        const pair = readProblemOffersPairing(problem.code, row?.freshness, problemHeldMs)
         return <CloudReadProblem key={problem.machine + ":" + problem.code}
           message={nextWord(pair ? "cloudReadNeedsPairing" : "cloudReadUnknownFailure", { machine: name })}
           code={problem.code} trace={problem.trace} retryLabel={nextWord("cloudRetry")}
