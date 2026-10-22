@@ -37,6 +37,7 @@ import { ImageMarkup } from "./ImageMarkup.js"
 import { ComposerBox } from "./ComposerBox.js"
 import { voiceSource } from "./voice-source.js"
 import "./voice-source.css"
+import "./drop-target.css"
 
 /**
  * The composer, as the original's `form#composer` is built.
