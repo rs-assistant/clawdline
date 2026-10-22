@@ -108,6 +108,9 @@ import {
 import "./cloud.css"
 import { attentionWatch, type Attention } from "./admin/health/attention.js"
 
+/** How long a read problem must last before the banner names it. */
+const READ_PROBLEM_SHOW_AFTER_MS = 8_000
+
 /**
  * What stands in front of the console when the build says it is Clawdline
  * Cloud's: this browser's account, then the machines on it, then one of them.
@@ -330,6 +333,17 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const [machineList, setMachineList] = useState<MachineListState>({ phase: "loading" })
   const machines = machineList.phase === "ready" ? machineList.machines : null
   const [problem, setProblem] = useState<AccessProblem | null>(null)
+  // The banner shows a read problem only once it has lasted. A daemon restart
+  // or a phone waking from the background loses a read or two and recovers on
+  // the next one; drawing those as "reading failed" flashed a failure at a
+  // device that was fine. A problem that is still there after this long is
+  // drawn; one cleared by a successful read before then never is.
+  const [shownProblem, setShownProblem] = useState<AccessProblem | null>(null)
+  useEffect(() => {
+    if (!problem) { setShownProblem(null); return }
+    const timer = setTimeout(() => setShownProblem(problem), READ_PROBLEM_SHOW_AFTER_MS)
+    return () => clearTimeout(timer)
+  }, [problem])
   const [chosen, setChosen] = useState<CloudMachine | null>(null)
   const [fleetScope, setFleetScope] = useState(() => location.hash === "#all-machines" || !!destinationFromFragment(location.hash))
   const fleetScopeRef = useRef(fleetScope)
@@ -1973,7 +1987,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   return (
     <>
       <IdentityHandoverDialog relay={screen.at === "pairing" ? "pairing_required" : "connected"} />
-      {problem && (screen.at === "console" || screen.at === "machines") && (() => {
+      {shownProblem && problem && (screen.at === "console" || screen.at === "machines") && (() => {
         const row = machinesRef.current?.find((machine) => machine.id === problem.machine)
         const name = row?.label ?? problem.machine
         const pair = readProblemOffersPairing(problem.code, row?.freshness)
