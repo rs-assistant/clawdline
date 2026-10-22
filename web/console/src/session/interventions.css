@@ -83,3 +83,7 @@
   .human-intervention-card { padding: 10px; }
   .human-intervention-title { flex-wrap: wrap; }
 }
+
+.human-intervention-withdrawn { background: var(--bg, #19191b); color: var(--dim, #999); }
+.human-intervention-withdrawn .human-intervention-stage { color: var(--dim, #999); background: var(--bg, #19191b); }
+.human-intervention-withdrawal { font-weight: 600; }

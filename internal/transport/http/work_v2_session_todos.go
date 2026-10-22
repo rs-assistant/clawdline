@@ -7,7 +7,9 @@ import (
 	"errors"
 	"github.com/sainteye/clawdline/internal/adapters/artifacts"
 	"github.com/sainteye/clawdline/internal/adapters/store"
+	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/app"
+	"github.com/sainteye/clawdline/internal/domain/session"
 	"github.com/sainteye/clawdline/internal/domain/work"
 	"net/http"
 	"strings"
@@ -77,13 +79,35 @@ func (s *Server) workV2SessionTodos(w http.ResponseWriter, r *http.Request, part
 			find = s.actions().FindForRead
 		}
 		sess, findErr := find(r.Context(), terminalID)
-		if findErr != nil || sess.ConversationID == "" {
+		if findErr != nil {
 			writeRefusal(w, http.StatusConflict, "session_unavailable", "The Session is unavailable or has no conversation id.")
 			return
 		}
 		conversation = sess.ConversationID
+		if conversation == "" {
+			// Only an honestly unrecorded assistant may start work this way. An
+			// unreadable/ambiguous binding is not evidence of a fresh Session.
+			if sess.Binding != session.BindingNoRecord {
+				writeRefusal(w, http.StatusConflict, "session_unavailable", "The Session is unavailable or has no conversation id.")
+				return
+			}
+			conversation = app.PendingTodoOwner(sess)
+			if conversation == "" {
+				writeRefusal(w, http.StatusConflict, "session_unavailable", "The Session is unavailable or has no conversation id.")
+				return
+			}
+		} else if err := s.workV2().BindPendingTodos(r.Context(), app.PendingTodoOwner(sess), conversation); err != nil {
+			s.writeWorkV2Error(w, err)
+			return
+		}
 	}
 	if len(parts) == 1 && r.Method == http.MethodGet {
+		if strings.HasPrefix(targetID, sessionTodoConversationPrefix) {
+			if err := s.bindFirstSessionTodos(r.Context(), conversation); err != nil {
+				s.writeWorkV2Error(w, err)
+				return
+			}
+		}
 		s.workV2SessionTodosRead(w, r, conversation, func() {
 			rows, truncated, err := s.workV2().DirectTodos(r.Context(), conversation, true, false)
 			if err != nil {
@@ -294,15 +318,35 @@ func (s *Server) workV2SessionTodos(w http.ResponseWriter, r *http.Request, part
 		for _, picture := range pictures {
 			dataURLs = append(dataURLs, "data:"+picture.Image.MediaType+";base64,"+base64.StdEncoding.EncodeToString(picture.Data))
 		}
-		sent, sendErr := s.actions().SendWithPictures(r.Context(), terminalID,
+		first, prepareErr := s.workV2().PrepareFirstTodoSend(r.Context(), id, conversation, found.Version)
+		if prepareErr != nil {
+			err = prepareErr
+			break
+		}
+		actions := s.actions()
+		if first {
+			actions.PendingTodoOwner = conversation
+		}
+		sent, sendErr := actions.SendWithPictures(r.Context(), terminalID,
 			app.DirectTodoSendText(found.ID, found.Text), dataURLs)
 		if sendErr != nil {
+			var unsent terminal.Unsent
+			if first && errors.As(sendErr, &unsent) {
+				if _, finishErr := s.workV2().FinishFirstTodoSend(context.WithoutCancel(r.Context()), id, time.Now(), true); finishErr != nil {
+					err = finishErr
+					break
+				}
+			}
 			err = &app.WorkError{Status: http.StatusBadGateway, Code: "send_failed", Message: sendErr.Error()}
 			break
 		}
 		s.issueRun(r.Context(), r, sent, found.Text)
 		var td work.DirectTodoV2
-		td, err = s.workV2().MarkDirectTodoSent(r.Context(), id, conversation, time.Now(), found.Version)
+		if first {
+			td, err = s.workV2().FinishFirstTodoSend(context.WithoutCancel(r.Context()), id, time.Now(), false)
+		} else {
+			td, err = s.workV2().MarkDirectTodoSent(r.Context(), id, conversation, time.Now(), found.Version)
+		}
 		if err == nil {
 			answer = directTodoAnswer(td, nil)
 			_ = s.store.CompleteReceipt(r.Context(), k, store.ReceiptAnswer{Status: http.StatusOK, Body: answer})
@@ -427,4 +471,21 @@ func (s *Server) workV2SessionTodosSummary(w http.ResponseWriter, r *http.Reques
 	}
 	writeJSON(w, map[string]any{"ok": true, "done": done, "active": active, "waiting": waiting,
 		"truncated": todoTruncated || assignedTruncated || recentTruncated})
+}
+
+// bindFirstSessionTodos runs only while provisional rows exist. The exact live
+// process must now name this conversation; a caller-supplied id never adopts it.
+func (s *Server) bindFirstSessionTodos(ctx context.Context, conversation string) error {
+	pending, err := s.store.HasPendingDirectTodos(ctx)
+	if err != nil || !pending {
+		return err
+	}
+	for _, live := range s.freshReading(ctx).Sessions {
+		if live.ConversationID == conversation {
+			if err := s.workV2().BindPendingTodos(ctx, app.PendingTodoOwner(live), conversation); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

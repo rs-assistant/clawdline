@@ -2048,6 +2048,10 @@ export interface BrowserDevice {
  * Local token only.
  */
 export interface BrowserRequest {
+  /**
+   * Optional local selection; omission preserves read-and-operate.
+   */
+  permission?: string
 }
 
 /**
@@ -2670,6 +2674,42 @@ export type CloseabilityState =
 
 export const CloseabilityStateValues: readonly CloseabilityState[] = ["safe", "blocked", "needs_attestation", "unknown"] as const
 
+export interface CloudPairingOfferRequest {
+  offer: string
+
+  /**
+   * Selected by the machine, never by the browser's encrypted offer.
+   */
+  scope?: CloudViewerScope
+}
+
+export interface CloudPairingRequest {
+  /**
+   * Omitted preserves the legacy operate default.
+   */
+  scope?: CloudViewerScope
+}
+
+export interface CloudViewerGrantRequest {
+  device: string
+  scope: CloudViewerScope
+}
+
+export interface CloudViewerGrantResponse {
+  device: string
+  scope: CloudViewerScope
+}
+
+/**
+ * The machine-local operation ceiling; the machine commands switch and account
+ * identity checks remain independent requirements.
+ */
+export type CloudViewerScope =
+    "readonly"
+  | "operate"
+
+export const CloudViewerScopeValues: readonly CloudViewerScope[] = ["readonly", "operate"] as const
+
 /**
  * GET /v1/orchestrator/completions?pending=true|false. `pending=true` (the default)
  * is every envelope not yet acknowledged, dead letters included; `pending=false`
@@ -3065,6 +3105,17 @@ export interface DeviceList {
 }
 
 /**
+ * Local token only. POST /v1/auth/devices/{id}/permission persists a grant; POST
+ * /v1/auth/pairings/{id}/permission selects the pending pairing before
+ * confirmation. Missing/invalid permission is 400 bad_request; unknown/expired id
+ * is 404 not_found. Public pair/confirm fields never select a grant. Repeated
+ * writes are idempotent.
+ */
+export interface DevicePermission {
+  permission: string
+}
+
+/**
  * GET /v1/diagnostics, this machine's own token only (a paired device is 403): what
  * health used to carry about the process — its state directory, its ports, the
  * clock's last pass and the broker's own account of itself.
@@ -3447,15 +3498,18 @@ export type HealthReason =
 export const HealthReasonValues: readonly HealthReason[] = ["broker_beat_stalled", "capacity_exhausted", "capacity_beat_stalled", "work_sweep_stalled"] as const
 
 /**
- * A project's mark: rows of `#RRGGBB`, with null for transparent. It is derived
- * from the project path and the machine's icon registry by the same rules the Swift
- * app uses, so both apps draw the same creature — a mark somebody recognises by
- * colour and shape is not recognisable if the second app draws it differently, and
- * near-identical is worse than obviously different.
+ * A project mark with an RGB accent and either bounded colour cells (null is
+ * transparent) or a self-contained static SVG with empty cells. Both render
+ * proportionally inside the existing icon slot.
  */
 export interface Icon {
   accent: string
   cells: ((string | null)[])[]
+
+  /**
+   * Optional self-contained SVG; cells is empty when present.
+   */
+  svg?: string
 }
 
 /**
@@ -4170,7 +4224,8 @@ export interface PairStarted {
 
 export interface PairedDevice {
   /**
-   * Paired devices have read and send access.
+   * Read-only grants have read; read-and-operate grants have read and send. Legacy
+   * rows and unselected new pairings default to read and send.
    */
   caps: string[]
 
@@ -4264,8 +4319,9 @@ export interface PastSession {
 
 /**
  * GET /v1/places/{id}/sessions[/{assistant}]: what that assistant has recorded in
- * the place, newest first, at most two hundred. Dispatched children and `-p` runs
- * are not conversations and are left out.
+ * the place, newest first. Codex returns one provider page of twenty with an opaque
+ * next_cursor; other assistants return at most two hundred. Dispatched children and
+ * `-p` runs are not conversations and are left out.
  */
 export interface PastSessionList {
   assistant: string
@@ -4275,6 +4331,11 @@ export interface PastSessionList {
    * The list stopped at its cap and there were more.
    */
   more: boolean
+
+  /**
+   * Opaque continuation for the next Codex page; omitted at the end.
+   */
+  next_cursor?: string
   place: string
   sessions: PastSession[]
 }
@@ -4362,8 +4423,9 @@ export interface PersonaSuggestionRequest {
 }
 
 /**
- * A refusal from the start, resume and history routes: not_found, forbidden,
- * bad_request, invalid_launch, terminal_closed, terminal_unsupported,
+ * A refusal from the start, resume and history routes: codex_unavailable (503;
+ * provider read failed, retryable and never evidence of absence), not_found,
+ * forbidden, bad_request, invalid_launch, terminal_closed, terminal_unsupported,
  * terminal_io_failed, iterm_attention_required, capability_unavailable,
  * terminal_busy, unknown_persona (a start or resume ending `/as/{persona}` that
  * names no persona in GET /v1/personas).
@@ -5254,6 +5316,39 @@ export interface ProposalDiagnostics {
 }
 
 /**
+ * An account quota observation. Empty windows means unknown, never zero.
+ * Credentials and account identifiers are never included. A provider with no
+ * windows is omitted from the footer.
+ */
+export interface ProviderQuotaRow {
+  id: string
+  label: string
+  observed_at?: number
+  problem?: string
+  source: string
+  stale: boolean
+  windows: ProviderQuotaWindow[]
+}
+
+/**
+ * GET /v1/provider-quotas. Current machine only; file observations for Claude and
+ * Codex, cached metadata reads for Gemini and Grok. Network refreshes are
+ * asynchronous and single-flight per provider; failures retain the last successful
+ * snapshot marked stale.
+ */
+export interface ProviderQuotaSnapshot {
+  at: number
+  providers: ProviderQuotaRow[]
+  updating: boolean
+}
+
+export interface ProviderQuotaWindow {
+  name: string
+  resets_at?: number
+  used_percent: number
+}
+
+/**
  * GET /v1/push/key. The application server key the page passes to `subscribe({
  * applicationServerKey })`: base64url of the uncompressed P-256 public point. It is
  * an identity rather than a session — every subscription a browser makes is bound
@@ -5886,16 +5981,16 @@ export interface ScheduleRecord {
 /**
  * The body POST /v1/orchestrator/schedules and PATCH /v1/orchestrator/schedules/:id
  * take — the form's fields, flattened. `place_id` is an id from GET /v1/places,
- * never a path. Either `at` with exactly one of `days` and `on` (`days` is not
- * defaulted), or `trigger_only: true` with none of `at`, `days` and `on` — a
- * schedule the clock never fires, run only by hand or by webhook. schedule_id,
- * created_at, when_changed_at, fired_at and project_dir are the machine's and are
- * refused as unknown fields. Writes need an Idempotency-Key and either a device
- * that may send or, for a schedule that runs once, this machine's orchestrator
- * token. A session carrying a person's recent instruction may write a repeating
- * schedule by sending both `session_id` and `via.run`; the run must have been
- * issued for a message to that conversation. Those proof fields are audit evidence
- * and are not stored in the schedule.
+ * never a path. Either `at` with one of `days`, `on`, or the pair `every_days` and
+ * `start` (`days` is not defaulted), or `trigger_only: true` with none of `at`,
+ * `days`, `on`, `every_days` and `start` — a schedule the clock never fires, run
+ * only by hand or by webhook. schedule_id, created_at, when_changed_at, fired_at
+ * and project_dir are the machine's and are refused as unknown fields. Writes need
+ * an Idempotency-Key and either a device that may send or, for a schedule that runs
+ * once, this machine's orchestrator token. A session carrying a person's recent
+ * instruction may write a repeating schedule by sending both `session_id` and
+ * `via.run`; the run must have been issued for a message to that conversation.
+ * Those proof fields are audit evidence and are not stored in the schedule.
  */
 export interface ScheduleRequest {
   assistant: string
@@ -5904,6 +5999,12 @@ export interface ScheduleRequest {
   close_tab?: string
   days?: string[]
   enabled?: boolean
+
+  /**
+   * Positive calendar-day interval, paired with start and at; excludes days, on and
+   * trigger_only.
+   */
+  every_days?: number
   instructions: string
 
   /**
@@ -5934,6 +6035,11 @@ export interface ScheduleRequest {
    * session-authorized repeating write.
    */
   session_id?: string
+
+  /**
+   * Inclusive anchor date, YYYY-MM-DD, for every_days. Manual runs do not move it.
+   */
+  start?: string
   template?: ScheduleTemplate
 
   /**
@@ -6009,6 +6115,7 @@ export interface ScheduleRow {
    * never fires it, and it runs only by hand or by webhook. It never has next_fire.
    */
   trigger_only?: boolean
+  when?: ScheduleWhen
 }
 
 /**
@@ -6106,13 +6213,25 @@ export interface ScheduleUserAuthorization {
 /**
  * `when` in the file's own spelling: `at` (HH:MM, local time) and exactly one of
  * `days` (`daily`, or weekday names sun…sat) or `on` (YYYY-MM-DD, a schedule that
- * runs once) — or, alone, `trigger_only: true`, a schedule with no time that runs
- * only by hand or by webhook.
+ * runs once), or `every_days` with `start` (an anchored calendar-day interval) —
+ * or, alone, `trigger_only: true`, a schedule with no time that runs only by hand
+ * or by webhook.
  */
 export interface ScheduleWhen {
   at?: string
   days?: string[]
+
+  /**
+   * Positive calendar-day interval, paired with start and at; excludes days, on and
+   * trigger_only.
+   */
+  every_days?: number
   on?: string
+
+  /**
+   * Inclusive anchor date, YYYY-MM-DD, for every_days. Manual runs do not move it.
+   */
+  start?: string
   trigger_only?: boolean
 }
 
@@ -6943,11 +7062,11 @@ export interface SessionRow {
   tty?: string
 
   /**
-   * The live broker work that makes a broker-projected `waiting_session` row wait,
-   * collected by the same pass that decided the state. Present only on such rows;
-   * at most `session.waiting_for` entries, with `waiting_for_omitted` counting the
-   * rest. Both Cloud list scopes and the local list describe a wait from this field
-   * alone.
+   * The live broker work owned by this Session, collected by the same pass that
+   * decided the work state. Independent of the terminal state, so working and
+   * unknown rows can also name outstanding work; at most `session.waiting_for`
+   * entries, with `waiting_for_omitted` counting the rest. Both Cloud list scopes
+   * and the local list describe a wait from this field alone.
    */
   waiting_for?: SessionWaitTarget[]
 
@@ -7292,6 +7411,28 @@ export interface SettingsRequest {
   claude_default_model: string | null
 
   /**
+   * Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+   * as ciphertext only paired owner devices can open. Separate from
+   * cloud_health_upload, which never permits it. Absent or false means off, and off
+   * makes no request. Only the local token may change it.
+   */
+  cloud_health_owner_retention: boolean | null
+
+  /**
+   * Whether this daemon uploads its connection-health records to Cloud. Absent or
+   * false means off, and off makes no request. Only the local token may change it.
+   * Owner diagnostics (location, age, deadline) are never sent.
+   */
+  cloud_health_upload: boolean | null
+
+  /**
+   * Only `false`: dismisses the retired Cloudflare tunnel notice by removing that
+   * tunnel's old keys from the file. The old keys themselves are refused as
+   * `retired_setting`.
+   */
+  cloudflare_tunnel_retired: boolean | null
+
+  /**
    * Whether a new session is named by an assistant.
    */
   codex_auto_name: boolean | null
@@ -7317,12 +7458,16 @@ export interface SettingsRequest {
   hotkey: string | null
 
   /**
-   * Whether this daemon asks iTerm2 for its sessions, their screens and their input
-   * over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
-   * setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
-   * sessions are refused before any Apple Event; opening a viewer tab for a tmux
-   * session, Reveal and closing a child tab this daemon opened still send their one
-   * Apple Event each. It takes effect on the next reading, without a restart.
+   * Explicit opt-in to reading and controlling iTerm2; absent is off, including
+   * existing installations.
+   */
+  iterm_integration: boolean | null
+
+  /**
+   * Legacy polling preference inside an explicitly enabled iterm_integration.
+   * Absent means true. This preference never grants integration consent. Off,
+   * background listing and screen sampling stop; requested actions are allowed only
+   * while integration is enabled.
    */
   iterm_scan: boolean | null
 
@@ -7474,16 +7619,6 @@ export interface SettingsRequest {
   remote: boolean | null
 
   /**
-   * A hostname, or empty.
-   */
-  remote_hostname: string | null
-
-  /**
-   * `off`, `quick` or `named`.
-   */
-  remote_tunnel: string | null
-
-  /**
    * Whether the bar comes back with the terminal.
    */
   reopen_on_return: boolean | null
@@ -7492,11 +7627,17 @@ export interface SettingsRequest {
    * Bundle identifiers separated by commas, or empty for every app.
    */
   scope_app: string | null
+  session_auto_discovery: boolean | null
 
   /**
    * Have a model write the sentence a notification carries.
    */
   smart_notifications: boolean | null
+
+  /**
+   * A full Tailscale name ending in `.ts.net`, or empty.
+   */
+  tailscale_hostname: string | null
 
   /**
    * `auto`, `iterm`, `iterm_native` or `tmux`.
@@ -7578,6 +7719,29 @@ export interface SettingsSnapshot {
   claude_default_model: string | null
 
   /**
+   * Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+   * as ciphertext only paired owner devices can open. Separate from
+   * cloud_health_upload, which never permits it. Absent or false means off, and off
+   * makes no request. Only the local token may change it.
+   */
+  cloud_health_owner_retention: boolean | null
+
+  /**
+   * Whether this daemon uploads its connection-health records to Cloud. Absent or
+   * false means off, and off makes no request. Only the local token may change it.
+   * Owner diagnostics (location, age, deadline) are never sent.
+   */
+  cloud_health_upload: boolean | null
+
+  /**
+   * True while the file still holds the built-in Cloudflare tunnel's settings
+   * (`remote_tunnel`, `remote_tunnel_name`, `remote_hostname`, `cloudflared_path`),
+   * removed on 2026-10-20. They start nothing; the settings page explains once, and
+   * writing `cloudflare_tunnel_retired: false` takes them out of the file.
+   */
+  cloudflare_tunnel_retired?: boolean
+
+  /**
    * Whether a new session is named by an assistant. The Swift app's spelling, kept
    * so a line copied between the two files means the same thing.
    */
@@ -7613,12 +7777,16 @@ export interface SettingsSnapshot {
   hotkey: string | null
 
   /**
-   * Whether this daemon asks iTerm2 for its sessions, their screens and their input
-   * over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
-   * setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
-   * sessions are refused before any Apple Event; opening a viewer tab for a tmux
-   * session, Reveal and closing a child tab this daemon opened still send their one
-   * Apple Event each. It takes effect on the next reading, without a restart.
+   * Explicit opt-in to reading and controlling iTerm2; absent is off, including
+   * existing installations.
+   */
+  iterm_integration: boolean | null
+
+  /**
+   * Legacy polling preference inside an explicitly enabled iterm_integration.
+   * Absent means true. This preference never grants integration consent. Off,
+   * background listing and screen sampling stop; requested actions are allowed only
+   * while integration is enabled.
    */
   iterm_scan: boolean | null
 
@@ -7786,16 +7954,6 @@ export interface SettingsSnapshot {
   remote: boolean | null
 
   /**
-   * The hostname a named tunnel answers on.
-   */
-  remote_hostname: string | null
-
-  /**
-   * `off`, `quick` or `named`.
-   */
-  remote_tunnel: string | null
-
-  /**
    * Whether the bar comes back with the terminal.
    */
   reopen_on_return: boolean | null
@@ -7805,11 +7963,18 @@ export interface SettingsSnapshot {
    * com.googlecode.iterm2. Empty is every app.
    */
   scope_app: string | null
+  session_auto_discovery: boolean | null
 
   /**
    * Have a model write the sentence a notification carries.
    */
   smart_notifications: boolean | null
+
+  /**
+   * This machine's full Tailscale name (`<machine>.<tailnet>.ts.net`) that
+   * Tailscale Serve answers on; accepted only while `remote` is on.
+   */
+  tailscale_hostname: string | null
 
   /**
    * Where a new session opens: `auto`, `iterm`, `iterm_native` or `tmux`. With tmux
@@ -8889,9 +9054,10 @@ export type TerminalRefusalCode =
   | "terminal_access_revoked"
   | "terminal_cloud_not_supported"
   | "terminal_socket_path_too_long"
+  | "viewer_read_only"
   | "terminal_invalid"
 
-export const TerminalRefusalCodeValues: readonly TerminalRefusalCode[] = ["terminal_forbidden", "not_controller", "terminal_controlled", "lease_superseded", "lease_expired", "input_gap", "input_state_unknown", "input_too_large", "terminal_busy", "terminal_closed", "terminal_unreachable", "terminal_unsupported", "terminals_full", "terminal_viewers_full", "terminal_access_revoked", "terminal_cloud_not_supported", "terminal_socket_path_too_long", "terminal_invalid"] as const
+export const TerminalRefusalCodeValues: readonly TerminalRefusalCode[] = ["terminal_forbidden", "not_controller", "terminal_controlled", "lease_superseded", "lease_expired", "input_gap", "input_state_unknown", "input_too_large", "terminal_busy", "terminal_closed", "terminal_unreachable", "terminal_unsupported", "terminals_full", "terminal_viewers_full", "terminal_access_revoked", "terminal_cloud_not_supported", "terminal_socket_path_too_long", "viewer_read_only", "terminal_invalid"] as const
 
 /**
  * POST /v1/terminals/{id}/resize. The holder only; the newest size asked for wins.
@@ -9205,81 +9371,6 @@ export interface TranscriptUnread {
    * How much of the record's end one read looks at.
    */
   windowBytes: number
-}
-
-/**
- * `off`; `quick`, an address made up per run under trycloudflare.com; `named`, the
- * person's own tunnel (`remote_tunnel_name`) and hostname (`remote_hostname`).
- */
-export type TunnelMode =
-    "off"
-  | "quick"
-  | "named"
-
-export const TunnelModeValues: readonly TunnelMode[] = ["off", "quick", "named"] as const
-
-/**
- * `off`; `starting`, launched or waiting to retry and not yet registered with the
- * edge; `up`; `failed`, with a reason — including a refusal to start.
- */
-export type TunnelState =
-    "off"
-  | "starting"
-  | "up"
-  | "failed"
-
-export const TunnelStateValues: readonly TunnelState[] = ["off", "starting", "up", "failed"] as const
-
-/**
- * One reading of the tunnel.
- */
-export interface TunnelStatus {
-  at: number
-
-  /**
-   * Launches in a row that have died, while it is retrying; absent when none have.
-   */
-  attempts?: number
-
-  /**
-   * The cloudflared the next launch would run: `cloudflared_path` when it is set
-   * and executable, else where a package manager puts it, else PATH. Absent when
-   * there is none.
-   */
-  binary?: string
-
-  /**
-   * When state, url or reason last moved.
-   */
-  changed: number
-
-  /**
-   * The command line of the child that is running or was last started, binary
-   * first. It always carries `--config` and this daemon's own file, never the
-   * person's ~/.cloudflared/config.yml.
-   */
-  command?: string[]
-
-  /**
-   * The configuration file cloudflared is pointed at, in this daemon's state
-   * directory.
-   */
-  config: string
-  installed: boolean
-  mode: TunnelMode
-
-  /**
-   * Why it failed or refused, in the tunnel's own sentence. Present when state is
-   * failed.
-   */
-  reason?: string
-  state: TunnelState
-
-  /**
-   * The address, once a connection to Cloudflare's edge is registered. Present when
-   * state is up.
-   */
-  url?: string
 }
 
 /**
@@ -11168,6 +11259,28 @@ export type WorkState =
   | "work_complete"
 
 export const WorkStateValues: readonly WorkState[] = ["ready", "working", "holding", "waiting_you", "waiting_session", "unknown", "milestone_complete", "work_complete"] as const
+
+export interface WorkflowSettingsRequest {
+  dispatch_full_permission: boolean | null
+
+  /**
+   * Explicit opt-in to iTerm2 access. False by default; older daemons omit this
+   * field.
+   */
+  iterm_integration: boolean | null
+  session_auto_discovery: boolean | null
+}
+
+export interface WorkflowSettingsSnapshot {
+  dispatch_full_permission: boolean
+
+  /**
+   * Explicit opt-in to iTerm2 access. False by default; older daemons omit this
+   * field.
+   */
+  iterm_integration: boolean | null
+  session_auto_discovery: boolean
+}
 
 export interface WorktreeCanonical {
   error: WorktreeIssue | null

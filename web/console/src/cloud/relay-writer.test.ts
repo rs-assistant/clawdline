@@ -55,6 +55,7 @@ class FakeClient implements CloudWriteClient {
   voiceFor?: CloudWriteClient["voiceFor"]
   /** What `_machineRequestAs` settles with, as the copied client resolves a payload's `body`. */
   machineAnswer: unknown = undefined
+  documentReply: Record<string, unknown> | null = null
   events(_listener: (event: CloudEvent) => void) {
     return () => {}
   }
@@ -83,7 +84,7 @@ class FakeClient implements CloudWriteClient {
   }
   _read(identity: CloudIdentity, type: string, extra: Record<string, unknown>, answer: string, timeoutMs?: number, options?: unknown) {
     return this.act("_read", [identity, type, extra, answer, timeoutMs, options], type === "document"
-      ? { scope: "project", path: "demo.md", media_type: "text/markdown; charset=utf-8", byte_count: 7, data: "IyBEZW1vCg==" }
+      ? this.documentReply ?? { scope: "project", path: "demo.md", media_type: "text/markdown; charset=utf-8", byte_count: 7, data: "IyBEZW1vCg==" }
       : type === "documents" ? { documents: [{ scope: "project", path: "demo.md", bytes: 7, modified: 1 }] }
       : { ok: true, id: identity.session, action: "keyed" })
   }
@@ -108,8 +109,8 @@ class FakeClient implements CloudWriteClient {
   places(machine: string) {
     return this.act("places", [machine], { places: [{ id: "mac-a\u0000p1", label: "api" }], assistants: [{ id: "claude" }] })
   }
-  pastSessions(place: string, assistant: string) {
-    return this.act("pastSessions", [place, assistant], { sessions: [] })
+  pastSessions(place: string, assistant: string, cursor?: string) {
+    return this.act("pastSessions", cursor ? [place, assistant, cursor] : [place, assistant], { sessions: [] })
   }
   startPlace(place: string, assistant: string, model: string) {
     return this.act("startPlace", [place, assistant, model], { ok: true, id: "new-1", backend: "iterm" })
@@ -240,7 +241,9 @@ test("each console route is the Cloud word the machine lists, and nothing else",
     ["GET", "/v1/notification-rules", "notification-rules"],
     ["POST", "/v1/notification-rules", "notification-rules-update"],
     ["GET", "/v1/settings/work-gates", "work-gate-settings"],
+    ["GET", "/v1/settings/workflow", "workflow-settings"],
     ["POST", "/v1/settings/work-gates", "work-gate-settings-update"],
+    ["POST", "/v1/settings/workflow", "workflow-settings-update"],
     ["POST", "/v1/update/apply", "update-apply"],
     ["POST", "/v1/board", "board-command"],
     ["GET", "/v1/places/p1/sessions/claude", "past-sessions"],
@@ -2440,10 +2443,12 @@ test("every read the writer carries is one it waits for", () => {
     ["/v1/usage/work-samples", "usage-work-samples"],
     ["/v1/usage/sessions/s1", "usage"],
     ["/v1/capacity", "capacity"],
+    ["/v1/provider-quotas", "provider-quotas"],
     ["/v1/settings/default-models", "default-models"],
     ["/v1/notification-rules", "notification-rules"],
     ["/v1/settings/notifications", "notification-settings"],
     ["/v1/settings/work-gates", "work-gate-settings"],
+    ["/v1/settings/workflow", "workflow-settings"],
     ["/v1/sessions/restorable", "restorable"],
     ["/v1/sessions/archived", "archived"],
     ["/v1/machine/usage", "machine-usage"],
@@ -2496,7 +2501,7 @@ test("usage overview carries a validated period and opaque project to the select
   assert.equal(writeRoute("GET", "/v1/usage/overview/more"), null)
   const response = await reader.fetch("/v1/usage/overview?days=28&project=opaque%2Fproject%26one")
   assert.equal(response.status, 200)
-  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "usage.overview", { days: 28, project: "opaque/project&one" }, "read"])
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "usage.overview", { days: "28", project: "opaque/project&one" }, "read"])
   const count = client.calls.length
   for (const query of ["days=8", "days=07", "days=7&days=28", "project=a&project=b", "project=%00", "since=1", "machine=other"]) {
     assert.equal((await reader.fetch("/v1/usage/overview?" + query)).status, 400, query)
@@ -2511,8 +2516,92 @@ test("usage overview also reads without the writer adapter and stays on its sele
   plain.attach(client)
   const response = await plain.fetch("/v1/usage/overview?days=7")
   assert.equal(response.status, 200)
-  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-b", "usage.overview", { days: 7 }, "read"])
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-b", "usage.overview", { days: "7" }, "read"])
   const count = client.calls.length
   assert.equal((await plain.fetch("/v1/usage/overview?days=28&project=a&project=b")).status, 400)
   assert.equal(client.calls.length, count)
+})
+
+test("usage overview browser bodies match the fixtures accepted by the daemon decoder", async () => {
+  const fixtures = JSON.parse(readFileSync(new URL("../../../../internal/app/cloudops/testdata/usage-overview-browser.json", import.meta.url), "utf8")) as { query: string; body: Record<string, string> }[]
+  for (const writer of [true, false]) {
+    const client = new FakeClient()
+    const reader = writer ? seam(client).reader : new RelayReader("mac-b")
+    if (!writer) reader.attach(client)
+    for (const fixture of fixtures) {
+      const response = await reader.fetch("/v1/usage/overview?" + fixture.query)
+      assert.equal(response.status, 200)
+      const call = client.calls.pop()
+      assert.equal(call?.[2], "usage.overview")
+      assert.deepEqual(JSON.parse(JSON.stringify(call?.[3])), fixture.body, "browser wire must be accepted by the real daemon fixture")
+    }
+  }
+})
+
+
+test("a static HTML document crosses the Cloud reader transport with its exact MIME and bytes", async () => {
+  const client = new FakeClient()
+  const text = "<p>report</p>"
+  client.documentReply = {scope: "project", path: "report.html", media_type: "text/html; charset=utf-8", byte_count: text.length, data: btoa(text)}
+  const {reader} = seam(client)
+  const response = await reader.fetch("/v1/sessions/s1/documents/project/report.html?machine=mac-a")
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get("content-type"), "text/html; charset=utf-8")
+  assert.equal(await response.text(), text)
+  for (const change of [{media_type: "application/xhtml+xml"}, {media_type: "text/html"}, {byte_count: 1}, {data: "%%%"}]) {
+    client.documentReply = {...client.documentReply, ...change}
+    const rejected = await reader.fetch("/v1/sessions/s1/documents/project/report.html?machine=mac-a")
+    assert.equal(rejected.status, 502)
+    assert.equal((await json<{error: string}>(rejected)).error, "malformed_answer")
+    client.documentReply = {scope: "project", path: "report.html", media_type: "text/html; charset=utf-8", byte_count: text.length, data: btoa(text)}
+  }
+})
+
+test("older history pages preserve their opaque cursor across the Cloud seam", async () => {
+ const client = new FakeClient()
+ const { reader } = seam(client)
+ const cursor = "older/+?= page"
+ const res = await reader.fetch("/v1/places/p1/sessions/codex?cursor=" + encodeURIComponent(cursor))
+ assert.equal(res.status,200)
+ assert.deepEqual(client.calls, [["pastSessions", "p1", "codex", cursor]])
+})
+
+// A machine's `viewer_read_only` that arrives without a status of its own is
+// still 403, so the page treats it as a refusal of this device and not as a
+// machine that broke (502).
+test("a readonly viewer's refusal without a status of its own answers 403 viewer_read_only", async () => {
+  for (const code of ["viewer_read_only", "cloud_read_only"]) {
+    const client = new FakeClient()
+    client.rows = [row("s1")]
+    client.fail._read = refusal(code)
+    const { reader } = seam(client)
+    const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-ro-" + code }))
+    assert.equal(res.status, 403, code)
+    const body = await json(res)
+    assert.equal(body.error, code)
+    assert.equal(body.outcome, "not_done", code)
+  }
+})
+
+
+test("the website workflow tab carries iTerm2 consent only to its selected machine", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  assert.equal((await reader.fetch("/v1/settings/workflow")).status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "workflow-settings", {}, "read"])
+  for (const on of [true, false]) {
+    assert.equal((await reader.fetch("/v1/settings/workflow", post({ iterm_integration: on }))).status, 200)
+    assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "workflow-settings-update", { changes: { iterm_integration: on } }, "action"])
+  }
+})
+
+
+test("provider quota metadata crosses Cloud as a machine read without credentials", async () => {
+  assert.deepEqual(writeRoute("GET", "/v1/provider-quotas"), { op: "provider-quotas", word: "provider-quotas" })
+  assert.equal(writeRoute("POST", "/v1/provider-quotas"), null)
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  assert.equal((await reader.fetch("/v1/provider-quotas")).status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "provider-quotas", {}, "read"])
+  assert.equal((await reader.fetch("/v1/provider-quotas?account=other")).status, 501)
 })

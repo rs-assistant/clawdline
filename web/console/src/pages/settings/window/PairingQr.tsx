@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { CloudPairing } from "../cloud.js"
 import { W, fill } from "./copy.js"
 import { QR_QUIET, encodeQr, qrPath, type QrCode } from "./qr.js"
+import { catalogWord } from "../../../catalog.js"
+import { showModalWithoutChoice } from "../../../modal-focus.js"
 
 /**
  * The pairing QR: the link drawn as a code a phone can read off this screen,
@@ -52,9 +54,11 @@ type Props = {
   busy: boolean
   /** Ask the daemon for a fresh invitation. */
   onRenew: () => void
+  /** A native confirmation must be requested by a press, never an expiry timer. */
+  automaticRenew?: boolean
 }
 
-export function PairingQr({ pairing, busy, onRenew }: Props) {
+export function PairingQr({ pairing, busy, onRenew, automaticRenew = true }: Props) {
   const now = useClock(pairing.phase === "waiting" || pairing.phase === "failed")
   const [enlarged, setEnlarged] = useState(false)
   // Renewals in a row that nobody asked for, the invitation the last one
@@ -84,14 +88,14 @@ export function PairingQr({ pairing, busy, onRenew }: Props) {
   // to the limit. The id is remembered so a re-render, or React's development
   // double effect, does not draw two.
   useEffect(() => {
-    if (!lapsed || lapsed !== shown.current || busy || renewedFor.current === lapsed) return
+    if (!automaticRenew || !lapsed || lapsed !== shown.current || busy || renewedFor.current === lapsed) return
     if (renewals.current >= AUTO_RENEW_LIMIT) return
     if (typeof document !== "undefined" && document.visibilityState !== "visible") return
     renewedFor.current = lapsed
     renewals.current += 1
     autoPending.current = true
     onRenew()
-  }, [lapsed, busy, onRenew])
+  }, [lapsed, busy, onRenew, automaticRenew])
 
   // A pairing that finished resets the count and closes the enlarged view:
   // the next code is a new errand. (A renewal keeps the view open on purpose —
@@ -115,9 +119,9 @@ export function PairingQr({ pairing, busy, onRenew }: Props) {
     return (
       <div className="sw-qr">
         <span className="sw-block-label">{W.pairingScanTitle}</span>
+        <ScanOrder />
         <FittedQr code={code} onOpen={() => setEnlarged(true)} />
         {deadline ? <Countdown remaining={remaining} deadline={deadline} renewed={renewals.current} /> : null}
-        <ScanOrder />
         {enlarged ? <FullQr code={code} remaining={remaining} onClose={() => setEnlarged(false)} /> : null}
       </div>
     )
@@ -188,10 +192,8 @@ function FittedQr({ code, onOpen }: { code: QrCode; onOpen: () => void }) {
     if (!element) return
     const measure = () => setWidth(element.clientWidth)
     measure()
-    // The card sits under the Cloud status in a window 660 points tall, so a
-    // code that has just appeared is often half below the fold. Bring the
-    // whole of it into view — "nearest" moves nothing when it already is.
-    element.scrollIntoView?.({ block: "nearest" })
+    // Keep the installation order above the QR in view instead of scrolling
+    // past it as soon as the code appears.
     if (typeof ResizeObserver === "undefined") return
     const observer = new ResizeObserver(measure)
     observer.observe(element)
@@ -205,7 +207,7 @@ function FittedQr({ code, onOpen }: { code: QrCode; onOpen: () => void }) {
       <button
         type="button"
         className="sw-qr-code"
-        onClick={onOpen}
+        onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); onOpen() }}
         title={W.webCloudPairEnlarge}
         aria-label={W.webCloudPairEnlarge}
         data-qr-modules={code.size}
@@ -273,7 +275,12 @@ function ScanOrder() {
         <li>{W.webCloudPairOrderScan}</li>
       </ol>
       <p className="sw-qr-order-warn">{W.webCloudPairOrderWhy}</p>
-      <p className="sw-qr-order-other">{W.webCloudPairOrderOther}</p>
+      <p className="sw-qr-order-head">{catalogWord("browserPairing", "androidTitle")}</p>
+      <ol>
+        <li>{catalogWord("browserPairing", "androidOpen")}</li>
+        <li>{catalogWord("browserPairing", "androidScan")}</li>
+        <li>{catalogWord("browserPairing", "androidCheck")}</li>
+      </ol>
     </div>
   )
 }
@@ -284,28 +291,34 @@ function ScanOrder() {
  * renewal, because the code it draws is whatever the card is drawing.
  */
 function FullQr({ code, remaining, onClose }: { code: QrCode; remaining: number; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null)
   const [view, setView] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
+  useLayoutEffect(() => {
+    const openedFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const element = dialog.current
+    showModalWithoutChoice(element)
+    return () => {
+      element?.close()
+      if (openedFrom?.isConnected) openedFrom.focus({ preventScroll: true })
+    }
+  }, [])
   useEffect(() => {
     const resize = () => setView({ w: window.innerWidth, h: window.innerHeight })
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose()
-    }
     window.addEventListener("resize", resize)
-    window.addEventListener("keydown", key)
     return () => {
       window.removeEventListener("resize", resize)
-      window.removeEventListener("keydown", key)
     }
-  }, [onClose])
+  }, [])
   const span = code.size + QR_QUIET * 2
-  // Room for the line of text underneath; everything else is the code.
-  const module = Math.max(1, Math.floor(Math.min(view.w - 24, view.h - 72) / span))
+  // Leave room for the countdown and a keyboard-accessible close button.
+  const module = Math.max(1, Math.floor(Math.min(view.w - 24, view.h - 132) / span))
   return (
-    <div
+    <dialog
+      ref={dialog}
       className="sw-qr-full"
-      role="dialog"
       aria-modal="true"
       aria-label={W.pairingScanTitle}
+      onCancel={(event) => { event.preventDefault(); onClose() }}
       onClick={onClose}
       data-qr-module-px={module}
     >
@@ -313,6 +326,9 @@ function FullQr({ code, remaining, onClose }: { code: QrCode; remaining: number;
       <p className={"sw-qr-full-line" + (remaining <= HURRY_MS ? " hurry" : "")}>
         {fill(W.webCloudPairRemainingShort, { time: clock(remaining) })} · {W.webCloudPairClose}
       </p>
-    </div>
+      <button type="button" className="sw-qr-full-close" onClick={(event) => { event.stopPropagation(); onClose() }}>
+        {catalogWord("legacy", "webClose")}
+      </button>
+    </dialog>
   )
 }

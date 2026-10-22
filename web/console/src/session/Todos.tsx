@@ -1,5 +1,7 @@
+import { LoadingSkeleton } from "../LoadingSkeleton.js"
 import { catalogFormat } from "../catalog.js"
 import { catalogWord } from "../catalog.js"
+import { useDetailsMotion } from "../ui/use-details-motion.js"
 import { closingMark } from "../punctuation.js"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { focusModalContainer } from "../modal-focus.js"
@@ -68,6 +70,8 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
   const rowID = row?.id ?? ""
   const rowSessionID = row?.sessionId ?? ""
   const readReady = sessionTodosReady(row)
+  const disclosure = useDetailsMotion(open, rowID)
+  useLayoutEffect(() => { expanded.current = open }, [open])
 
   const load = useCallback(async () => {
     if (!rowID || !readReady) return
@@ -154,15 +158,20 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
 
   return (
     <>
-      <details className="session-todos" id="session-todos" open={open}
+      <details className="session-todos" id="session-todos" ref={disclosure} data-expanded={open} data-motion-id="AN-003"
         onToggle={(ev) => {
           const next = (ev.currentTarget as HTMLDetailsElement).open
+          if (next !== open) return
           setOpen(next)
           expanded.current = next
           if (next) attention.close()
           if (next) void refresh(true)
         }}>
-        <summary>
+        <summary aria-expanded={open} onClick={(event) => {
+          if (event.defaultPrevented || event.target instanceof Element && event.target.closest("button, a, input, select, textarea")) return
+          event.preventDefault()
+          setOpen(!open)
+        }}>
           <b>{workWord("todosTitle")}</b>
           <button className="session-todos-add" type="button" aria-label={catalogWord("inline", "aab5446b4b41")}
             onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); setEditing(null); setAdding(true) }}><WorkIcon name="add" /></button>
@@ -172,13 +181,11 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
             : !readFailure && <span id="session-todos-count">{L.strings.webLoading}</span>}
           {readReady && readFailure && <ReadFailure state={todoHeaderState(summary !== null, true)} reason={readFailure.reason}
             retrying={reading} onRetry={() => { void refresh(true) }} needsUpdate={!!readFailure.update} />}
-          {attention.head}
+          <span className="session-todos-attention">{attention.head}</span>
         </summary>
-        <div className="session-todos-body">
+        <div className="session-todos-body" inert={!open}>
           {row.sessionId && <SessionUsage conversation={row.sessionId} />}
-          {open && readReady && !page && !readFailure && <p className="session-todos-loading" role="status">
-            <span className="work-assignment-spinner" aria-hidden="true" />{L.strings.webLoading}
-          </p>}
+          {open && readReady && !page && !readFailure && <LoadingSkeleton id="SK-24" label={L.strings.webLoading} />}
           {readReady && readFailure && (readFailure.update
             ? <NeedsUpdate update={readFailure.update} />
             : <p className="work-note" role="alert">{readFailure.words}</p>)}
@@ -219,7 +226,7 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
           </section>}
           {empty && <p className="session-todos-empty">{catalogWord("inline", "7fdc5e3bf06f")}</p>}
         </div>
-        <button className="session-todos-backdrop" type="button" tabIndex={-1} aria-label={catalogWord("inline", "3df6e2f5b818")}
+        <button className="session-todos-backdrop" type="button" tabIndex={-1} inert={!open} aria-label={catalogWord("inline", "3df6e2f5b818")}
           onClick={() => setOpen(false)} />
       </details>
       {attention.live}

@@ -105,17 +105,18 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 			WaitingForOmitted int64                        `json:"waiting_for_omitted,omitempty"`
 		}
 		type presentation struct {
-			ID                  string         `json:"id"`
-			Title               string         `json:"title"`
-			CWD                 string         `json:"cwd,omitempty"`
-			ProjectKey          string         `json:"project_key,omitempty"`
-			Icon                *contract.Icon `json:"icon,omitempty"`
-			ExecutionGeneration string         `json:"execution_generation,omitempty"`
-			Status              status         `json:"status"`
+			Assistant           contract.Assistant `json:"assistant,omitempty"`
+			ID                  string             `json:"id"`
+			Title               string             `json:"title"`
+			CWD                 string             `json:"cwd,omitempty"`
+			ProjectKey          string             `json:"project_key,omitempty"`
+			Icon                *contract.Icon     `json:"icon,omitempty"`
+			ExecutionGeneration string             `json:"execution_generation,omitempty"`
+			Status              status             `json:"status"`
 		}
 		rows := make([]presentation, 0, len(snapshot.Sessions))
 		for _, row := range snapshot.Sessions {
-			rows = append(rows, presentation{ID: row.ID, Title: row.Label, CWD: row.CWD, ProjectKey: row.ProjectKey,
+			rows = append(rows, presentation{Assistant: row.Assistant, ID: row.ID, Title: row.Label, CWD: row.CWD, ProjectKey: row.ProjectKey,
 				Icon: row.Icon, ExecutionGeneration: row.ExecutionGeneration,
 				Status: status{SessionID: row.SessionID, EpicParent: row.EpicParent, Persona: row.Persona, State: row.State, WorkState: row.WorkState, WorkNote: row.WorkNote,
 					WorkProvenance: row.WorkProvenance, WorkMovedBy: row.WorkMovedBy,
@@ -279,7 +280,7 @@ func (s *Server) sessionsPayloadRead(ctx context.Context, inv session.Inventory,
 	// console could only describe as unreadable.
 	items := make([]session.Session, 0, len(inv.Sessions))
 	for _, item := range inv.Sessions {
-		if item.IsAssistant() {
+		if item.IsAssistant() && !item.DiscoveryExcluded {
 			items = append(items, item)
 		}
 	}
@@ -418,7 +419,7 @@ func (s *Server) sessionsPayloadRead(ctx context.Context, inv session.Inventory,
 		})
 		// Every list reads what a Session waits for from the row, never from a
 		// task collection of its own: the Cloud lists do not have one.
-		if row.WorkState == contract.WorkStateWaitingSession && row.WorkProvenance == contract.WorkProvenanceBroker {
+		if len(row.waiting) > 0 {
 			row.WaitingFor, row.WaitingForOmitted = s.waitTargets(records, row.waiting, labels, heavyPlaces)
 		}
 		if attentionErr == nil && item.ConversationID != "" && conversationMatches[item.ConversationID] == 1 &&
@@ -1172,10 +1173,14 @@ func wireAgentReading(reading session.AgentReading) *contract.SessionAgentReadin
 
 // wireIcon carries a mark across to the wire in the shape the console draws.
 func wireIcon(g icon.Grid) *contract.Icon {
-	if len(g.Cells) == 0 {
+	if len(g.Cells) == 0 && g.SVG == "" {
 		return nil
 	}
-	return &contract.Icon{Accent: g.Accent, Cells: g.Cells}
+	cells := g.Cells
+	if cells == nil {
+		cells = [][]*string{}
+	}
+	return &contract.Icon{Accent: g.Accent, Cells: cells, Svg: g.SVG}
 }
 
 // wireMover is the one place a mover crosses from the domain to the wire. It is

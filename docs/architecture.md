@@ -241,6 +241,20 @@ The display states on a card ("queued", "in review", "landed") are derived from 
 they are read, never written back. [board-redesign.md](board-redesign.md) has the reasoning and the
 lifecycle of each structure.
 
+## Session reasoning effort
+
+The Session information sheet places an ordinal reasoning-effort meter immediately below
+model selection, including for read-only viewers. Its ticks show order, not percentages or
+comparable amounts of computation between providers or models. Unknown levels remain text;
+an absent reading says that the Session has not reported it yet.
+
+Codex reports `effort` from its newest `turn_context`, with its startup card as evidence before
+the first turn. A switch may therefore appear only when the next turn starts. Claude Code
+reports `perTurnEffort`, falling back to `effort`, from its newest real parent assistant record;
+sidechain and synthetic replies do not replace that reading. When the optional status-line
+cache retains Claude Code's live `effort.level`, that reading takes precedence. No machine-wide
+default is presented as a Session measurement. The same info payload crosses the Cloud relay.
+
 ## Schedules
 
 A schedule is a task template with a local wall-clock time and a catch-up window. The clock ticks
@@ -297,6 +311,18 @@ The web side is three npm workspaces:
 | `web/core` | the API client, refusals, the fleet store and its ordering rules | no DOM, no React, nothing bundler-specific |
 | `web/console` | the React DOM screens | both of the above |
 
+`web/console/src/ui/ProjectPicker.tsx` is the shared project selection control used by
+the work board (including its create sheet) and usage overview. It accepts caller-owned IDs,
+labels and marks; callers retain their surrounding layout and control dimensions. The control
+owns its non-native menu, keyboard navigation, dismissal and optional refresh on opening.
+Usage filter choices come from configured project places, using their configured names and marks.
+Their IDs match ledger options by SHA-256 of the exact path, as in `overviewProject`, never by
+basename. Only configured projects accepted by the current usage response are offered; historical
+Session-only paths and unattributed usage do not become project choices. The all-project reading
+and its aggregation remain unchanged. If configured places cannot be read, the all-project
+choice remains available. [Console loading inventory](console-loading.md) records the stable
+screen IDs and the first-read skeleton behavior.
+
 `core` asks its host for two things: `fetch`, and a stream transport. That split exists so a
 future React Native app can reuse everything below the screens ([plan.md](plan.md) §3.1).
 
@@ -307,3 +333,15 @@ keyboard, secret storage and the desktop. Each of those is a port with a per-pla
 and a platform that cannot do something says so by name instead of pretending.
 [cross-platform.md](cross-platform.md) goes feature by feature and records what each platform
 shows when it cannot.
+
+### Settings navigation
+
+The local console settings page has one tablist for browser, work, status, general
+machine settings, voice, remote access, session dispatch and dispatch rules. Machine
+panes share one mounted `SettingsWindow` with a controlled stable pane name; switching
+machine panes retains the window-level settings state and in-flight writes. Leaving the machine settings
+unmounts the window so background reads and listeners stop. Its embedded mode still uses the browser
+settings API and excludes privileged Cloud sign-in and pairing controls.
+Cloud browsers expose only browser, work and status. The standalone `settings.html`
+window retains its own navigation and machine-authorized controls. Update deep links
+continue to open the status pane.

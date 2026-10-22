@@ -513,7 +513,7 @@ frozen under another version.
 The Usage overview page reads `/v1/usage/overview` locally and `usage.overview`
 through Cloud for the explicitly selected machine. It shows the last 7 or 28
 complete local calendar days and the preceding equal period. Today is excluded.
-Dispatch counts follow task creation dates; successful-task elapsed medians follow
+Dispatch counts exclude background command callbacks and follow agent-task creation dates; successful-task elapsed medians follow
 completion dates and measure spawned-to-finished time, with sample counts.
 
 Daily tokens come from provider event timestamps, not transcript modification
@@ -536,6 +536,24 @@ period is incomplete. Project bars and token composition conserve the included
 primitive readings. Project identities are opaque hashes of canonical repository
 paths; unattributed readings remain visible. API list prices are not shown as
 subscription spending.
+
+Dispatched work belongs to its source repository, including its native
+subagents. Overview attribution joins the recorded task id, the broker's child
+conversation id, and recorded worktree paths (including working directories
+below them). Recorded links follow nested worktrees back to the source even
+after their checkouts or transcripts have been removed. The same resolution
+serves token bars, task cohorts and project filtering; it changes ownership,
+never the primitive token counts. Conflicting or missing evidence stays in
+Unattributed rather than displaying a directory basename or task UUID.
+
+The background reader keeps the original working directory and a separately
+verified canonical repository key. Older cursors become due once to populate
+that key without rewinding their bill; missing transcripts can still have
+their existing summaries attributed. The SQLite upgrade adds an empty key to
+old daily rows without deleting or replaying them. Until background verification
+or a durable dispatch link identifies their project, these readings remain
+unattributed. Overview requests read only persisted evidence and do not walk
+the filesystem. Verified identity remains usable after a checkout disappears.
 
 The completed-source count requires a readable, caught-up cursor with no replay,
 remaining bytes or unknown timestamps. It is not proof that every historical

@@ -113,7 +113,7 @@ func (s *Server) voiceWriting(w http.ResponseWriter, r *http.Request, body func(
 		return
 	}
 	r.Body = io.NopCloser(bytes.NewReader(raw))
-	k := store.ReceiptKey{Scope: scopeVoice, Actor: accessOf(r).verdict.Device, Key: key}
+	k := store.ReceiptKey{Scope: scopeVoice, Actor: actorOf(r), Key: key}
 	s.receipted(w, r, k, requestDigest(raw),
 		func(status int) bool {
 			return status != http.StatusTooManyRequests && status != http.StatusServiceUnavailable

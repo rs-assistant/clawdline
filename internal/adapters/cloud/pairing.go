@@ -179,7 +179,7 @@ type MachineRecord struct {
 	PublicKey      string  `json:"public_key"`
 	KeyFingerprint string  `json:"key_fingerprint"`
 	KeyEpoch       int     `json:"key_epoch"`
-	IdentityEpoch  int     `json:"identity_epoch"`
+	IdentityEpoch  *int    `json:"identity_epoch"`
 	RevokedAt      *string `json:"revoked_at"`
 }
 

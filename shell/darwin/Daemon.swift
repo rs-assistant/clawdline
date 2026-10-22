@@ -54,12 +54,9 @@ final class BundledDaemon {
 
     /// Stop the daemon this shell started and wait until it has gone.
     ///
-    /// SIGTERM to its pid first: the daemon takes its tunnel down on that and
-    /// then ends (cmd/clawdline `stopTunnelOnSignal`). Only if it is still
-    /// there after `grace` is it forced, and then its whole process group is,
-    /// so that a cloudflared it started does not outlive it — but only when
-    /// that group is the daemon's own, never this shell's. The answer is
-    /// returned for the log, and says which of those happened.
+    /// SIGTERM to its pid first, on which the daemon ends. Only if it is
+    /// still there after `grace` is it killed. The answer is returned for the
+    /// log, and says which of those happened.
     @discardableResult
     func stop(grace: TimeInterval = 5) -> String {
         guard let task = process else { return "no daemon was started by this shell" }
@@ -69,12 +66,7 @@ final class BundledDaemon {
         if waitForExit(task, within: grace) {
             return "pid \(pid) stopped on SIGTERM"
         }
-        let group = getpgid(pid)
-        if group == pid && group != getpgrp() {
-            kill(-group, SIGKILL)
-        } else {
-            kill(pid, SIGKILL)
-        }
+        kill(pid, SIGKILL)
         if waitForExit(task, within: 2) {
             return "pid \(pid) was still running \(Int(grace))s after SIGTERM and was killed"
         }

@@ -19,9 +19,11 @@
 
 import { CloudClient } from "./cloud-client.js";
 import { viewerEventLogFor } from "./cloud-viewer-events.js";
+import { classifyViewerError, viewerHealthBegin } from "./viewer-health-hook.js";
 import {
     importSenderPublicKey, loadCryptoKey, loadCryptoKeyID, loadPairingBinding,
-    storeCryptoKey, storePairingBinding, storePairingCryptoKeys
+    storeCryptoKey, storePairingBinding, storePairingCryptoKeys, loadMachineCryptoState,
+    adoptMachineRekey, importMasterSecret
 } from "./cloud-crypto.js";
 import {
     createPairingOffer, ed25519Fingerprint, encryptPairingOfferForInvitation,
@@ -289,6 +291,14 @@ function responseError(result, fallbackCode, fallbackMessage, terminal) {
  * Everything it touches — fetch, storage, IndexedDB, the clock, the socket — is injected, so
  * the same object runs under the tests with fakes and in the browser with the real thing.
  */
+/** `{ identity_epoch, key_epoch }` from a token mint, or null when either is not a whole number. */
+export function tokenIdentityOf(value) {
+    if (!value || typeof value !== "object") return null;
+    var identity = value.identity_epoch, key = value.key_epoch;
+    if (!Number.isSafeInteger(identity) || identity < 0 || !Number.isSafeInteger(key) || key < 1) return null;
+    return { identityEpoch: identity, deviceKeyEpoch: key };
+}
+
 export class CloudViewerSession {
     constructor(options) {
         options = options || {};
@@ -306,11 +316,15 @@ export class CloudViewerSession {
         this.deviceKind = ["browser", "ios", "android"].indexOf(options.deviceKind) >= 0
             ? options.deviceKind : "browser";
         this.returnTo = options.returnTo || this.config.appOrigin + "/";
+        this.operationsAccessChanged = typeof options.onOperationsAccess === "function" ? options.onOperationsAccess : function () {};
         this.account = null;
         this.deviceID = null;
         this.caps = [];
         this.devicePrivateKey = null;
+        this.tokenIdentity = null;
         this.devicePublicKey = null;
+        // Additive relay support must ship before the production composition root opts in.
+        this.enableViewerRekey = options.enableViewerRekey === true;
         this.client = null;
     }
 
@@ -329,10 +343,12 @@ export class CloudViewerSession {
      * `web_devices` row invalidates the cookie that names it (`api/src/routes/guards.ts`).
      */
     async ensureSession() {
+        this.operationsAccessChanged(false);
         var existing = await json(this.fetch, this.config.apiOrigin + "/v1/auth/session");
         if (existing.status === 200 && existing.body && existing.body.device_id) {
             var restored = await this.restoreDeviceKey(existing.body.device_id);
             if (restored) {
+                this.operationsAccessChanged(existing.body.operations_access === true);
                 this.account = existing.body.account_id;
                 this.deviceID = existing.body.device_id;
                 this.caps = await this.readCapabilities();
@@ -376,6 +392,7 @@ export class CloudViewerSession {
                 created.status >= 500 ? "session_unavailable" : "session_failed",
                 "Clawdline could not create this browser's session", created.status < 500);
         }
+        this.operationsAccessChanged(created.body.operations_access === true);
         this.account = created.body.account_id;
         this.deviceID = created.body.device_id;
         this.caps = Array.isArray(created.body.caps) ? created.body.caps : VIEWER_CAPABILITIES;
@@ -471,6 +488,9 @@ export class CloudViewerSession {
         if (minted.status !== 200 || !minted.body || typeof minted.body.token !== "string") {
             throw bootError("token_failed", "the device token could not be minted");
         }
+        // The epochs the token was minted under: the owner-diagnostics read proof names them
+        // (`cloud/health-owner/proof.ts`). Absent or malformed reads as unknown, never as 0.
+        this.tokenIdentity = tokenIdentityOf(minted.body.identity);
         return {
             token: minted.body.token,
             expiresAt: Date.parse(minted.body.expires_at),
@@ -517,11 +537,19 @@ export class CloudViewerSession {
             var legacy = masterKeyConnection(await this.accountKey(), await this.accountKeyID());
             masterKey = legacy.masterKeys[binding.keyID];
         } else {
-            var values = await Promise.all([
-                loadCryptoKey(this.machineMasterKeyName(machine), this.indexedDB),
-                loadCryptoKeyID(this.machineMasterKeyIDName(machine), this.indexedDB)
-            ]);
-            if (values[1] === binding.keyID) masterKey = values[0];
+            var snapshot = await loadMachineCryptoState({
+                bindingName: this.machineBindingName(machine),
+                masterName: this.machineMasterKeyName(machine),
+                masterKeyIDName: this.machineMasterKeyIDName(machine), senderName: senderName
+            }, this.indexedDB);
+            // A concurrent explicit pairing may have changed the pin's storage name. Ask again
+            // on the next operation, rather than mixing two pairing generations.
+            if (!snapshot.bindingName || snapshot.bindingName.senderID !== binding.senderID) {
+                throw bootError("machine_key_incomplete", "machine pairing changed during lookup");
+            }
+            binding = snapshot.bindingName;
+            senderKey = snapshot.senderName;
+            if (snapshot.masterKeyIDName === binding.keyID) masterKey = snapshot.masterName;
         }
         if (!masterKey || !senderKey) {
             throw bootError("machine_key_incomplete",
@@ -530,7 +558,20 @@ export class CloudViewerSession {
         }
         return { machineID: binding.machineID, senderID: binding.senderID,
             keyID: binding.keyID, masterKey: masterKey, senderKey: senderKey,
-            legacy: binding.legacy };
+            legacy: binding.legacy, epoch: binding.epoch === undefined && binding.keyID === "ms-1"
+                ? 1 : binding.epoch, revision: binding.revision };
+    }
+
+    async persistMachineRekey(pairing, state, operation, valid) {
+        var masterKey = await importMasterSecret(state.key);
+        var binding = await adoptMachineRekey({
+            bindingName: this.machineBindingName(pairing.machineID),
+            masterName: this.machineMasterKeyName(pairing.machineID),
+            masterKeyIDName: this.machineMasterKeyIDName(pairing.machineID),
+            expected: pairing, masterKey: masterKey, keyID: state.key_id, epoch: state.epoch,
+            operation: operation, valid: valid
+        }, this.indexedDB);
+        return Object.assign({}, pairing, { keyID: binding.keyID, epoch: binding.epoch, masterKey: masterKey });
     }
 
     /**
@@ -678,7 +719,9 @@ export class CloudViewerSession {
             senderKey: senderKey,
             bindingName: this.machineBindingName(opened.machineID),
             binding: { v: 1, machineID: opened.machineID, senderID: opened.machineDeviceID,
-                keyID: opened.keyID, legacy: false },
+                keyID: opened.keyID, legacy: false,
+                epoch: opened.keyID === "ms-1" ? 1 : Number((/^mk-([1-9][0-9]*)-[a-f0-9]{64}$/
+                    .exec(opened.keyID) || [])[1]) || undefined },
             // Compatibility aliases are written only if no old account key exists. `put` is
             // deliberately forbidden for an existing alias: pairing AWS must not evict the Mac.
             preserve: { masterName: this.masterKeyName(),
@@ -706,6 +749,11 @@ export class CloudViewerSession {
             relayURL: token.relayURL,
             deviceToken: token.token,
             devicePrivateKey: this.devicePrivateKey,
+            devicePublicKey: this.devicePublicKey,
+            enableViewerRekey: this.enableViewerRekey,
+            persistMachineRekey: function (pairing, state, operation, valid) {
+                return self.persistMachineRekey(pairing, state, operation, valid);
+            },
             deviceID: this.deviceID,
             account: this.account,
             keyID: keyConnection.keyID,
@@ -861,6 +909,9 @@ export function keepConnected(session, options) {
     // Parked by 4403s `MAXIMUM_FORBIDDEN_PARKS` times: the page coming back no longer starts it.
     var parkedForGood = false;
     var lastAttemptAt = null;
+    // Whether this loop has tried before: the connection-health stage of the next try is a
+    // reconnect, not a first connect (`viewer-health-hook.js`).
+    var attemptedBefore = false;
     // A hidden page keeps its connection exactly as a shown one does: nothing here closes the socket
     // or holds back a connect because the page is out of sight. What is kept is when it was hidden,
     // only to recover from a page the browser froze meanwhile (`staleResume`).
@@ -1099,10 +1150,17 @@ export function keepConnected(session, options) {
             if (stopped) return;
             var outcome = null;
             lastAttemptAt = now();
+            // A connect while a client still serves replaces its carrier (a renewal, or a fresh socket
+            // after a long hide); one after any earlier try is a reconnect; the loop's first is a connect.
+            var healthStage = active && active.ready ? "viewer_carrier_replace"
+                : attemptedBefore ? "viewer_reconnect" : "viewer_connect";
+            attemptedBefore = true;
+            var healthSpan = viewerHealthBegin(healthStage, "transport");
             try {
                 outcome = await session.connect();
             } catch (error) {
-                if (stopped) return;
+                if (stopped) { healthSpan.complete("aborted"); return; }
+                healthSpan.fail(classifyViewerError(error, "connect"));
                 if (error && error.code === "revoked") {
                     onState({ state: "revoked", error: error });
                     return;
@@ -1137,13 +1195,19 @@ export function keepConnected(session, options) {
                 continue;
             }
             if (stopped) {
+                healthSpan.complete("aborted");
                 if (outcome && outcome.client && outcome.client !== active) retireClient(outcome.client);
                 return;
             }
             if (outcome.state !== "connected") {
+                // Signing in again is the session refused; pairing or a device seat is not a failed
+                // connection, only one that did not go on.
+                if (outcome.state === "sign_in") healthSpan.fail("auth_refused");
+                else healthSpan.complete("aborted");
                 onState(outcome);
                 return;
             }
+            healthSpan.complete("ok");
             if (!active || !active.ready || healthySince === null) healthySince = now();
             active = outcome.client;
             staleResume = false;

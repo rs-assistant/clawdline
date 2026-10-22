@@ -34,8 +34,10 @@ func (s *Server) secretHandoffNote(ctx context.Context, id string) (work.HumanIn
 // console that never displayed the command, such as a hosted console built
 // before commands were declared, from handing off a value blind.
 func (s *Server) personSubmitSecretHandoff(w http.ResponseWriter, r *http.Request, conversation, id, actor string) {
+	// A resolved Note is not refused here: a submission's own replay is
+	// answered below, before the completed Note is.
 	note, valid := s.secretHandoffNote(r.Context(), id)
-	if !valid || note.ResolvedAt != nil || note.TargetConversation != conversation {
+	if !valid || note.TargetConversation != conversation {
 		writeRefusal(w, http.StatusNotFound, "secret_handoff_unavailable", "This Secret Handoff is no longer available.")
 		return
 	}
@@ -67,19 +69,30 @@ func (s *Server) personSubmitSecretHandoff(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	if err := s.secretHandoffs.Put(id, conversation, []byte(body.Value)); err != nil {
+	// Replay a successful submission before checking the now-completed Note.
+	if note.ResolvedAt != nil {
 		_ = s.store.ReleaseReceipt(context.WithoutCancel(r.Context()), k)
-		switch {
-		case errors.Is(err, app.ErrSecretFull):
-			writeRefusal(w, http.StatusServiceUnavailable, "secret_handoffs_full", "Too many handoffs are pending. Try again later.")
-		default:
-			writeRefusal(w, http.StatusConflict, "secret_handoff_unavailable", "This Secret Handoff cannot accept another value.")
-		}
+		writeRefusal(w, http.StatusNotFound, "secret_handoff_unavailable", "This Secret Handoff is no longer available.")
 		return
 	}
 	answer := []byte(`{"ok":true,"received":true}`)
-	if err := s.store.CompleteReceipt(r.Context(), k, store.ReceiptAnswer{Status: http.StatusOK, Body: answer}); err != nil {
-		writeRefusal(w, http.StatusServiceUnavailable, "receipt_unavailable", "The handoff receipt could not be recorded. Check the Session before trying again.")
+	// Completion acknowledges the person's handoff, not the tool's later
+	// claim. Commit the Note and receipt together before publishing the value.
+	if err := s.secretHandoffs.PutAndCommit(id, conversation, []byte(body.Value), func() error {
+		_, _, err := s.humanInterventions().Update(r.Context(), id, conversation, "resolve", "", note.Version, k,
+			func(work.HumanIntervention) []byte { return answer })
+		return err
+	}); err != nil {
+		switch {
+		case errors.Is(err, app.ErrSecretFull):
+			_ = s.store.ReleaseReceipt(context.WithoutCancel(r.Context()), k)
+			writeRefusal(w, http.StatusServiceUnavailable, "secret_handoffs_full", "Too many handoffs are pending. Try again later.")
+		case errors.Is(err, app.ErrSecretUnavailable):
+			_ = s.store.ReleaseReceipt(context.WithoutCancel(r.Context()), k)
+			writeRefusal(w, http.StatusConflict, "secret_handoff_unavailable", "This Secret Handoff cannot accept another value.")
+		default:
+			writeRefusal(w, http.StatusServiceUnavailable, "receipt_unavailable", "The handoff receipt could not be recorded. Check the Session before trying again.")
+		}
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -131,10 +144,13 @@ func (s *Server) agentClaimSecretHandoff(w http.ResponseWriter, r *http.Request,
 	// does; keeping the value in memory for that Session only lengthens the
 	// time it has to find another way. The Note is closed too, so the person
 	// sees that the request ended, and handing off again is their choice.
+	// A submission already resolved the Note as handed off, so the resolution
+	// is rewritten whatever its state: left alone, the Note would read as
+	// delivered when the value was thrown away.
 	if !app.SameSecretHandoffCommand(declared.Command, body.Command) {
 		s.secretHandoffs.Discard(id, target)
 		ctx := context.WithoutCancel(r.Context())
-		if note, err := s.store.HumanIntervention(ctx, id); err == nil && note.ResolvedAt == nil {
+		if note, err := s.store.HumanIntervention(ctx, id); err == nil {
 			_, _, _ = s.humanInterventions().Update(ctx, id, target, "resolve", "Secret Handoff refused: command mismatch", note.Version, store.ReceiptKey{}, nil)
 		}
 		writeRefusal(w, http.StatusForbidden, "secret_handoff_command_mismatch", "This is not the command the Secret Handoff Note named. Nothing was handed off; any waiting value was discarded and the Note was closed.")

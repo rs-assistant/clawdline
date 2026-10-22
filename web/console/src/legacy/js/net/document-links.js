@@ -5,7 +5,7 @@ export const CANONICAL_DOCUMENT_ORIGIN = "https://app.clawdline.com";
 const DOCUMENT_MAX_PATH = 512;
 const DOCUMENT_MAX_DEPTH = 6;
 const DOCUMENT_MAX_LIST = 200;
-const DOCUMENT_EXTENSIONS = new Set(["md", "markdown", "txt"]);
+const DOCUMENT_EXTENSIONS = new Set(["md", "markdown", "txt", "html"]);
 const TASK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const utf8 = new TextEncoder();
 
@@ -275,7 +275,8 @@ export function documentAnswer(wanted, body) {
         body.scope !== locator.scope || body.path !== locator.path ||
         (locator.scope === "task" && body.task !== locator.task) ||
         (body.media_type !== "text/markdown; charset=utf-8" &&
-         body.media_type !== "text/plain; charset=utf-8") ||
+         body.media_type !== "text/plain; charset=utf-8" &&
+         body.media_type !== "text/html; charset=utf-8") ||
         !Number.isSafeInteger(body.byte_count) || body.byte_count < 0 ||
         body.byte_count > DOCUMENT_MAX_BYTES || typeof body.data !== "string") {
         throw new TypeError("document answer does not match the requested document");
@@ -294,7 +295,8 @@ export function documentBytesAnswer(wanted, mediaType, value) {
     var locator = normalizeDocumentLocator(wanted);
     var bytes = value instanceof Uint8Array ? value : new Uint8Array(value || []);
     if (mediaType !== "text/markdown; charset=utf-8" &&
-        mediaType !== "text/plain; charset=utf-8") {
+        mediaType !== "text/plain; charset=utf-8" &&
+        mediaType !== "text/html; charset=utf-8") {
         throw new TypeError("document answer has an unsupported media type");
     }
     if (bytes.length > DOCUMENT_MAX_BYTES) {

@@ -1,0 +1,4 @@
+[
+  {"query":"", "body":{"days":"7"}},
+  {"query":"days=28&project=opaque%2Fproject%26one", "body":{"days":"28","project":"opaque/project&one"}}
+]

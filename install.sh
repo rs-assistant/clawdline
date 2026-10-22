@@ -23,6 +23,9 @@
 #   CLAWDLINE_INSTALL_BASE_URL   where the manifest and the archives are (tests)
 #   CLAWDLINE_INSTALL_TEST_KEY   one more trusted key, only with the line above (tests)
 set -eu
+# Nothing this script writes — the manifest, the archive, the unpacked release —
+# is readable by another user of the machine while it is being checked.
+umask 077
 
 repo_url=https://github.com/sainteye/clawdline
 
@@ -44,8 +47,9 @@ detail() { [ "$verbose" = 0 ] || say "  $*"; }
 die() { printf 'clawdline install: %s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# fetch <url> <file>: 0 when the file arrived; 22 for a 404, so "no release
-# yet" can be told from a network failure.
+# fetch <url> <file> <max bytes>: 0 when the file arrived; 22 for a 404, so
+# "no release yet" can be told from a network failure. A body larger than its
+# bound is refused, whatever the server says its length is.
 #
 # Only curl: it keeps every request and redirect on https. wget cannot —
 # GNU wget's --https-only applies only to recursive downloads (measured with
@@ -57,7 +61,8 @@ fetch() {
   # by CLAWDLINE_INSTALL_BASE_URL.
   proto='=https'
   case ${CLAWDLINE_INSTALL_BASE_URL:-} in http://*) proto='=https,http' ;; esac
-  code=$(curl -sSL --proto "$proto" --proto-redir "$proto" --retry 2 -o "$2" -w '%{http_code}' "$1") || return 1
+  code=$(curl -sSL --proto "$proto" --proto-redir "$proto" --retry 2 --max-filesize "$3" -o "$2" -w '%{http_code}' "$1") || return 1
+  [ ! -f "$2" ] || [ "$(wc -c <"$2" | tr -d ' ')" -le "$3" ] || return 1
   [ "$code" = 200 ] && return 0
   [ "$code" = 404 ] && return 22
   return 1
@@ -91,7 +96,7 @@ platform() {
 # from the Releases API (newest first). The list is not signed; the manifest
 # of the tag it names is, and is checked like any other.
 newest_tag() {
-  fetch "https://api.github.com/repos/sainteye/clawdline/releases?per_page=10" "$work/releases.json" ||
+  fetch "https://api.github.com/repos/sainteye/clawdline/releases?per_page=10" "$work/releases.json" 1048576 ||
     die "could not list the releases at $repo_url/releases. Check your network, or pass --version vX.Y.Z."
   sed -n 's/^ *"tag_name": *"\(v[0-9][^"]*\)".*/\1/p' "$work/releases.json" | head -n 1
 }
@@ -181,8 +186,12 @@ verify_release() {
   die "nothing here can check this release's Ed25519 signature: $openssl is missing or older than OpenSSL 3, and ssh-keygen is missing, older than OpenSSH 8.1, or the release carries no manifest.sshsig. Nothing was installed; the downloaded files are not run unchecked. $next."
 }
 
-# field <name>: a top-level string field of the verified manifest.
+# field <name>: a top-level string field of the verified manifest. A field
+# named twice is refused: a JSON reader elsewhere could take the other one,
+# and the two would no longer be describing the same release.
 field() {
+  n=$(grep -c "^[[:space:]]*\"$1\":" "$work/manifest.lines" || true)
+  [ "$n" -le 1 ] || die "the release's manifest names \"$1\" more than once; nothing was installed. Report it at $repo_url/issues."
   sed -n "s/^[[:space:]]*\"$1\":[[:space:]]*\"\([^\"]*\)\"[[:space:]]*\$/\1/p" "$work/manifest.lines" | head -n 1
 }
 
@@ -314,7 +323,8 @@ main() {
   detail "from $base"
   for f in manifest.json manifest.sig.json manifest.sshsig; do
     status=0
-    fetch "$base/$f" "$work/$f" || status=$?
+    case $f in manifest.json) bound=65536 ;; *) bound=16384 ;; esac
+    fetch "$base/$f" "$work/$f" "$bound" || status=$?
     # A release from before the SSH copy of the signature has none; openssl
     # checks manifest.sig.json, which every release has.
     if [ "$f" = manifest.sshsig ] && [ "$status" = 22 ]; then
@@ -376,7 +386,7 @@ main() {
   esac
   [ -n "$want" ] || die "release $v has no archive for $os/$arch. Pass --version with a release that has one ($repo_url/releases)."
 
-  fetch "$base/$name" "$work/$name" || die "could not download $base/$name. Check your network and run this again."
+  fetch "$base/$name" "$work/$name" 536870912 || die "could not download $base/$name. Check your network and run this again."
   got=$(sha256_of "$work/$name")
   [ "$got" = "$want" ] || die "$name has sha256 $got, the signed manifest says $want; nothing was installed. Run this again; if it repeats, report it at $repo_url/issues."
   detail "$name matches the signed manifest"

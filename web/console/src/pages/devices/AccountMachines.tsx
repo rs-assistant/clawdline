@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../LoadingSkeleton.js"
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import { nextWord } from "../../next-strings.js"
@@ -13,6 +14,7 @@ import { listViewerDevices, revokeViewerDevice, type ViewerDevice, type ViewerDe
 import { MachinePlatformIcon } from "../../cloud/MachinePlatformIcon.js"
 import { sessionsFact } from "../../cloud/unpaired-rows.js"
 import { machineSeenWord } from "../../cloud/machine-seen.js"
+import { OwnerDiagnostics } from "../../cloud/health-owner/OwnerDiagnostics.js"
 import "./account-machines.css"
 
 /**
@@ -126,7 +128,7 @@ export function AccountMachines({ shown, onStart }: { shown: boolean; onStart: (
         </div>
       )}
       {rows === null ? (
-        <p className="am-quiet" role="status">{nextWord("msLoading")}</p>
+        <LoadingSkeleton id="SK-04" kind="cards" label={nextWord("msLoading")} />
       ) : rows.length === 0 ? (
         <p className="am-quiet">{nextWord("msEmpty")}</p>
       ) : (
@@ -176,9 +178,9 @@ export function AccountMachines({ shown, onStart }: { shown: boolean; onStart: (
   )
 }
 
-type Tab = "connection" | "access"
+type Tab = "connection" | "access" | "diagnostics"
 
-function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
+export function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
   machine: Row
   manager: MachineManager
   onClose: () => void
@@ -187,6 +189,13 @@ function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
 }) {
   const [tab, setTab] = useState<Tab>("connection")
   const [forgetting, setForgetting] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const afterClose = useRef<(() => void) | null>(null)
+  const close = (after = onClose) => {
+    if (afterClose.current) return
+    afterClose.current = after
+    setClosing(true)
+  }
   const box = useRef<HTMLDivElement>(null)
   const name = nameOf(machine)
 
@@ -199,13 +208,16 @@ function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
   }, [])
 
   const onKey = (event: React.KeyboardEvent) => {
-    if (event.key === "Escape") { event.preventDefault(); if (forgetting) setForgetting(false); else onClose() }
+    if (event.key === "Escape") { event.preventDefault(); if (forgetting) setForgetting(false); else close() }
   }
 
   return (
-    <div className="am-layer" onKeyDown={onKey}>
-      <div className="am-scrim" onClick={onClose} aria-hidden="true" />
-      <div className="am-sheet" role="dialog" aria-modal="true" aria-labelledby="am-sheet-title" ref={box} tabIndex={-1}>
+    <div className="am-layer" data-closing={closing} onKeyDown={onKey}>
+      <div className="am-scrim" onClick={() => close()} aria-hidden="true" />
+      <div className="am-sheet" role="dialog" aria-modal="true" aria-labelledby="am-sheet-title" ref={box} tabIndex={-1}
+        inert={closing} onAnimationEnd={(event) => {
+          if (event.target === event.currentTarget && event.animationName === "am-sheet-out") afterClose.current?.()
+        }}>
         <div className="am-grab" aria-hidden="true" />
         <div className="am-sheet-head">
           <span className="am-icon"><MachinePlatformIcon platform={machine.kind ?? ""} /></span>
@@ -217,12 +229,12 @@ function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
               {" · "}{machineSeenWord(machine.observedAt)}
             </p>
           </div>
-          <button type="button" className="am-close" aria-label={nextWord("msClose")} onClick={onClose}>
+          <button type="button" className="am-close" aria-label={nextWord("msClose")} onClick={() => close()}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
         {forgetting ? (
-          <ForgetPanel machine={machine} manager={manager} onCancel={() => setForgetting(false)} onForgotten={onForgotten} />
+          <ForgetPanel machine={machine} manager={manager} onCancel={() => setForgetting(false)} onForgotten={(word) => close(() => onForgotten(word))} />
         ) : (
           <>
             <div className="am-tabs" role="tablist">
@@ -230,11 +242,15 @@ function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
                 className={tab === "connection" ? "on" : ""} onClick={() => setTab("connection")}>{nextWord("msTabConnection")}</button>
               <button type="button" role="tab" id="am-tab-access" aria-selected={tab === "access"} aria-controls="am-panel"
                 className={tab === "access" ? "on" : ""} onClick={() => setTab("access")}>{nextWord("msTabNameAccess")}</button>
+              <button type="button" role="tab" id="am-tab-diagnostics" aria-selected={tab === "diagnostics"} aria-controls="am-panel"
+                className={tab === "diagnostics" ? "on" : ""} onClick={() => setTab("diagnostics")}>{nextWord("ownerDiagTab")}</button>
             </div>
-            <div className="am-panel" id="am-panel" role="tabpanel" aria-labelledby={tab === "connection" ? "am-tab-connection" : "am-tab-access"}>
+            <div className="am-panel" id="am-panel" role="tabpanel" aria-labelledby={"am-tab-" + tab}>
               {tab === "connection"
-                ? <ConnectionTab machine={machine} manager={manager} onStart={onStart} />
-                : <AccessTab machine={machine} manager={manager} onForget={() => setForgetting(true)} />}
+                ? <ConnectionTab machine={machine} manager={manager} onStart={() => close(onStart)} />
+                : tab === "diagnostics"
+                  ? <OwnerDiagnostics machineID={machine.id} />
+                  : <AccessTab machine={machine} manager={manager} onForget={() => setForgetting(true)} />}
             </div>
           </>
         )}
@@ -251,8 +267,9 @@ const Cross = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" 
 function ConnectionTab({ machine, manager, onStart }: { machine: Row; manager: MachineManager; onStart: () => void }) {
   useHistoryTick()
   const [attempt, setAttempt] = useState<"idle" | "trying" | DirectTry>("idle")
+  const [localNetwork, setLocalNetwork] = useState<"idle" | "saving" | "enabled" | "failed">("idle")
   const live = useRef(true)
-  useEffect(() => () => { live.current = false }, [])
+  useEffect(() => { live.current = true; return () => { live.current = false } }, [])
   const name = nameOf(machine)
   const history = directHistory(machine.id)
   const since = failingSince(history)
@@ -265,6 +282,21 @@ function ConnectionTab({ machine, manager, onStart }: { machine: Row; manager: M
     const outcome = await manager.tryDirect(machine.id)
     if (live.current) setAttempt(outcome)
   }
+  const enableSameNetwork = async () => {
+    if (localNetwork === "saving" || !manager.enableSameNetwork) return
+    setLocalNetwork("saving")
+    try {
+      await manager.enableSameNetwork(machine.id)
+    } catch {
+      if (live.current) setLocalNetwork("failed")
+      return
+    }
+    if (!live.current) return
+    setLocalNetwork("enabled")
+    await tryNow()
+  }
+  const suggestLocal = road === "failing" && machine.pairing !== "not_paired" &&
+    manager.sameNetworkAvailable?.(machine.id) === true
   const canTry = road !== "offline" && road !== "machine_off" && road !== "direct" && machine.pairing !== "not_paired"
 
   return (
@@ -295,8 +327,22 @@ function ConnectionTab({ machine, manager, onStart }: { machine: Row; manager: M
       )}
       <HistoryChart history={history} since={since} />
       {attempt !== "idle" && <AttemptResult attempt={attempt} machine={name} />}
+      {suggestLocal && localNetwork !== "enabled" && (
+        <div className="am-stack">
+          <div>
+            <h3 className="am-road-title">{nextWord("msSameNetworkTitle")}</h3>
+            <p className="am-say">{nextWord("msSameNetworkHint", { machine: name })}</p>
+          </div>
+          <button type="button" className="am-ghost am-wide" onClick={enableSameNetwork}
+            disabled={localNetwork === "saving" || attempt === "trying"} aria-busy={localNetwork === "saving"}>
+            {nextWord(localNetwork === "saving" ? "msSameNetworkSaving" : "msSameNetworkEnable")}
+          </button>
+        </div>
+      )}
+      {localNetwork === "failed" && <p className="am-say" role="alert">{nextWord("msSameNetworkFailed")}</p>}
+      {localNetwork === "enabled" && <p className="am-say" role="status">{nextWord("msSameNetworkEnabled", { machine: name })}</p>}
       {canTry && (
-        <button type="button" className="am-ghost am-wide" onClick={tryNow} disabled={attempt === "trying"} aria-busy={attempt === "trying"}>
+        <button type="button" className="am-ghost am-wide" onClick={tryNow} disabled={attempt === "trying" || localNetwork === "saving"} aria-busy={attempt === "trying"}>
           {attempt === "trying" ? nextWord("msTrying") : nextWord("msTryNow")}
         </button>
       )}

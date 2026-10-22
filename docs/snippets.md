@@ -217,8 +217,8 @@ here blocks it; see the last section.
 Reads take the ordinary read gate. **Writes take all three write gates in order** — the remote write
 switch, this device's `send` capability, a non-empty `Idempotency-Key` — and land a line in
 `remote-audit.jsonl` like every other write. That is deliberately the same bar as typing into a
-session: both change what is on this Mac, and a device that may only read must not be able to
-rewrite the owner's snippets. A brake of ten writes in ten minutes, copied from
+session: both change what is on this Mac, so a snippet write passes the same switch and the
+same idempotency check as a typed message. A brake of ten writes in ten minutes, copied from
 `POST /v1/orchestrator/schedules`, keeps a looping client off the disk.
 
 `docs/api.md` carries one section for the set, beside

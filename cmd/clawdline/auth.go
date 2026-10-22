@@ -198,12 +198,16 @@ func openURL(u string) error {
 // pairingCode); the device name and pairing code remain as received.
 func pairCommand(args []string) {
 	fs := flag.NewFlagSet("pair", flag.ExitOnError)
+	permission := fs.String("permission", "", cliCopy("ops", "devices.pair_permission_help", "select read-only or read-and-operate on this machine before showing the pairing code"))
 	watch := fs.Bool("watch", false, cliCopy("core", "auth.watch_help", "keep printing codes until interrupted"))
 	reset := fs.Bool("reset", false, cliCopy("misc", "pair.reset_help", "open pairing again after wrong codes closed it, then exit"))
 	_ = fs.Parse(args)
 	if *reset {
 		resetPairing()
 		return
+	}
+	if *permission != "" && *permission != "read-only" && *permission != "read-and-operate" {
+		fail(errors.New(cliCopy("ops", "devices.permission_invalid", "permission must be read-only or read-and-operate")))
 	}
 
 	req, err := daemonRequest(http.MethodGet, "/v1/auth/pairings", nil)
@@ -239,6 +243,16 @@ func pairCommand(args []string) {
 			if event == "pairing" {
 				var n contract.PairingNotice
 				if json.Unmarshal([]byte(data), &n) == nil {
+					if *permission != "" {
+						door, err := openLocalDoor()
+						if err != nil {
+							fail(err)
+						}
+						var result contract.AuthOK
+						if err := door.doBody(http.MethodPost, "/v1/auth/pairings/"+n.PairingID+"/permission", contract.DevicePermission{Permission: *permission}, &result); err != nil {
+							fail(err)
+						}
+					}
 					printPairing(n)
 					if !*watch {
 						return

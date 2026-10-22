@@ -1,5 +1,10 @@
 # 殼與網頁之間的介面
 
+Current entry point (2026-10-21): the standalone macOS settings surface is sunset.
+Use website Settings for configuration. iTerm2 consent is under **Workflow and
+control** in both Cloud and local browser consoles; see [the current boundary](interface.md#turning-iterm2-scanning-off).
+The native-window sections below document the retained bridge, not the primary settings workflow.
+
 > 這份文件給「之後要寫 Linux／Windows 殼的人」。每一節寫一個畫面：**殼負責什麼、網頁負責什麼、
 > 兩邊怎麼講話**。寫 Linux 殼的時候，照著同一組訊息名字實作一次，同一份 web 就能用。
 >
@@ -221,8 +226,8 @@ key 的拼法、值的範圍都跟舊 app 的 `Config` 一樣，所以一行從�
   `voice_engine`, `voice_settle_seconds`, and `voice_stop_seconds` do not affect transcription,
   so the Voice tab omits those controls. It offers the effective `voice_language`, the resolved
   recognition language, and the shell's Whisper status.
-- **遠端那一頁的開關與通道**——`remote`、`remote_write`、四個推播開關、`remote_tunnel`、
-  `remote_hostname` 都寫得進檔案；tunnel 本身、已配對裝置清單、Cloud 登入卡片沒有後端，所以沒有畫。
+- **遠端那一頁的開關**——`remote`、`remote_write`、四個推播開關、`tailscale_hostname` 都寫得進檔案；
+  內建的 Cloudflare 通道已於 2026-10-20 移除，舊設定只會顯示一次說明。
 - **Dispatch rules** have their own tab. The shipped base is read-only and the person's local
   additions are editable. `/v1/settings/dispatch-policy` requires this machine's identity and
   a read version before saving, so a stale page cannot overwrite an external edit. Schedules

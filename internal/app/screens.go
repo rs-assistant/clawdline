@@ -75,7 +75,7 @@ const (
 	// being replicated lets a paired reader look — but on tmux each watched
 	// pane costs a `pipe-pane`, which is a `sh -c` tmux forks and a FIFO in
 	// this daemon's directory. Nothing bounded how many could be alive at
-	// once, so a device that may only read could name one session after
+	// once, so a paired device could name one session after
 	// another and leave a process and a pipe behind each time, for the length
 	// of a lease. Ten is more screens than anybody has open and far fewer than
 	// a machine notices. Past it a screen reads as unreadable, which is what

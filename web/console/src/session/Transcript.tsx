@@ -58,6 +58,7 @@ import "./lightbox-steps.css"
 import "./transcript-error.css"
 import { atNewest, jumpOffered } from "./jump.js"
 import { joinTranscript } from "./history.js"
+import { HistoryFill, historyAdvanced } from "./history-fill.js"
 import { recordSendDiagnostic } from "../cloud/install.js"
 import "./jump.css"
 import "./history.css"
@@ -125,23 +126,28 @@ interface EarlierPages {
   pages: TranscriptPage[]
 }
 
-export function Transcript({
-  id,
-  row,
-  agentId,
-  onAgent,
-}: {
+interface TranscriptProps {
   id: string
   row?: SessionRow
   agentId?: string
   onAgent?: (id: string) => void
-}) {
-  // Keyed, so a different session starts from nothing: no previous session's
-  // turns, error or opened folds are shown under the new name.
-  return <TranscriptOf key={`${id}:${agentId ?? ""}`} id={id} row={row} agentId={agentId} onAgent={onAgent} />
 }
 
-function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: SessionRow; agentId?: string; onAgent?: (id: string) => void }) {
+export function Transcript(props: TranscriptProps) {
+  return <TranscriptFrame key={`${props.id}:${props.agentId ?? ""}`} {...props} />
+}
+
+function TranscriptFrame(props: TranscriptProps) {
+  const [filling, setFilling] = useState(true)
+  return <div className="tx-history-wrap" aria-busy={filling}>
+    {filling && <div className="tx-history-loading"><Skeleton /></div>}
+    <div className="tx-history-body" style={{ visibility: filling ? "hidden" : undefined }} aria-hidden={filling || undefined}>
+      <TranscriptOf {...props} onFilling={setFilling} />
+    </div>
+  </div>
+}
+
+function TranscriptOf({ id, row, agentId, onAgent, onFilling }: TranscriptProps & { onFilling: (filling: boolean) => void }) {
   // The page last read, and whether the pane is on its fast pace: the read
   // asks only for what was appended to it unless this is the safety read of
   // the whole page (`transcript-follow.ts`).
@@ -242,6 +248,12 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
   const [olderLoading, setOlderLoading] = useState(false)
   const [olderError, setOlderError] = useState<string | null>(null)
   const olderBusy = useRef(false)
+  const historyFill = useRef(new HistoryFill())
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
   const olderAnchor = useRef<{ top: number; height: number } | null>(null)
   // The list row's spinner and live line, repeated under the conversation's
   // newest end, where the reader's eye already is. Only the session's own
@@ -262,9 +274,11 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
   const olderCursor = earlier
     ? earlier.pages.length ? earlier.pages[earlier.pages.length - 1].nextBefore : earlier.base.nextBefore
     : data?.nextBefore
-  const loadOlder = useCallback(async () => {
+  const loadOlder = useCallback(async (automatic = false) => {
     if (!olderCursor || olderBusy.current || !data) return
     olderBusy.current = true
+    historyFill.current.begin(automatic)
+    onFilling(true)
     setOlderLoading(true)
     setOlderError(null)
     const scroll = document.getElementById("tx-scroll")
@@ -272,16 +286,56 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
       const page = agentId
         ? await client.agentTranscript(id, agentId, LIMIT, olderCursor)
         : await client.transcript(id, LIMIT, olderCursor)
+      if (!alive.current) return
+      if (!historyAdvanced(olderCursor, page.nextBefore)) {
+        setOlderError(nextWord("transcriptEarlierStalled"))
+        return
+      }
       if (page.evidence !== "transcript") throw new Error(page.note || "Earlier conversation could not be read")
       if (scroll) olderAnchor.current = { top: scroll.scrollTop, height: scroll.scrollHeight }
       setEarlier((was) => ({ base: was?.base ?? data, pages: [...(was?.pages ?? []), page] }))
     } catch (error) {
+      if (!alive.current) return
       setOlderError(L.failureSentence(error, nextWord("transcriptEarlierFailed")))
     } finally {
       olderBusy.current = false
-      setOlderLoading(false)
+      if (alive.current) setOlderLoading(false)
     }
-  }, [agentId, data, id, olderCursor])
+  }, [agentId, data, id, olderCursor, onFilling])
+  // Empty raw-record windows and compact tool groups may leave no scrollbar.
+  // Fill after layout without requiring a scroll gesture. The per-opening
+  // budget survives polling and resizes; only the person can restart it.
+  useEffect(() => {
+    const scroll = document.getElementById("tx-scroll")
+    const box = document.getElementById("tx")
+    if (!scroll || !box || !data || data.evidence !== "transcript") {
+      onFilling(show === "loading")
+      return
+    }
+    if (skeleton) { onFilling(true); return }
+    let frame = 0
+    const fill = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        if (olderBusy.current) return
+        const body = box.querySelector(".tx-history-body")
+        const style = getComputedStyle(scroll)
+        const viewportHeight = scroll.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+        if (historyFill.current.needed({
+          cursor: olderCursor, contentHeight: body?.getBoundingClientRect().height ?? 0, viewportHeight,
+          loading: false, failed: !!olderError || show === "failure",
+        })) {
+          onFilling(true)
+          void loadOlder(true)
+        } else onFilling(false)
+      })
+    }
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fill)
+    observer?.observe(scroll)
+    observer?.observe(box)
+    fill()
+    return () => { observer?.disconnect(); cancelAnimationFrame(frame) }
+  }, [data, earlier, olderCursor, olderError, olderLoading, show, skeleton, loadOlder, onFilling])
   useLayoutEffect(() => {
     const anchor = olderAnchor.current
     if (!anchor) return
@@ -604,8 +658,8 @@ export function TranscriptEntries({ entries, assistant, working = false, picture
   const latestPictureSource = useRef(pictureSource)
   latestPictureSource.current = pictureSource
   const queue = useRef<NonNullable<TranscriptEntry["artifacts"]>>([])
-  tiles.current ??= new ArtifactTiles((artifact, session) => latestPictureSource.current
-    ? latestPictureSource.current(artifact, session)
+  tiles.current ??= new ArtifactTiles((artifact, session, size) => latestPictureSource.current
+    ? latestPictureSource.current(artifact, session, size)
     : Promise.reject(Object.assign(new Error("No image reader"), { code: "read_failed" })))
   queue.current = []
   useLayoutEffect(() => { tiles.current?.settle(box.current, queue.current, sessionID) })
@@ -900,9 +954,16 @@ function pendingAction(ev: MouseEvent<HTMLElement>) {
   if (diagnose) {
     const card = pendingSends.card(diagnose.getAttribute("data-pending-diagnose") ?? "")
     if (card?.state === "failed") {
-      const kept = recordSendDiagnostic(card.failure)
-      diagnose.textContent = nextWord(kept ? "sendDiagnosticQueued" : "sendDiagnosticUnavailable")
-      if (diagnose instanceof HTMLButtonElement) diagnose.disabled = kept
+      if (!(diagnose instanceof HTMLButtonElement) || diagnose.disabled) return
+      diagnose.disabled = true
+      diagnose.textContent = nextWord("sendDiagnosticSending")
+      void recordSendDiagnostic(card.failure).then(() => {
+        diagnose.textContent = nextWord("sendDiagnosticQueued")
+      }, (error: unknown) => {
+        diagnose.textContent = nextWord("sendDiagnosticUnavailable")
+        diagnose.title = L.failureSentence(error, nextWord("sendDiagnosticUnavailable"))
+        diagnose.disabled = false
+      })
     }
     return
   }
@@ -1541,12 +1602,17 @@ function activityOf(e: Entry): TranscriptActivity | null {
   return e.activity
 }
 
+const planWords = {
+  en: { updatedPlan: "Updated Plan" },
+  "zh-Hant": { updatedPlan: "更新後的計畫" },
+} as const satisfies Record<"en" | "zh-Hant", Record<"updatedPlan", string>>
+
 /** `planHTML`. */
 function planHTML(v: View, e: Entry, at: number) {
   const esc = L.escapeHTML
   const steps = planOf(e) || []
   const card =
-    '<section class="plan-card"><header>Updated Plan</header><ol>' +
+    '<section class="plan-card"><header>' + esc(catalogWord("transcript", "updatedPlan")) + '</header><ol>' +
     steps
       .map((step) => {
         const mark = step.status === "completed" ? "✓" : step.status === "inProgress" ? "●" : "○"

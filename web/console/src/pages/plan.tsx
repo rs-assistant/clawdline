@@ -41,9 +41,6 @@ function PlanPageView({ shown }: { shown: boolean }) {
       unbindPromo.current?.()
       page.current?.leave()
       page.current = bindPlan(document, origin)
-      unbindPromo.current = bindPromoForm(document, origin, async () => {
-        await page.current?.enter()
-      })
       boundOrigin.current = origin
       entered.current = false
     }
@@ -60,6 +57,10 @@ function PlanPageView({ shown }: { shown: boolean }) {
     // is written to.
     const arrive = () => {
       if (!shown || entered.current) return
+      unbindPromo.current?.()
+      unbindPromo.current = bindPromoForm(document, origin, async () => {
+        await page.current?.enter()
+      })
       entered.current = true
       checkoutReturn.current = false
       void page.current?.enter({ returning })

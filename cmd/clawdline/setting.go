@@ -84,6 +84,43 @@ var settingKeys = map[string]struct {
 	"push_on_app_release_success":   {parse: parseSettingBool, show: showSettingBool, takes: "on/off or true/false"},
 	"push_on_cloud_release_success": {parse: parseSettingBool, show: showSettingBool, takes: "on/off or true/false"},
 	"push_on_release_failure":       {parse: parseSettingBool, show: showSettingBool, takes: "on/off or true/false"},
+	// The connection-health uploader's opt-in. Absent means off, and off
+	// makes no request; it takes effect on the uploader's next cycle.
+	"cloud_health_upload": {
+		parse: parseSettingBool,
+		show: func(raw json.RawMessage) string {
+			var on *bool
+			switch {
+			case len(raw) == 0 || string(raw) == "null":
+				return cliCopy("core", "setting.health_upload_off", "off (nothing is uploaded)")
+			case json.Unmarshal(raw, &on) != nil || on == nil:
+				return "unknown"
+			case *on:
+				return cliCopy("core", "setting.health_upload_on", "on (uploading connection-health records to Cloud)")
+			}
+			return cliCopy("core", "setting.health_upload_off", "off (nothing is uploaded)")
+		},
+		takes: "on uploads this machine's connection-health records to Cloud; off (the default) sends nothing",
+	},
+	// The owner-sealed diagnostic retention opt-in. It is separate from
+	// cloud_health_upload: the metadata switch alone never permits keeping
+	// owner diagnostics. Absent means off, and off makes no request.
+	"cloud_health_owner_retention": {
+		parse: parseSettingBool,
+		show: func(raw json.RawMessage) string {
+			var on *bool
+			switch {
+			case len(raw) == 0 || string(raw) == "null":
+				return cliCopy("core", "setting.owner_retention_off", "off (no owner diagnostics are kept in Cloud)")
+			case json.Unmarshal(raw, &on) != nil || on == nil:
+				return "unknown"
+			case *on:
+				return cliCopy("core", "setting.owner_retention_on", "on (owner diagnostics are kept in Cloud, sealed for paired owner devices)")
+			}
+			return cliCopy("core", "setting.owner_retention_off", "off (no owner diagnostics are kept in Cloud)")
+		},
+		takes: "on keeps this machine's owner diagnostics in Cloud as ciphertext only paired owner devices can open; off (the default) sends nothing",
+	},
 	"product_language": {
 		parse: func(s string) (any, bool) {
 			for _, language := range nextconfig.ProductLanguages {
@@ -174,6 +211,10 @@ func settingTakes(key, english string) string {
 		return cliCopy("core", "setting.takes_bool", english)
 	case "product_language":
 		return cliCopy("core", "setting.takes_language", english)
+	case "cloud_health_upload":
+		return cliCopy("core", "setting.takes_health_upload", english)
+	case "cloud_health_owner_retention":
+		return cliCopy("core", "setting.takes_owner_retention", english)
 	}
 	return english
 }

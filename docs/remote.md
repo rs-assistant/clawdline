@@ -15,7 +15,7 @@ Cloud 版本，裝置配對等等」。這份文件記下當時量到的差距�
 | 路徑 | 版本 | 舊版靠什麼 | Go 版（2026-09-17，master ef77892） |
 |---|---|---|---|
 | 本機瀏覽器／Mac 視窗 | 免費 | RemoteServer（只綁 loopback） | 有；20 條路由（舊版 89 條）；Session 頁已接近 1:1 |
-| 自己的 cloudflared tunnel＋手機配對 | 免費 | RemoteAuth 541、RemoteTunnel 742、RemotePage 1,267、RemoteQR 44 行，加上 RemoteServer（5,976 行）裡的閘門 | 有（2026-09-19）：閘門與配對核心、網頁的配對頁、tunnel。見下方「配對頁與 tunnel」 |
+| 自己的 cloudflared tunnel＋手機配對 | 免費 | RemoteAuth 541、RemoteTunnel 742、RemotePage 1,267、RemoteQR 44 行，加上 RemoteServer（5,976 行）裡的閘門 | 有（2026-09-19）：閘門與配對核心、網頁的配對頁、tunnel。tunnel 已於 2026-10-20 移除，改走 Tailscale Serve；見下方「配對頁與 tunnel」 |
 | app.clawdline.com | Cloud | 18 個 `Cloud*.swift` 共 22,345 行＋WebPush 858 行；網頁端 `net/cloud-*.js` 共 7,796 行 | 0 行 |
 
 量法：`wc -l ~/code/clawdline/Sources/Cloud*.swift` 等，在 `~/code/clawdline` 的工作樹上量；路由數是
@@ -58,7 +58,10 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
    沒有桌面環境的 Linux 仍退回 0600 檔案，並在設定頁寫明。
 5. **配對的承諾照搬**（`~/code/clawdline/docs/remote.md` 的 How a device is paired）：碼只顯示在本機，
    不出現在回應、log、audit；最多猜 5 次、2 分鐘失效、一次一個、10 分鐘 3 次；token 以 constant-time 比對、
-   只存雜湊；寫入是另一個權限，預設關閉；本機也沒有例外；還沒有配對任何裝置之前 tunnel 不准啟動。
+   只存雜湊；本機也沒有例外；還沒有配對任何裝置之前 tunnel 不准啟動。直接配對的裝置逐台是只讀
+   （`read`）或可讀可操作（`read`+`send`），只有本機 token 能選（`POST /v1/auth/devices/{id}/permission`、
+   配對前的 `POST /v1/auth/pairings/{id}/permission`）；舊裝置與本機沒選過的新配對維持可讀可操作。
+   Cloud 是整台機器一個操作開關（`clawdline cloud commands`）；Cloud 逐個 viewer 的權限尚未實作。
    沒有原生殼的平台（Linux、Windows），碼由 CLI 在終端印出。
 
 ## 順序
@@ -75,7 +78,7 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
    已知還沒做：React console 的配對畫面、Dashboard 的派工按鈕（會 403）、send 的 Idempotency-Key、
    公開 health 的版本、真實 cloudflared 與原生殼寫入的驗證。
 3. 配對的網頁入口（照抄 `door/door.js`、`door.css`）與原生殼的 Remote 設定。**已做**，見下一節。
-4. tunnel：跑使用者自己安裝的 cloudflared，一律帶 `--config`，還沒配對任何裝置就拒絕啟動。**已做**，見下一節。
+4. tunnel：跑使用者自己安裝的 cloudflared，一律帶 `--config`，還沒配對任何裝置就拒絕啟動。**已做，2026-10-20 移除**，見下一節。
 5. Cloud bridge：先讀 PROTOCOL.md，拆成傳輸與加密一波、27 種操作分兩三波，用假的 relay 測。
 
 ## 配對頁與 tunnel（2026-09-19）
@@ -95,31 +98,21 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
 - 三個狀態與密碼那一路照舊。和舊版不同的一處：猜錯碼的拒絕在這裡叫 `wrong_code`（舊版叫 `forbidden`），
   而且帶 `tries_left`（這個 daemon 跨配對、24 小時計算），用完就結束這次配對。
 
-### tunnel
+### tunnel（2026-10-20 整個移除）
 
-`internal/adapters/tunnel` 是 `RemoteTunnel.swift` 的規則，`internal/transport/http/tunnel.go` 是接線。
+2026-09-19 落地的 cloudflared 監督（`internal/adapters/tunnel`、`/v1/tunnel`、`clawdline tunnel`、
+設定 `remote_tunnel`／`remote_tunnel_name`／`remote_hostname`／`cloudflared_path`）在 2026-10-20 經使用者同意
+整個移除；`quick`（`*.trycloudflare.com`）早一天先移除。免費版的遠端改走 SSH port forward 或 Tailscale Serve
+（`tailscale_hostname`），跨網路與多機走 Clawdline Cloud（見 `docs/user/remote-access.md`）。
 
-- **跑使用者自己裝的 cloudflared**：`cloudflared_path`（只能手改 config.json，設定路由不收，因為它指名一支
-  會被執行的程式）→ Homebrew／MacPorts 的位置 → PATH。
-- **一律帶 `--config`**，指向 `CLAWDLINE_NEXT_DIR/cloudflared.yml`（0600，每次啟動前重寫）；
-  查 named tunnel 憑證的 `cloudflared tunnel list` 也帶。從來不讀 `~/.cloudflared/config.yml`。
-- **還沒有人被放進來就拒絕啟動**：判斷讀的是閘門自己的 authority（`IsConfigured`：一台非本機的已核准裝置，
-  或設了密碼——與 Swift 相同），而且在每次可能改變答案的時候重讀：daemon 啟動、`/v1/settings` 寫了
-  `remote`／`remote_tunnel`／`remote_hostname`、`/v1/auth/` 下的配對完成、密碼登入、登出與所有裝置路由。
-  撤銷到沒有裝置時，正在跑的 tunnel 會被關掉。另外 `remote`（「讓瀏覽器或你的手機看得到你的 session」）
-  關著也拒絕：Swift 的理由（本機 server 沒開）在這裡不成立，保留的理由是它是使用者對「可被這台機器以外連到」
-  的同意。
-- **兩種模式**：`quick`（`--url http://127.0.0.1:<port>`，位址從 banner 讀，等到第一條連線註冊才公布）與
-  `named`（`run <remote_tunnel_name>`，位址是 `https://<remote_hostname>`，YAML 裡只有這一條 ingress
-  加上 404）。所有來自設定的值在 YAML 裡都是雙引號字串，名稱與 hostname 另有格式檢查。
-- **看得見**：`GET /v1/tunnel`（只有本機 token；quick tunnel 的位址本身就是通行證）、`clawdline tunnel`、
-  設定視窗「遠端」分頁 hostname 下方的卡片（off／…／位址／原因，字照 `Settings.swift` 的 `refreshTunnel`）。
-- **閘門的 hostname 跟著同一次讀取更新**，named tunnel 改了 hostname 不必重啟 daemon。
-- **不留孤兒**：SIGINT／SIGTERM 時先收掉 cloudflared 再把訊號照原樣重拋；SIGKILL 接不到，所以子行程的 pid
-  記在 `cloudflared.pid`，下次啟動時只有在該 pid 的命令列確實帶著這個目錄的 `--config` 時才停掉它，
-  讀不到行程表就什麼都不做。
-- 已知沒做：真的 cloudflared 連到 Cloudflare 的那一段沒有實測（驗收只到「被正確呼叫、參數正確」與真 binary
-  的 `--help` 認得這些參數）；Windows 上不收孤兒（沒有 `ps`）；`quick` 位址會寫進 daemon log 一次（同 Swift）。
+- **升級**：設定檔裡還留著這四個鍵時，daemon 照常啟動、不執行任何 cloudflared，也不讀它們；設定快照帶
+  `cloudflare_tunnel_retired: true`，「遠端」分頁顯示一次說明，按「知道了」寫入
+  `cloudflare_tunnel_retired: false`，四個鍵從檔案裡刪掉。直接寫這四個鍵回 400 `retired_setting`。
+- **閘門**：Host 只收 loopback 與 Tailscale 名稱（`remote` 開著時精確比對）；`remote_hostname` 不再放行。
+  `Cf-Connecting-Ip` 等 Cloudflare 專屬判斷一併移除；Secure cookie 仍跟著 `X-Forwarded-Proto: https`
+  （Tailscale Serve 會帶）。
+- **未處理**：升級前一刻若有舊 daemon 被 SIGKILL 而留下 cloudflared，新 daemon 不再依 `cloudflared.pid`
+  收掉它；正常結束（SIGTERM）的舊 daemon 會自己收。
 
 ## 終端機：誰能看、誰能打字（2026-09-29）
 
@@ -133,7 +126,7 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
   `termi`, `term`, and `termr` channels. The machine checks the Cloud principal and local pairing pin for every terminal operation; the relay cannot turn a generic machine request
   into terminal authority. See `docs/cloud-terminal-wire.md`.
 - **本機自己的 token** 直接可以。
-- **已配對裝置預設可傳送**：本機配對裝置須仍在裝置清單（`Holds`）；Cloud viewer 須登入且本機 pin 的公鑰與 roster 相符。已撤銷、未配對或公鑰不符者皆被拒絕；該機器的 Cloud 命令開關仍可停止遠端操作。不再要求獨立的 `terminal_control` 或本機終端 grant；看畫面仍須符合資格，打字另需控制租約。
+- **直接配對裝置依其權限**：只讀裝置可看畫面、不能取得控制租約或輸入；可讀可操作的裝置須仍在裝置清單（`Holds`）；Cloud viewer 須登入且本機 pin 的公鑰與 roster 相符。已撤銷、未配對或公鑰不符者皆被拒絕；該機器的 Cloud 命令開關仍可停止遠端操作。不再要求獨立的 `terminal_control` 或本機終端 grant；看畫面仍須符合資格，打字另需控制租約。
 - **舊 grant 檔已移除**：`terminal-grants.json` 與本機 `POST /v1/auth/devices/{id}/terminal` 已刪除（後者現在回 `404`）；裝置清單不再有 `terminal` 欄位，診斷也不再報告 `grants_ok`。
 - **撤銷立即生效**：裝置或配對 pin 被撤銷時，服務重新檢查租約與串流；失去資格的租約作廢，串流送出 `terminal_access_revoked` 後關閉。每個效果和畫面也重新檢查。
 - **一次一個控制者**：租約 30 秒、每 10 秒續約；別人持有時 `acquire` 回 `terminal_controlled` 並說明是誰；

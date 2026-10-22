@@ -14,6 +14,7 @@ import { requestPage } from "../overlays/index.js"
 import * as L from "../legacy/bridge.js"
 import { documentHash } from "../legacy/js/net/document-links.js"
 import { leaveDetail, listHash } from "../page-detail.js"
+import { bindDocumentFullscreen, type DocumentFullscreen } from "./documents/fullscreen.js"
 import sectionMarkup from "./documents/section.html?raw"
 import "../page-bar.css"
 import "./documents/page.css"
@@ -77,10 +78,12 @@ function stepToDocument(address: string): void {
  */
 function DocumentsPageView({ shown }: { shown: boolean }) {
   const page = useRef<DocumentsPage | null>(null)
+  const fullscreen = useRef<DocumentFullscreen | null>(null)
   const was = useRef(false)
 
   useLayoutEffect(() => {
     if (!page.current) page.current = bindDocuments(document, navigate)
+    if (!fullscreen.current) fullscreen.current = bindDocumentFullscreen(document)
   }, [])
 
   // A row opened, the way back to the listing, Read again, and the browser's
@@ -159,6 +162,7 @@ function DocumentsPageView({ shown }: { shown: boolean }) {
     if (shown === was.current) return
     was.current = shown
     if (!shown) {
+      fullscreen.current?.close()
       page.current?.leave()
       return
     }

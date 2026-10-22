@@ -29,7 +29,7 @@ var browserSettings = map[string]bool{
 	"language": true, "terminal": true,
 	"mascot": true, "notch": true, "voice_language": true,
 	"codex_auto_name": true, "auto_name_assistant": true,
-	"remote": true, "remote_tunnel": true, "remote_hostname": true,
+	"remote": true, "tailscale_hostname": true, "cloudflare_tunnel_retired": true,
 	"push_on_delivery": true, "push_on_fanout": true,
 	"smart_notifications": true, "push_on_deploy": true,
 	"push_on_waiting": true, "push_on_board_decision": true, "push_on_board_done": true,
@@ -39,7 +39,7 @@ var browserSettings = map[string]bool{
 	"orchestrator_agent_notify": true, "orchestrator_enabled": true,
 	"orchestrator_max_children": true, "orchestrator_permission": true,
 	"orchestrator_notify_root": true, "orchestrator_child_linger": true,
-	"claude_auto_compact_window": true, "iterm_scan": true,
+	"claude_auto_compact_window": true, "iterm_scan": true, "iterm_integration": true, "session_auto_discovery": true,
 }
 
 // notificationSettings is the machine-wide event policy. A device's ability
@@ -109,7 +109,12 @@ func (s *Server) settingsRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if browser {
-			for name := range changes {
+			for name, value := range changes {
+				// Dismissing the Cloudflare notice removes the retired
+				// keys; the browser asked for cloudflare_tunnel_retired.
+				if value == nextconfig.Remove {
+					continue
+				}
 				if !browserSettings[name] {
 					writeRawRefusal(w, http.StatusForbidden, "browser_setting_unavailable",
 						"This setting is not available in the browser: "+name)
@@ -138,12 +143,14 @@ func (s *Server) settingsRoute(w http.ResponseWriter, r *http.Request) {
 			writeSettingsFailure(w, f, err)
 			return
 		}
-		// The Remote tab's switches are the tunnel's; it follows them the
-		// moment they are written, as the Swift app's did on its reload.
-		if tunnelSettingChanged(changes) {
-			s.applyTunnel()
+		// The Tailscale address follows `remote` and its own name from this
+		// very write, so turning either off refuses the next request.
+		if tailscaleSettingChanged(changes) {
+			s.gate().setTailscale(v)
 		}
-		if _, changed := changes["iterm_scan"]; changed {
+		_, scanChanged := changes["iterm_scan"]
+		_, integrationChanged := changes["iterm_integration"]
+		if scanChanged || integrationChanged {
 			applyITermScan(v)
 		}
 		writeJSON(w, settingsSnapshot(f, v))
@@ -274,6 +281,89 @@ func (s *Server) workGateSettingsRoute(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// workflowSettingsRoute exposes only workflow defaults, discovery and iTerm2 consent.
+func (s *Server) workflowSettingsRoute(w http.ResponseWriter, r *http.Request) {
+	f := s.settingsFile()
+	read := func() (contract.WorkflowSettingsSnapshot, error) {
+		v, err := f.Read()
+		if err != nil {
+			return contract.WorkflowSettingsSnapshot{}, err
+		}
+
+		integration, _ := v.Bool("iterm_integration")
+		return contract.WorkflowSettingsSnapshot{ItermIntegration: &integration, DispatchFullPermission: v.DispatchPermission() == "full", SessionAutoDiscovery: v.SessionAutoDiscovery()}, nil
+	}
+	switch r.Method {
+	case http.MethodGet, http.MethodHead:
+		answer, err := read()
+		if err != nil {
+			writeSettingsFailure(w, f, err)
+			return
+		}
+		writeJSON(w, answer)
+	case http.MethodPost:
+		if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+			writeRefusal(w, http.StatusUnsupportedMediaType, "unsupported_media_type",
+				"a workflow settings write is application/json")
+			return
+		}
+		var body map[string]json.RawMessage
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, settingsRequestBodyLimit))
+		if err := dec.Decode(&body); err != nil || body == nil {
+			writeRefusal(w, http.StatusBadRequest, "bad_request", "that body is not a workflow settings change")
+			return
+		}
+		for name := range body {
+			if name != "dispatch_full_permission" && name != "session_auto_discovery" && name != "iterm_integration" {
+				writeRawRefusal(w, http.StatusBadRequest, "bad_request", "not a workflow setting key: "+name)
+				return
+			}
+		}
+		if raw, exists := body["dispatch_full_permission"]; exists {
+			if string(raw) != "null" {
+				var on bool
+				if err := json.Unmarshal(raw, &on); err != nil {
+					writeRefusal(w, http.StatusBadRequest, "bad_request", "dispatch_full_permission must be a boolean")
+					return
+				}
+				mode := "ask"
+				if on {
+					mode = "full"
+				}
+				body["orchestrator_permission"], _ = json.Marshal(mode)
+			}
+			delete(body, "dispatch_full_permission")
+		}
+		changes, refusal := settingsChanges(body)
+		if refusal != nil {
+			writeRawRefusal(w, http.StatusBadRequest, refusal.code, refusal.message)
+			return
+		}
+		var err error
+		var values nextconfig.Values
+		if len(changes) == 0 {
+			values, err = f.Read()
+		} else {
+			values, err = f.Set(changes)
+		}
+		if err != nil {
+			writeSettingsFailure(w, f, err)
+			return
+		}
+		if _, changed := changes["iterm_integration"]; changed {
+			applyITermScan(values)
+		}
+		answer, err := read()
+		if err != nil {
+			writeSettingsFailure(w, f, err)
+			return
+		}
+		writeJSON(w, answer)
+	default:
+		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "GET or POST")
+	}
+}
+
 // notificationSettingsRoute exposes only event switches to a paired console.
 // It never returns paths, remote settings, or browser subscription material.
 func (s *Server) notificationSettingsRoute(w http.ResponseWriter, r *http.Request) {
@@ -371,15 +461,12 @@ func defaultModelsSnapshot(f *nextconfig.File, v nextconfig.Values) defaultModel
 
 type settingsRefusal struct{ code, message string }
 
-// tunnelSettingChanged is whether a write touched what the tunnel is decided
-// on (tunnel.go).
-func tunnelSettingChanged(changes map[string]any) bool {
-	for _, key := range []string{"remote", "remote_tunnel", "remote_hostname"} {
-		if _, ok := changes[key]; ok {
-			return true
-		}
-	}
-	return false
+// tailscaleSettingChanged is whether a write touched what the gate admits the
+// Tailscale address on.
+func tailscaleSettingChanged(changes map[string]any) bool {
+	_, remote := changes["remote"]
+	_, name := changes["tailscale_hostname"]
+	return remote || name
 }
 
 // settingsChanges turns a request body into the keys to write.
@@ -391,6 +478,24 @@ func tunnelSettingChanged(changes map[string]any) bool {
 func settingsChanges(body map[string]json.RawMessage) (map[string]any, *settingsRefusal) {
 	changes := map[string]any{}
 	for name, raw := range body {
+		// The built-in Cloudflare tunnel was removed; its keys are named in
+		// the refusal rather than called unknown, so a script that still
+		// writes them learns where remote access went.
+		if nextconfig.RetiredCloudflareKey(name) {
+			return nil, &settingsRefusal{"retired_setting", name + ": the built-in Cloudflare tunnel was removed; " +
+				"reach this machine through Tailscale Serve (tailscale_hostname) or Clawdline Cloud"}
+		}
+		// The settings page's "Got it" under the retirement notice: the old
+		// keys leave the file, and the notice with them.
+		if name == "cloudflare_tunnel_retired" {
+			if string(raw) != "false" {
+				return nil, &settingsRefusal{"bad_request", "cloudflare_tunnel_retired is only ever written false, to dismiss the notice"}
+			}
+			for _, key := range nextconfig.RetiredCloudflareKeys {
+				changes[key] = nextconfig.Remove
+			}
+			continue
+		}
 		key, known := nextconfig.SettableByName(name)
 		if !known {
 			return nil, &settingsRefusal{"bad_request", "not a key this app sets: " + name}
@@ -504,6 +609,10 @@ func settingsSnapshot(f *nextconfig.File, v nextconfig.Values) settingsSnapshotW
 			field.SetZero()
 		}
 	}
+	// A file from before the built-in Cloudflare tunnel was removed still
+	// holds its configuration. It starts nothing; the flag lets the settings
+	// page say why, once.
+	out.CloudflareTunnelRetired = nextconfig.CloudflareTunnelRetired(v)
 	return out
 }
 
@@ -521,10 +630,11 @@ func writeSettingsFailure(w http.ResponseWriter, f *nextconfig.File, err error) 
 	}
 }
 
-// applyITermScan sets the iTerm2 scan switch from the settings file: absent,
-// or anything but false, is on. It runs once when the server is built and
-// again on every write that names the key, so the next reading follows it.
+// applyITermScan requires explicit consent even for existing installations.
+// The old scan key only controls polling after integration has been enabled.
 func applyITermScan(v nextconfig.Values) {
+	enabled, _ := v.Bool("iterm_integration")
+	terminal.SetITermIntegration(enabled)
 	on, ok := v.Bool("iterm_scan")
 	terminal.SetITermScan(!ok || on)
 }

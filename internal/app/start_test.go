@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -101,5 +102,37 @@ func TestANewSessionUsesTheMachinesDefaultModel(t *testing.T) {
 	}
 	if started.Model != "" || strings.Contains(term.command, "--model") || strings.Contains(term.command, "model_reasoning_effort") {
 		t.Fatalf("resume changed model: %+v / %s", started, term.command)
+	}
+}
+
+func TestResumeVerifiesTheSelectionWithoutRelistingHistory(t *testing.T) {
+	place := projects.Place{Path: t.TempDir()}
+	id := "0f1e2d3c-0000-4000-8000-000000000005"
+	term := &personaTerminal{}
+	failure := StartRefusal{Status: 503, Code: "codex_unavailable", Message: "retry"}
+	s := Starter{
+		Terminal: func() projects.TerminalChoice { return projects.TerminalTmux }, Launcher: term,
+		Past: func(context.Context, projects.Place, string) []projects.Past {
+			t.Fatal("resume relisted history")
+			return nil
+		},
+		VerifyPast: func(_ context.Context, p projects.Place, assistant, selected string) (bool, error) {
+			if p.Path != place.Path || assistant != "codex" || selected != id {
+				t.Fatal("wrong selection")
+			}
+			return false, failure
+		},
+	}
+	_, err := s.Resume(context.Background(), place, id, "codex", "")
+	var refused StartRefusal
+	if !errors.As(err, &refused) || refused.Code != "codex_unavailable" || term.command != "" {
+		t.Fatalf("err=%v command=%q", err, term.command)
+	}
+	s.VerifyPast = func(context.Context, projects.Place, string, string) (bool, error) { return true, nil }
+	if _, err = s.Resume(context.Background(), place, id, "codex", ""); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(term.command, "codex resume "+id) {
+		t.Fatalf("wrong command %q", term.command)
 	}
 }

@@ -26,6 +26,21 @@ depend on the target Linux or Windows installation carrying zoneinfo.
 `first_seen`（這支 daemon 第一次看見它）、`last_fire`（已經決定過的最近一次）、`last_missed`。
 舊的間隔模型用的 `schedules` 表留著不讀（沒有真的資料寫進去過），讓舊 store 照樣開得起來。
 
+## Calendar-day intervals
+
+A repeating schedule may use `when: {"at":"09:00", "every_days":3, "start":"2026-10-21"}`
+instead of `days` or `on`. The form API flattens these three keys beside `time_zone`.
+`every_days` is a positive integer; `start` is an inclusive Gregorian date in the existing
+1970–9999 date grammar. The rules are mutually exclusive, including `trigger_only`.
+Occurrences are anchored to that date in the schedule's named time zone, retaining the local
+wall-clock time across daylight-saving changes. Calculation jumps to the adjacent occurrence,
+without scanning each intervening day. A next date beyond the supported calendar is absent.
+Manual execution, failure, disabling and re-enabling do not move the anchor. Existing catch-up,
+first-seen, deduplication and active-run decisions still apply to the latest occurrence only.
+Changing the interval or anchor stamps `when_changed_at`, just like changing weekday or time.
+List rows include `when` for interval schedules, so the console can display their cadence.
+Older daemons reject these new keys; move targets must support them before accepting the copy.
+
 ## 路由（與舊版相同）
 
 | 路由 | 誰可以 |
@@ -435,3 +450,11 @@ changed (`TestTheSchedulePermissionFieldRoundTrips`, `TestAnAgentMayNotSetOrChan
 Codex 的舊 run 不回補，只有新的 run 從讀數記下對話。
 
 `TestAFinishedRunIsResumedByItsChildsConversation`、`TestAChildConversationIsFoundByItsFirstLine`。
+
+## Incident investigation schedules
+
+A trigger-only schedule with `task.kind: "health_investigation"` can receive a
+frozen incident through its bound Cloud webhook. Permission remains the person's
+choice; ordinary hooks never become investigation workers automatically. See
+[Health investigations](health-investigations.md) for the binding, read-only
+evidence, bounded result format and restart behavior.

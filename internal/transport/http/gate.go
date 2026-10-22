@@ -18,7 +18,6 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/devices"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
-	"github.com/sainteye/clawdline/internal/adapters/tunnel"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/auth"
@@ -45,8 +44,8 @@ import (
 //     plain text without asking; it cannot send application/json without the
 //     browser first asking this daemon, which does not answer yes.
 //
-// There is no exception for loopback. Through a tunnel every request comes
-// from 127.0.0.1, and a web page the person is visiting can reach a local port
+// There is no exception for loopback. Through Tailscale Serve every request
+// comes from 127.0.0.1, and a web page the person is visiting can reach a local port
 // too — with a DNS rebinding, as same-origin.
 
 const (
@@ -101,6 +100,11 @@ func judgedAsDevice(r *http.Request) bool {
 // notThisMachine is the verdict as a request that named an actor is judged by:
 // the same device, the same capabilities, and not this machine. It only ever
 // removes: a verdict that was not `Local` comes back unchanged.
+//
+// The capabilities stay as they are, deliberately. An in-process Cloud request
+// carries this machine's own token, so a Cloud viewer keeps read, send and
+// Admin; Admin is what lets it manage the board (boardViewer), which a device
+// paired on this machine's own network may not.
 func notThisMachine(v auth.Verdict) auth.Verdict {
 	v.Local = false
 	return v
@@ -115,14 +119,14 @@ type gate struct {
 	// err is why the gate could not open. Every route behind it is then
 	// refused; an unreadable device file is never an empty one.
 	err error
-	// hostname is `remote_hostname` from this app's config.json: the one name
-	// besides loopback and a quick tunnel that the Host check accepts. The
-	// Origin check follows the Host that passed. It is read when the daemon
-	// starts and again every time the tunnel is applied (tunnel.go), through
-	// the same reading the tunnel's own ingress is written from, so a named
-	// tunnel and the gate in front of it never disagree about its name.
-	hostname atomic.Pointer[string]
-	port     int
+	// tailscale is `tailscale_hostname` while `remote` is on, and "" while it
+	// is off or the name is unset: the address Tailscale Serve proxies to
+	// this daemon's loopback port. Serve keeps running whatever this daemon
+	// says, so the switch is enforced here, on every request, and not by
+	// stopping anything. It is read when the gate opens and again on every
+	// settings write that touches either key.
+	tailscale atomic.Pointer[string]
+	port      int
 	// opens is the one-time codes `clawdline open` handed a browser and the
 	// browser has not traded yet (open_code.go).
 	opens openCodes
@@ -199,9 +203,7 @@ func openGate(cfg config.Config) *gate {
 		})
 	}
 	if v, err := nextconfig.Open(cfg.Dir).Read(); err == nil {
-		if h, ok := v.String("remote_hostname"); ok {
-			g.setHostname(h)
-		}
+		g.setTailscale(v)
 	}
 	// Paths only. Neither token is ever written to the log.
 	log.Printf("auth: local token at %s, orchestrator token at %s, audit at %s",
@@ -209,23 +211,33 @@ func openGate(cfg config.Config) *gate {
 	return g
 }
 
-// setHostname takes `remote_hostname` as the file has it. A value that is not
-// a hostname admits no name at all: the Host check then answers loopback and
-// quick tunnels only, which is what an unreadable setting should open.
-func (g *gate) setHostname(raw string) {
-	h, ok := tunnel.Hostname(raw)
-	if !ok {
+// setTailscale takes `tailscale_hostname` and `remote` from one reading of
+// the settings. The name admits requests only while remote access is on, and
+// a value that is not a Tailscale name admits nothing.
+func (g *gate) setTailscale(v nextconfig.Values) {
+	h, _ := v.String("tailscale_hostname")
+	remote, _ := v.Bool("remote")
+	if !remote || !nextconfig.ValidTailscaleHostname(h) {
 		h = ""
 	}
-	g.hostname.Store(&h)
+	g.tailscale.Store(&h)
 }
 
-// allowedHostname is the configured name the Host check accepts, or "".
-func (g *gate) allowedHostname() string {
-	if h := g.hostname.Load(); h != nil {
+// tailscaleHostname is the Tailscale name the Host check accepts now, or "".
+func (g *gate) tailscaleHostname() string {
+	if h := g.tailscale.Load(); h != nil {
 		return *h
 	}
 	return ""
+}
+
+// viaTailscale is whether this request named the Tailscale address. Serve
+// connects from loopback with the Host the phone asked for, so the Host is
+// the only thing that tells it from a request made on this machine. It can
+// only narrow: a local caller who spells that Host is judged as a device.
+func (g *gate) viaTailscale(r *http.Request) bool {
+	name := g.tailscaleHostname()
+	return name != "" && hostOnly(r.Host) == name
 }
 
 // access is what the gate learned about a request, for the handlers behind it.
@@ -292,7 +304,10 @@ func (g *gate) wrap(next http.Handler) http.Handler {
 			writeAuthRefusal(w, http.StatusForbidden, "forbidden", msg)
 			return
 		}
-		device := judgedAsDevice(r)
+		// A request through Tailscale Serve arrives from loopback like the
+		// shell's own, and is a paired device's all the same: neither this
+		// machine's local-token exemptions nor the orchestrator door apply.
+		device := judgedAsDevice(r) || g.viaTailscale(r)
 		machine := machineScoped(p) && !device &&
 			g.verifyMachine(r.Header.Get(machineHeader))
 		verdict := g.permission(r)
@@ -388,6 +403,9 @@ func openPath(p string) bool {
 // orchestrator's credential opens; the shadows of the board and the schedules
 // are gone (D07).
 func machineScoped(p string) bool {
+	if squadAgentPath(p) {
+		return true
+	}
 	if strings.HasPrefix(p, "/v1/orchestrator/") {
 		return true
 	}
@@ -469,6 +487,11 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 		return 0, "", ""
 	}
 	send := v.Allowed && v.Caps.Has(auth.Send)
+	if v.Allowed && !v.Local && !send && !machine && !strings.HasPrefix(p, "/v1/auth/") && p != "/v1/terminals" && !strings.HasPrefix(p, "/v1/terminals/") &&
+		p != "/v1/squad-packages/preview" && p != "/v1/squad-packages/export" &&
+		p != "/v1/push/subscribe" && p != "/v1/push/unsubscribe" && p != "/v1/push/test" {
+		return http.StatusForbidden, "forbidden", "This device may read, and not send."
+	}
 	switch {
 	case strings.HasPrefix(p, "/v1/cloud/peer/"):
 		if !send {
@@ -542,7 +565,7 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 		if !(v.Allowed && (v.Local || v.Caps.Has(auth.Send))) {
 			return http.StatusForbidden, "forbidden", "This device may read, and not change default models."
 		}
-	case p == "/v1/settings/work-gates":
+	case p == "/v1/settings/work-gates" || p == "/v1/settings/workflow":
 		// This narrow route exposes only the two future-assignment gate
 		// defaults. A paired device needs Send to change them, as it does for
 		// the other machine-wide controls carried to Settings.
@@ -560,6 +583,9 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 			return http.StatusForbidden, "forbidden", "This device may not read squad packages."
 		}
 	case strings.HasPrefix(p, "/v1/squad-packages/") || strings.HasPrefix(p, "/v1/squad/"):
+		if machine && squadAgentPath(p) {
+			return 0, "", ""
+		}
 		if !(v.Allowed && (v.Local || v.Caps.Has(auth.Send))) {
 			return http.StatusForbidden, "forbidden", "This device may read the squad, and not change it."
 		}
@@ -583,7 +609,7 @@ func (g *gate) crossOriginRefusal(r *http.Request) string {
 	if isCrossSiteSubresource(r.Header) {
 		return "Cross-site requests are not answered."
 	}
-	if !isAllowedHost(r.Host, g.allowedHostname()) {
+	if !isAllowedHost(r.Host, g.tailscaleHostname()) {
 		return "Wrong host."
 	}
 	return ""
@@ -602,28 +628,37 @@ func isCrossSiteSubresource(h http.Header) bool {
 
 // isAllowedHost is the DNS-rebinding defence: rebinding changes what a name
 // resolves to, never the Host header, so a Host this daemon does not answer
-// to is refused before anything else is looked at. A quick tunnel's name is
-// generated per run, so its whole suffix is allowed; rebinding needs the
-// attacker to control that DNS answer, and those answers are Cloudflare's.
-func isAllowedHost(header, hostname string) bool {
-	host := strings.ToLower(strings.TrimSpace(header))
-	if strings.HasPrefix(host, "[") {
-		end := strings.Index(host, "]")
-		if end < 0 {
-			return false
-		}
-		host = host[1:end]
-	} else if i := strings.LastIndex(host, ":"); i >= 0 {
-		host = host[:i]
+// to is refused before anything else is looked at. Besides loopback the one
+// name is the Tailscale name, matched exactly, which is "" while remote access
+// is off. The Cloudflare tunnel's names went with it: `*.trycloudflare.com` on
+// 2026-10-19 and the named tunnel's `remote_hostname` on 2026-10-20.
+func isAllowedHost(header, tailscale string) bool {
+	host := hostOnly(header)
+	if host == "" {
+		return false
 	}
 	switch host {
 	case "127.0.0.1", "localhost", "::1":
 		return true
 	}
-	if hostname != "" && host == hostname {
-		return true
+	return tailscale != "" && host == tailscale
+}
+
+// hostOnly is a Host header's name, lowercase, without its port or IPv6
+// brackets; "" when the brackets do not close.
+func hostOnly(header string) string {
+	host := strings.ToLower(strings.TrimSpace(header))
+	if strings.HasPrefix(host, "[") {
+		end := strings.Index(host, "]")
+		if end < 0 {
+			return ""
+		}
+		return host[1:end]
 	}
-	return strings.HasSuffix(host, ".trycloudflare.com")
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		host = host[:i]
+	}
+	return host
 }
 
 // isChange is every method but the two that only read.
@@ -677,7 +712,7 @@ func sameOrigin(origin string, r *http.Request) bool {
 }
 
 // requestOrigin is how a browser spells the origin this request went to: the
-// scheme — https when the tunnel in front says so, since this daemon itself
+// scheme — https when the proxy in front (Tailscale Serve) says so, since this daemon itself
 // speaks only http — then the Host it asked for, with the port written out.
 // X-Forwarded-Proto cannot be set by a page elsewhere without asking first,
 // and a local caller who sets it is only describing its own request.

@@ -828,6 +828,9 @@ function daemon(): Server {
             reasons: blockedCloseability().reasons,
           })
         }
+        if (decodeURIComponent(closing[1]) === UNKNOWN && force !== true) {
+          return json(res, 409, { error: "closeability_unknown", detail: "unreadable work" })
+        }
         json(res, 200, { ok: true })
       })
       return
@@ -1513,6 +1516,53 @@ test("a confirmed new pane opens on the phone before an inventory row exists", (
     assert.doesNotMatch(empty, /Nothing to read|還沒有可讀內容/)
   }))
 
+test("the header state filter is quiet until applied and selects one state on phone and desktop", () =>
+  inTab(async (tab) => {
+    for (const layout of ["phone", "desktop"] as const) {
+      if (layout === "desktop") await tab.desktop()
+      await list(tab)
+      const all = await tab.run(`document.querySelectorAll('#rows > li').length`)
+      assert.equal(await tab.run(`document.querySelector('#session-state-filter-open').dataset.active`), "false")
+      await tab.press("#session-state-filter-open")
+      assert.equal(await tab.run(`document.getElementById('session-state-filter').open`), true)
+      const size = await tab.run(`(() => {const r=document.getElementById('session-state-filter').getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,w:innerWidth,h:innerHeight}})()`)
+      assert.ok(size.left >= 0 && size.right <= size.w && size.top >= 0 && size.bottom <= size.h)
+      await tab.shot("session-state-filter-" + layout)
+      const beforeRefresh = listReads
+      await tab.press(".session-state-refresh")
+      await tab.run(`new Promise(r => setTimeout(r, 100))`)
+      assert.ok(listReads > beforeRefresh, "Refresh reaches the list reading")
+      await tab.press('[data-filter="working"]')
+      assert.equal(await tab.run(`document.querySelector('#session-state-filter') === null`), true)
+      const applied = await tab.run(`({active:document.querySelector('#session-state-filter-open').dataset.active,
+        color:getComputedStyle(document.querySelector('.session-state-selected')).color,
+        expected:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
+        states:[...document.querySelectorAll('#rows > li')].map(e=>e.dataset.state),
+        focus:document.activeElement?.id})`)
+      assert.equal(applied.active, "true")
+      assert.equal(applied.focus, "session-state-filter-open")
+      assert.notEqual(applied.color, "rgb(154, 151, 143)")
+      assert.ok(applied.states.length > 0 && applied.states.length < all)
+      assert.ok(applied.states.every((state: string) => state === "working"))
+      await tab.press("#session-state-filter-open")
+      await tab.key("Escape")
+      assert.equal(await tab.run(`document.querySelector('#session-state-filter-open').dataset.active`), "true")
+      await tab.press("#session-state-filter-open")
+      await tab.press('[data-filter="all"]')
+      assert.equal(await tab.run(`document.querySelector('#session-state-filter-open').dataset.active`), "false")
+      assert.equal(await tab.run(`document.querySelectorAll('#rows > li').length`), all)
+      assert.equal(await tab.run(`document.querySelector('.session-state-selected') === null`), true)
+      await tab.press("#session-state-filter-open")
+      await tab.press('[data-filter="attention"]')
+      assert.equal(await tab.run(`document.querySelectorAll('#rows > li').length`), 0)
+      assert.match(await tab.run(`document.getElementById('list-empty').textContent`), /目前沒有需要注意|No Sessions need your attention/)
+      assert.equal(await tab.run(`document.querySelectorAll('.session-state-empty').length`), 1)
+      await tab.shot("session-state-empty-" + layout)
+      await tab.press("#list-empty button")
+      assert.equal(await tab.run(`document.querySelectorAll('#rows > li').length`), all)
+    }
+  }))
+
 test("the machine dashboard owns Clawdfather creation on phone and desktop", () =>
   inTab(async (tab) => {
     for (const layout of ["phone", "narrow", "desktop"] as const) {
@@ -1523,6 +1573,13 @@ test("the machine dashboard owns Clawdfather creation on phone and desktop", () 
       assert.equal(await tab.run(`document.querySelector('#start-resume .machine-start') === null`), true)
       await tab.press("#start-close")
       await tab.press("#counts")
+      assert.equal(await tab.run(`document.querySelector('.machine-overlay') === null`), true)
+      await tab.press(".session-state-close")
+      await tab.press("#brand")
+      assert.equal(await tab.run(`document.getElementById('sidebar').hidden`), false)
+      assert.equal(await tab.run(`document.querySelector('.machine-overlay') === null`), true)
+      await tab.press("#brand")
+      await tab.press("#machine-dashboard-open")
       await tab.run(`new Promise((resolve, reject) => {
         const started = Date.now()
         const check = () => {
@@ -1570,7 +1627,7 @@ test("the focused machine start sheet keeps Tab inside and gives focus back", ()
     for (const layout of ["phone", "desktop"] as const) {
       if (layout === "desktop") await tab.desktop()
       await list(tab)
-      await tab.press("#counts")
+      await tab.press("#machine-dashboard-open")
       await tab.press(".machine-clawdfather")
       await tab.run(`new Promise((resolve, reject) => {
         const started = Date.now()
@@ -1592,14 +1649,14 @@ test("the focused machine start sheet keeps Tab inside and gives focus back", ()
       assert.equal(await tab.run(`document.activeElement?.id`), "start-close")
       await tab.key("Escape")
       assert.deepEqual(await tab.run(`({ hidden: document.getElementById('start').hidden, focused: document.activeElement?.id })`),
-        { hidden: true, focused: "counts" })
+        { hidden: true, focused: "machine-dashboard-open" })
       for (const mode of ["button", "backdrop"] as const) {
-        await tab.press("#counts")
+        await tab.press("#machine-dashboard-open")
         await tab.press(".machine-clawdfather")
         if (mode === "button") await tab.press("#start-close")
         else await tab.press("#start")
         assert.deepEqual(await tab.run(`({ hidden: document.getElementById('start').hidden, focused: document.activeElement?.id })`),
-          { hidden: true, focused: "counts" })
+          { hidden: true, focused: "machine-dashboard-open" })
       }
     }
   }))
@@ -1608,7 +1665,7 @@ test("the dashboard creation button uses the guarded machine start route", () =>
   inTab(async (tab) => {
     machineStarts = []
     await list(tab)
-    await tab.press("#counts")
+    await tab.press("#machine-dashboard-open")
     await tab.press(".machine-clawdfather")
     await tab.run(`new Promise((resolve, reject) => {
       const started = Date.now()
@@ -1669,7 +1726,7 @@ test("Clawdfather's icon opens the Snippet / Workflow sheet on its own tab, and 
       workflowRecords = []
       await tab.go("/")
       await tab.until("the machine Session arrives", (s) => s.order.join() === RETAINED)
-      await tab.press("#counts")
+      await tab.press("#machine-dashboard-open")
       assert.match(await tab.run(`document.querySelector('.machine-clawdfather')?.textContent`), /前往 Clawdfather/)
       await tab.press(".machine-clawdfather")
       await tab.until("the existing Clawdfather opens", (s) => s.detailName === "Clawdfather")
@@ -2995,7 +3052,7 @@ test("a Project-page Board address selects and reads that Project", () =>
     const selected = await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const read = () => {
-        const text = document.querySelector('.work-project-trigger')?.textContent || ''
+        const text = document.querySelector('.project-picker-trigger')?.textContent || ''
         if (text.includes('Clawdline')) return resolve(text)
         if (Date.now() >= deadline) return reject(new Error('the Project-scoped Board did not arrive: ' + text))
         setTimeout(read, 25)
@@ -3701,4 +3758,24 @@ test("a reading beyond the retention window removes the row and says the source 
     } finally {
       readingScenario = "normal"
     }
+  }))
+
+test("an unreadable close reopens a modal and only an explicit second press forces it", () =>
+  inTab(async (tab) => {
+    await list(tab)
+    await swipeOpen(tab, UNKNOWN)
+    await tab.press("li.row[data-swipe='open'] > .swipe-end")
+    await tab.until("work has been checked", (s) => s.sheet !== null && s.confirmDisabled === false)
+    await tab.press("#action-confirm-go")
+    const warning = await tab.until("the force-close question is visible", (s) =>
+      s.sheet !== null && (s.sheetSay ?? "").includes("是否要強制關閉"))
+    assert.equal(warning.focused, "action-confirm-cancel")
+    assert.equal(closes.length, 1, "showing the override never sends it")
+    assert.notEqual(closes[0].force, true)
+    await tab.press("#action-confirm-go")
+    await tab.until("the confirmed close has finished", (s) => s.sheet === null)
+    assert.equal(closes.length, 2)
+    assert.equal(closes[1].force, true)
+    assert.equal(closes[1].version, closes[0].version)
+    assert.notEqual(closes[1].key, closes[0].key)
   }))

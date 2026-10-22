@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { SurveyStatistics } from "../../onboarding/Statistics.js"
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { chooseTransport, cloudViewerDeviceMetadata, newCloudSession, readCloudConfig, type CloudConfig, type EnsuredSession } from "../copied.js"
 import { DeviceLimitPanel } from "../DeviceLimitPanel.js"
-import { bootCatalog } from "../../catalog.js"
-import { catalogURL } from "../strings.js"
+import { currentCatalogTag } from "../../catalog.js"
 import { AccountsPage, OverviewPage, RouteLink, UsagePage, type Go } from "./AdminDashboard.js"
 import { PromoManagement } from "./PromoManagement.js"
 import { DemoPromotions } from "./DemoPromotions.js"
 import { demoOverview } from "./demo.js"
 import { mayLeaveCode } from "./navigation-guard.js"
 import { loadOverview, type Overview } from "./api.js"
-import { ADMIN_ROUTES, adminLocale, adminPath, adminRoute, adminWords, type AdminRoute, type Say } from "./words.js"
+import { ADMIN_ROUTES, adminPath, adminRoute, adminWords, bootAdminCatalog, type AdminRoute, type Say } from "./words.js"
+// Loaded on first visit, so the other operations pages do not carry its screens and copy.
+const ConnectionHealth = lazy(() => import("./health/ConnectionHealth.js").then((m) => ({ default: m.ConnectionHealth })))
+import { healthRoute } from "./health/route.js"
+import type { Refusal } from "./health/cloud.js"
 import "./admin.css"
+import { BrowserLanguageControl } from "../../ui-language/BrowserLanguageControl.js"
 import { BRAND_MARK } from "../../brand-mark.js"
 
 /*
@@ -26,6 +31,16 @@ import { BRAND_MARK } from "../../brand-mark.js"
 
 type SessionHandle = ReturnType<typeof newCloudSession>
 
+/*
+ * The connection-health fixture harness: development builds only, and only when
+ * VITE_ADMIN_HEALTH_FIXTURE names a scenario (health/fixture.ts). It skips the
+ * session, answers every health read from task-owned example data in memory and
+ * says so on every view. A production build drops the branch and the module.
+ */
+const HEALTH_FIXTURE: string | null = import.meta.env.DEV && import.meta.env.VITE_ADMIN_HEALTH_FIXTURE
+  ? String(import.meta.env.VITE_ADMIN_HEALTH_FIXTURE)
+  : null
+
 type Phase =
   | { kind: "misdeclared" }
   | { kind: "checking" }
@@ -36,6 +51,7 @@ type Phase =
   | { kind: "forbidden" }
   | { kind: "failed"; code: string }
   | { kind: "ready"; overview: Overview; refreshing: boolean; stale: { code: string } | null }
+  | { kind: "fixture"; get: typeof fetch }
 
 function configFrom(declared: string): CloudConfig | null {
   try {
@@ -54,31 +70,28 @@ function failureCode(error: unknown): string {
 
 export function AdminGate({ declared }: { declared: string }) {
   const config = useMemo(() => configFrom(declared), [declared])
-  const locale = useMemo(() => adminLocale(navigator.languages?.length ? navigator.languages : [navigator.language]), [])
-  const say: Say = useMemo(() => adminWords(locale), [locale])
-  const [phase, setPhase] = useState<Phase>(config ? { kind: "checking" } : { kind: "misdeclared" })
+  const [locale, setLocale] = useState(currentCatalogTag())
+  const say = useMemo(() => adminWords(), [])
+  const [phase, setPhase] = useState<Phase>(config || HEALTH_FIXTURE ? { kind: "checking" } : { kind: "misdeclared" })
   const [catalogReady, setCatalogReady] = useState(false)
   const [demo, setDemo] = useState(false)
   const sample = useMemo(() => demoOverview(), [])
   const session = useRef<SessionHandle | null>(null)
   const generation = useRef(0)
 
-  useEffect(() => {
-    document.documentElement.lang = locale
-    document.documentElement.dir = "ltr"
-    document.documentElement.classList.remove("booting")
-  }, [locale, say])
+  useLayoutEffect(() => {
+    if (catalogReady) document.documentElement.classList.remove("booting")
+  }, [catalogReady])
 
   useEffect(() => {
-    if (!config) return
     let active = true
-    void bootCatalog((tag) => catalogURL(config, tag, document.baseURI)).finally(() => {
+    void bootAdminCatalog(config, document.baseURI).then((selected) => {
       if (!active) return
-      document.documentElement.lang = locale
+      setLocale(selected)
       setCatalogReady(true)
     })
     return () => { active = false }
-  }, [config, locale])
+  }, [config])
 
   const fetchOverview = useCallback(async (keep: Overview | null) => {
     if (!config) return
@@ -106,6 +119,11 @@ export function AdminGate({ declared }: { declared: string }) {
   }, [config])
 
   const start = useCallback(async () => {
+    if (HEALTH_FIXTURE) {
+      const { fixtureFetch } = await import("./health/fixture.js")
+      setPhase({ kind: "fixture", get: fixtureFetch(HEALTH_FIXTURE) })
+      return
+    }
     if (!config) return
     const mine = ++generation.current
     setPhase({ kind: "checking" })
@@ -161,14 +179,22 @@ export function AdminGate({ declared }: { declared: string }) {
     void fetchOverview(current.overview)
   }, [fetchOverview])
 
-  const { route, search, go, moved } = useAdminRoute()
+  const { route, pathname, search, go, moved } = useAdminRoute()
   const consoleHref = config ? config.appOrigin + "/" : "/"
-  const navigable = phase.kind === "ready" || phase.kind === "loading"
+  // Connection health reads its own routes, so an overview that failed to load does not hide it.
+  const navigable = phase.kind === "ready" || phase.kind === "loading" || phase.kind === "fixture" || (phase.kind === "failed" && route === "health")
+  const health = route === "health" ? healthRoute(pathname, search) : null
+  // A refused health read ends what this page may show: signed out signs in again, forbidden says so.
+  const healthRefused = useCallback((refusal: Refusal) => {
+    if (refusal === "forbidden") setPhase({ kind: "forbidden" })
+    else void start()
+  }, [start])
+  const healthFetch = useMemo<typeof fetch>(() => (url, init) => fetch(url, init), [])
   const pageTitle = say(`nav_${route}`)
 
   useEffect(() => {
     document.title = navigable ? say("docTitlePage", { page: pageTitle }) : say("docTitle")
-  }, [navigable, pageTitle, say])
+  }, [navigable, pageTitle, say, locale])
 
   if (!navigable) {
     return (
@@ -191,6 +217,33 @@ export function AdminGate({ declared }: { declared: string }) {
     )
   }
 
+  if (route === "health") {
+    return (
+      <Shell route={route} go={go} say={say} consoleHref={consoleHref} stampText={null} refreshing={false} onRefresh={null}>
+        <Suspense fallback={<Skeleton label={say("loading")} />}>
+        {health === null ? (
+          <Notice title={say("failedTitle")} body={say("healthUnknownAddress")}>
+            <RouteLink href={adminPath("health")} go={go} className="adm-btn" current={false}>{say("nav_health")}</RouteLink>
+          </Notice>
+        ) : phase.kind === "fixture" ? (
+          <ConnectionHealth route={health} go={go} apiOrigin="fixture:" get={phase.get} fixture onRefused={() => undefined} arrivedByMove={moved > 0} />
+        ) : config ? (
+          <ConnectionHealth route={health} go={go} apiOrigin={config.apiOrigin} get={healthFetch} fixture={false} onRefused={healthRefused} arrivedByMove={moved > 0} />
+        ) : null}
+        </Suspense>
+      </Shell>
+    )
+  }
+
+  if (phase.kind === "fixture") {
+    return (
+      <Shell route={route} go={go} say={say} consoleHref={consoleHref} stampText={null} refreshing={false} onRefresh={null}>
+        <PageHead route={route} say={say} moved={moved} />
+        <Notice title={say("fixtureOnlyTitle")} body={say("fixtureOnlyBody")} />
+      </Shell>
+    )
+  }
+
   return (
     <Shell route={route} go={go} say={say} consoleHref={consoleHref}
       stampText={phase.kind === "ready" ? demo ? say("demoStamp") : say("generated", { time: stamp(phase.overview.generated_at, locale) }) : null}
@@ -204,7 +257,7 @@ export function AdminGate({ declared }: { declared: string }) {
           </button>
         </div>
       ) : null}
-      {phase.kind === "loading" ? (
+      {phase.kind !== "ready" ? (
         <Skeleton label={say("loading")} />
       ) : (
         <>
@@ -214,6 +267,7 @@ export function AdminGate({ declared }: { declared: string }) {
             </p>
           ) : null}
           {route === "overview" ? <OverviewPage overview={demo ? sample : phase.overview} say={say} locale={locale} go={go} /> : null}
+          {route === "survey" && config ? <SurveyStatistics apiOrigin={config.apiOrigin} demo={demo} refreshToken={phase.overview.generated_at} /> : null}
           {route === "accounts" ? <AccountsPage overview={demo ? sample : phase.overview} say={say} locale={locale} go={go} /> : null}
           {route === "usage" ? <UsagePage overview={demo ? sample : phase.overview} say={say} locale={locale} go={go} /> : null}
           {route === "promotions" && demo ? <DemoPromotions overview={sample} say={say} locale={locale} /> : null}
@@ -235,7 +289,7 @@ export function AdminGate({ declared }: { declared: string }) {
  * on a move and not on arrival.
  */
 function useAdminRoute() {
-  const read = () => ({ route: adminRoute(location.pathname), search: location.search })
+  const read = () => ({ route: adminRoute(location.pathname), pathname: location.pathname, search: location.search })
   const [where, setWhere] = useState(read)
   const [moved, setMoved] = useState(0)
   const currentAddress = useRef(location.pathname + location.search)
@@ -272,7 +326,7 @@ function useAdminRoute() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { route: where.route ?? "overview", search: where.search, go, moved }
+  return { route: where.route ?? "overview", pathname: where.pathname, search: where.search, go, moved }
 }
 
 function useNarrow(): boolean {
@@ -413,6 +467,7 @@ function Shell({ route, go, say, consoleHref, stampText, refreshing, onRefresh, 
           </ul>
         </nav>
         <div className="adm-side-foot">
+          <BrowserLanguageControl id="admin-ui-language" />
           {stampText ? <p className="adm-stamp">{stampText}</p> : null}
           {onRefresh && !narrow ? (
             <button type="button" className="adm-btn adm-btn-quiet adm-btn-block" onClick={onRefresh} disabled={refreshing} aria-busy={refreshing}>
@@ -484,6 +539,7 @@ function Body({ phase, say, session, onRetry, catalogReady }: {
         </Notice>
       )
     case "ready":
+    case "fixture":
       // Drawn by the shell instead.
       return null
   }

@@ -1,3 +1,4 @@
+import { loadingSkeletonHTML } from "../loading-skeleton.js"
 // The Git panel's part of the bridge.
 //
 // `input/git-panel.js` is not copied: it reaches `els["git-body"]` through
@@ -90,7 +91,7 @@ export function row(
 }
 
 function diffHTML(loading: boolean, error: string | null, diff: GitFileDiff | null): string {
-  if (loading) return '<div class="git-diff-note" role="status">' + e(S.webLoading) + "</div>"
+  if (loading) return loadingSkeletonHTML(S.webLoading, "SK-26", "text")
   if (error) return '<div class="git-diff-note err" role="alert">' + e(error) + "</div>"
   if (!diff || !diff.patches.length) return '<div class="git-diff-note">' + e(S.webGitClean) + "</div>"
   return '<div class="git-diff">' + diff.patches.map((patch) => {
@@ -117,7 +118,7 @@ export function bodyHTML(state: {
   diff?: GitFileDiff | null
 }): string {
   if (state.loading) {
-    return '<div class="git-note" role="status">' + e(S.webLoading) + "</div>"
+    return loadingSkeletonHTML(S.webLoading, "SK-26")
   }
   if (state.error) {
     return '<div class="git-note err" role="alert">' + e(state.error) + "</div>"

@@ -1,8 +1,10 @@
 package app
 
 import (
+	"github.com/sainteye/clawdline/internal/domain/session"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 )
 
@@ -41,5 +43,31 @@ func TestTodoPreviewIsOneLineAndCutsBetweenCharacters(t *testing.T) {
 	got := TodoPreview(strings.Repeat("字", reportOpenTodoTextLimit+1))
 	if !utf8.ValidString(got) || utf8.RuneCountInString(got) != reportOpenTodoTextLimit || !strings.HasSuffix(got, "…") {
 		t.Fatalf("cut: %d runes, valid %v, %q", utf8.RuneCountInString(got), utf8.ValidString(got), got)
+	}
+}
+
+func TestPendingTodoOwnerRequiresTheExactProcessAndTerminal(t *testing.T) {
+	row := session.Session{ID: "%4", Backend: session.BackendTmux, Assistant: session.AssistantCodex, PID: 42}
+	started := time.Unix(1000, 0)
+	owner := TodoProcessOwner(row, started)
+	if owner == "" || !strings.HasPrefix(owner, "pending:") {
+		t.Fatalf("owner: %q", owner)
+	}
+	for _, tc := range []struct {
+		name string
+		row  session.Session
+		at   time.Time
+	}{
+		{"pid reused", row, started.Add(time.Second)},
+		{"start unknown", row, time.Time{}},
+		{"process changed", func() session.Session { r := row; r.PID++; return r }(), started},
+		{"terminal changed", func() session.Session { r := row; r.ID = "%5"; return r }(), started},
+		{"assistant changed", func() session.Session { r := row; r.Assistant = session.AssistantClaude; return r }(), started},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := TodoProcessOwner(tc.row, tc.at); got == owner {
+				t.Fatalf("different process matched %q", got)
+			}
+		})
 	}
 }

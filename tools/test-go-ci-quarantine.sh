@@ -9,7 +9,7 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/clawdline-quarantine.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
 # A real test in a real file, so only the date decides.
-entry='internal/adapters/tunnel/supervisor_test.go | TestReclaim | board item 0000 | 2026-10-20 | flaky under load'
+entry='internal/transport/http/gate_test.go | TestGateChangeChecks | board item 0000 | 2026-10-20 | flaky under load'
 
 # run <want exit> <today> <entry>
 run() {
@@ -26,23 +26,23 @@ expect() { grep -Fq "$1" "$tmp/out.txt" || fail "the output does not say: $1"; }
 
 # 1. Before and on its date: skipped and printed with owner and reason.
 run 0 2026-10-09 "$entry"
-expect 'Quarantined until 2026-10-20: internal/adapters/tunnel/supervisor_test.go TestReclaim (owner board item 0000)'
+expect 'Quarantined until 2026-10-20: internal/transport/http/gate_test.go TestGateChangeChecks (owner board item 0000)'
 expect 'Reason: flaky under load'
-expect '|TestReclaim)$'
+expect '|TestGateChangeChecks)$'
 run 0 2026-10-20 "$entry"
 
 # 2. The day after: the run fails and names it.
 run 1 2026-10-21 "$entry"
-expect 'Quarantine expired on 2026-10-20: internal/adapters/tunnel/supervisor_test.go TestReclaim (owner board item 0000)'
+expect 'Quarantine expired on 2026-10-20: internal/transport/http/gate_test.go TestGateChangeChecks (owner board item 0000)'
 
 # 3. A test the file no longer defines fails, as an exclusion does.
-run 1 2026-10-09 'internal/adapters/tunnel/supervisor_test.go | TestNoSuchTest | board item 0000 | 2026-10-20 | gone'
+run 1 2026-10-09 'internal/transport/http/gate_test.go | TestNoSuchTest | board item 0000 | 2026-10-20 | gone'
 expect 'Quarantine entry is stale'
 
 # 4. No owner, or a date that is not one, fails.
-run 1 2026-10-09 'internal/adapters/tunnel/supervisor_test.go | TestReclaim |  | 2026-10-20 | no owner'
+run 1 2026-10-09 'internal/transport/http/gate_test.go | TestGateChangeChecks |  | 2026-10-20 | no owner'
 expect 'has no owner'
-run 1 2026-10-09 'internal/adapters/tunnel/supervisor_test.go | TestReclaim | board item 0000 | next week | no date'
+run 1 2026-10-09 'internal/transport/http/gate_test.go | TestGateChangeChecks | board item 0000 | next week | no date'
 expect 'want YYYY-MM-DD'
 
 # 5. The list in the repository is well formed today.

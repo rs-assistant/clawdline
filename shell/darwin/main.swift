@@ -155,13 +155,16 @@ let fleetBridgeScript = """
 /// were never on a web page — and a page that made its own would be inventing
 /// them. See web/console/src/pages/settings/shell.ts for the other half.
 func settingsWordsScript() -> String {
-    let words: [String: String] = [
-        "hotkey": L.t.settingsHotkey,
-        "recording": L.t.settingsRecording,
-        "scope": L.t.settingsScope,
-        "scopeGlobal": L.t.settingsScopeGlobal,
-        "off": L.t.settingsOff,
-    ]
+    var words: [String: [String: String]] = [:]
+    for tag in ShellLanguage.tags {
+        words[tag] = [
+            "hotkey": ShellLanguage.word("settingsHotkey", language: tag),
+            "recording": ShellLanguage.word("settingsRecording", language: tag),
+            "scope": ShellLanguage.word("settingsScope", language: tag),
+            "scopeGlobal": ShellLanguage.word("settingsScopeGlobal", language: tag),
+            "off": ShellLanguage.word("settingsOff", language: tag),
+        ]
+    }
     let json = (try? JSONSerialization.data(withJSONObject: words, options: [.sortedKeys]))
         .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     let mascotsJSON = (try? JSONSerialization.data(withJSONObject: MascotPacks.available()))
@@ -177,7 +180,11 @@ func settingsWordsScript() -> String {
     return """
     (function () {
       var shell = window.__clawdlineShell || (window.__clawdlineShell = {});
-      shell.settings = { words: \(json), mascots: \(mascotsJSON), dictation: \(dictationJSON) };
+      var words = \(json);
+      shell.settings = { mascots: \(mascotsJSON), dictation: \(dictationJSON) };
+      Object.defineProperty(shell.settings, 'words', { get: function () {
+        return words[document.documentElement.lang] || words.en;
+      }});
     })();
     """
 }
@@ -433,8 +440,8 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
 
     // The daemon this shell started is this shell's to stop, and it is waited
     // for. A quit that returns first races the next launch: `quit` and then
-    // `open` start a new daemon while the old one is still taking its tunnel
-    // down, and the new one finds the port held. Only that one daemon, by its
+    // `open` start a new daemon while the old one is still shutting down,
+    // and the new one finds the port held. Only that one daemon, by its
     // pid — Daemon.swift says why none other.
     func applicationWillTerminate(_ note: Notification) {
         pairing.stop()
@@ -487,6 +494,7 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
                                            injectionTime: .atDocumentStart,
                                            forMainFrameOnly: true))
         content.add(WeakMessageHandler(self), name: "shellSettings")
+        content.add(WeakMessageHandler(self), name: "shellLanguage")
         content.add(WeakMessageHandler(self), name: "shellAgentSetup")
         content.add(WeakMessageHandler(self), name: "shellRestartApp")
         // The notch island listens to the same stream and opens this window
@@ -611,23 +619,34 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
 
     // MARK: - Pairing
 
-    /// The Swift app's alert, word for word, with its one button.
+    /// The pairing in flight, held until its flow ends.
+    private var pairingFlow: PairingPermissionFlow?
+
+    /// Choose a permission, save it, and only then show the code.
+    ///
+    /// The code never reaches the screen before the daemon has said the
+    /// permission is saved: a refusal, no answer or an expired pairing shows
+    /// why and no code. Saving runs off the main queue; the alerts are modal,
+    /// as the one before them was.
     ///
     /// One at a time: something hammering the pairing route must not stack a
     /// wall of alerts to dismiss one by one. The watcher holds that gate (see
-    /// PairingWatcher for why it cannot be held here); the daemon's rate limit
-    /// is the other half.
+    /// PairingWatcher for why it cannot be held here); the flow opens it again
+    /// on every way out. The daemon's rate limit is the other half.
     private func showPairing(_ pending: PairingNotice) {
-        defer { pairing.alertClosed() }
         // The name, never the code.
-        shellLog("pairing: \(pending.name) is asking; alert shown")
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = L.t.pairingAsks(pending.name)
-        alert.informativeText = L.t.pairingCode(pending.code)
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: L.t.pairingIgnore)
-        alert.runModal()
+        shellLog("pairing: \(pending.name) is asking; choosing a permission")
+        let client = PairingPermissionClient(base: home)
+        let flow = PairingPermissionFlow(
+            pending,
+            screens: PairingDialogs.screens,
+            save: client.save,
+            finished: { [weak self] in
+                self?.pairingFlow = nil
+                self?.pairing.alertClosed()
+            })
+        pairingFlow = flow
+        flow.start()
     }
 
     // MARK: - Where the hotkey applies
@@ -777,6 +796,22 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
                                    action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         appItem.submenu = appMenu
         main.addItem(appItem)
+        // Standard responder actions also reach the Settings WKWebView. Only
+        // ConsoleWindow had an editing-key fallback, so Cmd-V did nothing in
+        // the pairing-code field in a separate native settings window.
+        let editItem = NSMenuItem(title: L.t.menuEdit, action: nil, keyEquivalent: "")
+        let editMenu = NSMenu(title: L.t.menuEdit)
+        for (title, action, key) in [
+            (L.t.menuUndo, Selector(("undo:")), "z"),
+            (L.t.menuCut, #selector(NSText.cut(_:)), "x"),
+            (L.t.menuCopy, #selector(NSText.copy(_:)), "c"),
+            (L.t.menuPaste, #selector(NSText.paste(_:)), "v"),
+            (L.t.menuSelectAll, #selector(NSText.selectAll(_:)), "a"),
+        ] {
+            editMenu.addItem(NSMenuItem(title: title, action: action, keyEquivalent: key))
+        }
+        editItem.submenu = editMenu
+        main.addItem(editItem)
         main.addItem(browserMenuItem())
 
         let windowItem = NSMenuItem(title: L.t.menuWindow, action: nil, keyEquivalent: "")
@@ -840,7 +875,32 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
             : L.t.statusWaiting(waiting)
     }
 
+    private func applyShellLanguage(_ tag: String, fromSettings: Bool) {
+        guard ShellLanguage.select(tag) else { return }
+        installMainMenu()
+        statusItem?.menu = buildMenu()
+        refreshStatusItem()
+        bar?.updateLanguage()
+        refreshBrowserBar()
+        NotchIsland.shared.languageChanged()
+        AgentSetupWindowController.shared.languageChanged()
+        SettingsWindowController.shared.languageChanged(reloadPage: !fromSettings)
+        // The other local WebView has the same browser preference but does
+        // not observe this window's reload. Its next bridge message selects
+        // the same tag and stops here.
+        if fromSettings, let page = web.url, isConsole(page) { web.reload() }
+    }
+
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "shellLanguage" {
+            guard message.frameInfo.isMainFrame, message.webView === web,
+                  let page = message.frameInfo.request.url, isConsole(page),
+                  let current = web.url, isConsole(current),
+                  let body = message.body as? [String: String],
+                  let tag = body["tag"] else { return }
+            applyShellLanguage(tag, fromSettings: false)
+            return
+        }
         if message.name == "shellRestartApp" {
             guard message.frameInfo.isMainFrame, message.webView === web,
                   let page = web.url, isConsole(page), !showingCloud,
@@ -1061,7 +1121,7 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
     /// summon the window without the built-in combination. Its own scheme: the
     /// Swift app owns clawdline://. Only what this app can do is answered.
     func application(_ application: NSApplication, open urls: [URL]) {
-        shellLog("url: \(urls.map { $0.host == "cloud-signed-in" ? "clawdline-next://cloud-signed-in" : $0.absoluteString }.joined(separator: " "))")
+        shellLog("url: \(urls.map { ["cloud-signed-in", "pair-browser"].contains($0.host ?? "") ? "clawdline-next://\($0.host ?? "")" : $0.absoluteString }.joined(separator: " "))")
         guard let url = urls.first else { return }
         switch url.host ?? "" {
         case "toggle":
@@ -1070,6 +1130,18 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
             showConsole()
         case "setup":
             showAgentSetup()
+        case "pair-browser":
+            showConsole()
+            guard let window else { return }
+            Task { @MainActor in
+                let failure = await CloudPairLocal.pairFromLink(url, in: window)
+                guard !failure.isEmpty, failure != "cancelled", failure != "busy" else { return }
+                let alert = NSAlert()
+                alert.messageText = L.t.pairLinkFailed
+                alert.informativeText = CloudPairLocal.pairingFailureText(failure)
+                alert.addButton(withTitle: L.t.dialogOK)
+                _ = await alert.beginSheetModal(for: window)
+            }
         case "cloud-signed-in":
             // The browser sign-in's answer, when it reached the app rather than
             // the sign-in session that asked for it (Browser.swift). Without
@@ -1174,15 +1246,18 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
         pageLoaded = false
         let generation = loadGeneration
         let retrying = failedLoads <= 30
+        let title = ShellLanguage.htmlText(L.t.daemonUnavailableTitle)
+        let body = ShellLanguage.htmlText(L.t.daemonUnavailableBody(home.absoluteString))
+        let start = ShellLanguage.htmlText(L.t.daemonUnavailableStart)
+        let retry = ShellLanguage.htmlText(retrying ? L.t.daemonUnavailableRetrying
+                                                  : L.t.daemonUnavailableStopped)
+        let detail = ShellLanguage.htmlText(error.localizedDescription)
         let html = """
         <body style="font:14px -apple-system;padding:40px;color:#ddd;background:#1c1c1e">
-        <h2>The daemon is not answering</h2>
-        <p>This shell shows what <code>\(home.absoluteString)</code> serves, and nothing is
-        listening there.</p>
-        <p style="color:#888">Start it with <code>clawdline serve</code>. \(retrying
-            ? "This window tries again by itself; ⌘R tries now."
-            : "This window has stopped trying; ⌘R tries again.")</p>
-        <p style="color:#666">\(error.localizedDescription)</p></body>
+        <h2>\(title)</h2>
+        <p>\(body)</p>
+        <p style="color:#888">\(start) <code>clawdline serve</code>. \(retry)</p>
+        <p style="color:#666">\(detail)</p></body>
         """
         webView.loadHTMLString(html, baseURL: nil)
         shellLog("load failed (\(failedLoads)): \(error.localizedDescription)")
@@ -1369,6 +1444,9 @@ extension Shell {
 /// and because they are the whole of what that window may reach: it draws
 /// nothing of this app's state and changes nothing but the file.
 extension Shell: SettingsWindowHost {
+    func settingsLanguageSelected(_ tag: String) {
+        applyShellLanguage(tag, fromSettings: true)
+    }
     func settingsSuspendHotKey() {
         stopRecording(restore: false)
         hotKey.unregister()

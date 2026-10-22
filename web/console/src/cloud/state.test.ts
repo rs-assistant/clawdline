@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/relay-reader.test.ts.
-import { machineAccessProblem, machineListAnswer, machineListRefusal, retryReason } from "./state.ts"
+import { accessProblemAfterRead, machineAccessProblem, machineListAnswer, machineListRefusal, retryReason } from "./state.ts"
 
 test("the machine list keeps loading, authoritative empty, and refusal apart", () => {
   assert.deepEqual(machineListAnswer({ machines: [], syncing: true }), { phase: "loading" })
@@ -54,4 +54,22 @@ test("an access problem with no machine is withheld instead of accusing one of f
     machineAccessProblem({ type: "error", error: { code: "unknown_sender", detail: { machine: "machine-two" } } }),
     { machine: "machine-two", code: "unknown_sender" },
   )
+})
+
+
+test("timeout and a named pairing refusal retain their machine without guessing a cause", () => {
+  assert.deepEqual(machineAccessProblem({ type: "read", identity: {machine: "m"}, error: {code: "cloud_read_timeout"} }), {machine: "m", code: "cloud_read_timeout"})
+  assert.deepEqual(machineAccessProblem({ type: "error", machine: "m", error: {code: "machine_pairing_required"} }), {machine: "m", code: "machine_pairing_required"})
+  assert.equal(machineAccessProblem({type: "read", machine: "m"}), null)
+  assert.equal(machineAccessProblem({type: "error", error: {code: "cloud_read_timeout"}}), null)
+})
+
+
+test("cached data and other machines do not clear a failed read", () => {
+  const held = {machine: "m", code: "cloud_read_timeout"}
+  for (const event of [
+    {type:"sessions", machine:"m"}, {type:"read", machine:"other"}, {type:"read"},
+    {type:"read", machine:"m", realign:true}, {type:"read", machine:"m", error:{code:"offline"}},
+  ]) assert.equal(accessProblemAfterRead(held,event),held)
+  assert.equal(accessProblemAfterRead(held,{type:"read", identity:{machine:"m"}}),null)
 })

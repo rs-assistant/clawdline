@@ -66,6 +66,30 @@ func TestSecretHandoffLimitsAndReplacement(t *testing.T) {
 	}
 }
 
+func TestSecretHandoffCommitFailureDoesNotPublishOrReplaceValue(t *testing.T) {
+	h := NewSecretHandoffs()
+	failed := errors.New("commit failed")
+	for _, existing := range []bool{false, true} {
+		if existing {
+			if err := h.Put("note", "session", []byte("accepted fixture")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := h.PutAndCommit("note", "session", []byte("rejected fixture"), func() error { return failed }); !errors.Is(err, failed) {
+			t.Fatalf("commit failure: %v", err)
+		}
+		if h.Pending("note", "session") != existing {
+			t.Fatal("failed commit changed availability")
+		}
+		if existing {
+			value, err := h.Take("note", "session")
+			if err != nil || string(value) != "accepted fixture" {
+				t.Fatalf("accepted value replaced: %q %v", value, err)
+			}
+		}
+	}
+}
+
 func TestADiscardedSecretHandoffIsWipedAndCannotBeClaimed(t *testing.T) {
 	h := NewSecretHandoffs()
 	if err := h.Put("note", "session-a", []byte("credential fixture")); err != nil {

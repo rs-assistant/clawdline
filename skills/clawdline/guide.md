@@ -74,7 +74,7 @@ the command instead.
 | `clawdline dispatch --title "…" --claims a,b < brief.md` | Dispatches an owned child (§4) |
 | `clawdline item show\|steps\|name\|phase\|step-add\|step-done\|doc\|acceptance <item id> …` | Reads and advances a Board item you own (`clawdline guide feature-root`, §10) |
 | `clawdline todo add\|list\|done` | This Session's own to-dos, only when the person asks (§10) |
-| `clawdline heavy [--handoff] -- <command…>` | Runs a build or test suite in the machine's one compile slot; `--handoff` gives a queued wait to a callback (§11) |
+| `clawdline heavy [--handoff] -- <command…>` | Queues application/native compilation; ordinary commands run directly; `--handoff` gives a queued wait to a callback (§11) |
 | `clawdline send --to <terminal> "…"` | Relays a message into another session (§8) |
 | `clawdline notify --title "…" --body "…"` | Pushes a notification to the person (§9) |
 | `clawdline note create --body-file <JSON> [--target <terminal>]` | Leaves one actionable note above a Session (§9a) |
@@ -123,7 +123,7 @@ ledger has not read, or can no longer read, answers `not_yet_read`, `transcript_
 **Continue on the completion notice.** After dispatching a child, end the turn: the child's own
 completion notice wakes you, so do not add a callback to watch it. For a queued `heavy`, CI, deploy,
 long build or other command that can run without Agent decisions, register `clawdline callback`
-(or use `heavy --handoff` / `tools/check.sh`) and end the turn. On its notice, run
+(or use `heavy --handoff` for native compilation) and end the turn. On its notice, run
 `clawdline task show <id>` once; the read closes the notice. Treat success, failure and timeout as
 different results. Inspect a failure, timeout or uncertain outcome before deciding whether a retry
 is safe; do not start the same work again just because a wait expired. Do not poll from later turns,
@@ -179,7 +179,7 @@ print nothing while running; for long commands use the callback path above.
   exit code: 75 means the compile-slot or memory wait expired before the build ran; 76 means `heavy --handoff` started a callback, so end your turn and wait for its notice.
 
 `clawdline heavy` waits at most `--max-wait` (default 30m) and then exits 75 without running the
-command. With `--handoff`, a queued wait starts a callback and exits 76; `tools/check.sh` requests this by default. A child needs no waiting callback. If a callback is refused, read the typed refusal and choose a supported path; a refusal has not started the command.
+command. With `--handoff`, a queued wait starts a callback and exits 76; Ordinary `tools/check.sh` runs do not queue. A child needs no waiting callback. If a callback is refused, read the typed refusal and choose a supported path; a refusal has not started the command.
 
 **Curl to an orchestrator route.** Read `<state dir>/orchestrator-token` and send it in the
 `X-Clawdline-Orchestrator` header. Keep the token out of command arguments: use
@@ -356,10 +356,11 @@ Work through these four checks, skipping a check only when it genuinely does not
    with `clawdline project add <absolute-root>` and list again. This records a place from which a
    Session may start; it does not change the repository.
 2. **Name and icon.** Clawdline derives a stable icon when none is configured. If the person wants
-   a deliberate name or pixel mark, preserve every other entry in `~/.claude/project-icons.json`
+   a deliberate name, pixel mark or SVG, preserve every other entry in `~/.claude/project-icons.json`
    and edit only the longest-containing path for this Project. The format is documented in the
-   Clawdline repository's `docs/project-status.md`; the Projects page can also copy an existing
-   resolved icon without hand-editing JSON. A global user file is not repository content: show the
+   Clawdline repository's `docs/project-icons.md`: pixel grids are limited to 64×64 and SVGs
+   require a positive `viewBox`, static content and local references only (96 KiB maximum).
+   Both fit the existing icon slot without enlarging the layout. A global user file is not repository content: show the
    exact proposed entry before changing it when the request did not already authorize that edit.
 3. **Deploy and long work.** Clawdline only reads status receipts; it never runs a deploy. For a
    GitHub repository, a deploy receipt is
@@ -692,7 +693,7 @@ included — so the task the child reads is the one that was validated, and it d
 | `instructions` | required, at most 16 KiB. They must stand on their own: the child knows nothing else. Carry the facts you already verified, each with its `file:line` or command; an investigation child also gets a stop condition and a turn limit |
 | `claims` | **required**: at most 32 relative paths the child may write. `[]` means it writes nothing and is warned about (`claims_missing`) |
 | `isolation` | `none` (default) or `worktree` for a private checkout on its own branch |
-| `permission_mode` | `ask`, `edits` or `full` |
+| `permission_mode` | `ask`, `edits` or `full`; absent follows the machine setting (initially `full`) |
 | `timeout_minutes` | 1–240, default 30 |
 | `kind`, `deliverables`, `model` | optional; `model` is `[a-z0-9._-]`, at most 64 characters |
 | `work_id` | optional UUID of the board item this serves |
@@ -1029,6 +1030,8 @@ there is no run: ask them to send the instruction through Clawdline. Never reuse
 permission for work the person's message did not request. This proof makes the relay auditable; it
 does not turn the machine-wide orchestrator token into a session-specific credential.
 
+A calendar-day interval uses `"at":"09:00", "every_days":3, "start":"2026-10-21"` instead of `days` or `on`. The positive integer counts calendar dates in `time_zone`, starting on the inclusive anchor date. Manual runs do not shift the anchor; catch-up still considers only the latest occurrence. It is a recurring instruction and requires the same authorization proof.
+
 A schedule may have no time: send `"trigger_only": true` instead of `at`, `days` and `on`. The
 clock never runs it; it runs only by `…/run` or by its webhook, and only while `enabled`. It is a
 standing instruction like a repeating one and needs the same proof.
@@ -1170,6 +1173,12 @@ screenshot", 「傳圖片給我」「給我看截圖」 — and whenever a scree
 clawdline image send /absolute/path.png [more.png …]
 ```
 
+Put every flag before the first picture path: for example,
+`clawdline image send --port 7727 /absolute/path.png`. This also applies to
+`--target` and `--from`. After the first path, arguments are treated as more image paths;
+a trailing `--port 7727` becomes two nonexistent files and the whole batch is refused with
+`400 invalid_image_path`.
+
 It stores the pictures as shown in your own Session, and the console draws them under **the first
 reply your Session writes into its record after they are stored** — usually the message that ran
 the command, since Claude Code records it after the command starts, otherwise the next one.
@@ -1226,6 +1235,14 @@ clawdline note create --requested-by-person --body-file note.json
 For a password, credential, or API key, use **Secret Handoff**. Create a `kind: "secret"` Note with a non-secret title, action and reason. Put the exact credential name (such as "Production API key") in `summary`; it appears as the label immediately above the dedicated multi-line field. Put the exact command that will receive the value in `command`, as an argv array such as `["gh","auth","login","--with-token"]`; a Secret Handoff Note without it is refused. `clawdline note create` resolves a bare executable name to its absolute path in your environment, and the console shows the person that command beside the field ("This value will be given to: `/usr/bin/gh auth login --with-token`") so they can check where the value goes before handing it off. Name the real consumer directly, not a shell or a wrapper. Leave `detail`, `options`, and `document_url` empty; no other Note kind takes `command`. The person pastes the value into that field, even for a one-line value. Never request it in a suggested reply, normal message, document, or command argument. After the person submits, the target Session may run `clawdline secret run <note-id> -- <command> [args...]` with exactly the command the Note names; the daemon compares the full argv after resolving the executable the same way and refuses any other command (`secret_handoff_command_mismatch`). A mismatch hands nothing over, wipes the waiting value, and closes the Note, so the person must hand it off again to a new or reopened Note. The command receives the one-time value on standard input, and its output is suppressed. The value expires in 15 minutes or on daemon restart. A failed consumer still consumes it. Ask for a new handoff when needed, and never print the value or pipe it through a shell transcript. See `docs/secret-handoff.md` for the boundary and person-facing steps.
 
 `kind` is `read`, `answer`, `action`, `report`, or `secret`; `title`, `summary`, `action`, and `reason` are required. An `answer` can offer two to four choices. Each `draft` is the suggested reply shown on its button. When the person taps it, the Console sends it right away as a conversation message to the note's Session, followed by a context line with the note ID, title, and action so the receiving Session knows which request the person answered; the context is not shown on the button. Only after the send succeeds does the note move to recently handled. If the send fails, the note stays pending and the attention control says the reply was not sent. `detail` can hold longer text. `document_url` can link to a real, readable Cloud document; verify the document route and file before posting it. Act on the conversation message that arrives, not on the note's state: a note the person marked handled by hand sent nothing. Use `--requested-by-person` only for an explicit request to create the note, not for a broader request to complete work. That flag keeps the note visible without sending a note push. If your work is actually blocked on the answer, record the waiting-user state; an agent-initiated note already sends the attention push, so do not duplicate it. A note does not wake an Agent.
+
+**Withdraw an obsolete Note**
+
+Run `clawdline note list` to read only Notes attributed to your live Root (including their IDs, versions and current outcomes). When your own open Note no longer needs attention, run:
+
+`clawdline note withdraw --id <note-id> --version <version> --reason "The prerequisite is now satisfied."`
+
+The reason is required. Use `--from <live-root-conversation>` only when the environment cannot identify your Root. The CLI prints an idempotency key; reuse it with `--key` after an uncertain result. A stale version returns `version_conflict`: reread before deciding to retry. Another source's Note returns `intervention_not_found`; an already closed Note returns `intervention_already_closed` and preserves its outcome. Withdrawal removes the attention dot and moves the Note to recent history, in gray with its reason and an Agent-withdrawn label. It is never a person's answer or approval. The person can reopen it. Do not withdraw another Root's Notes or pretend a named source is cryptographically isolated: the machine credential remains shared.
 
 ## 10. The board
 
@@ -1966,7 +1983,7 @@ checkout), and `daemon_restart` (one machine-wide restart window).
 
 Build before taking `daemon_restart`. Never put `clawdline dev install` or another command that requests `heavy_compile` inside that wrapper: the restart lease blocks the compile slot. Run `clawdline dev install` directly after arranging the maintenance window; it builds before switching. Run `clawdline update --apply` directly too: it performs its own download, switch, health check and rollback. Use the wrapper only for a separate restart command that does not build.
 
-**Run a build or a test suite through `clawdline heavy -- <command>`**, not bare. It queues for
+**Only application builds and native compilation use `clawdline heavy -- <command>`.** Go build/install, Swift build, Objective-C/C compilation and Xcode builds queue. Python, ordinary tests (including Go/Swift tests), frontend bundles and type checks run directly, regardless of CPU use. Unknown commands also run directly without a memory wait or callback. Use `--compile` (or `tools/heavy.sh --compile`) only to declare an opaque application/native build script; never wrap an entire check/test script as compilation. `--no-slot` explicitly requests a memory-only wait. Native compilation queues for
 `heavy_compile`, waits until the machine has memory available (a quarter of it, at most 1 GB, and
 no memory stall above 10%), runs the command at a lower priority — on Linux also as the first
 thing the kernel kills if memory runs out — renews the lease while it runs and releases it after. It keeps the
@@ -1978,7 +1995,7 @@ prints one line when the wait starts and one when it ends, nothing in between: w
 long (§2, "Waiting on a long command"). A `heavy` inside a `heavy` runs directly. `--min-available 1500M` asks for more; `--no-slot` checks memory only. In a repository
 that has it, `tools/heavy.sh <command>` finds the binary for you.
 
-`heavy` starts a callback by default when a Root would wait; it then exits **76** with the callback id and queue position when known. End your turn and wait for the notice. `tools/check.sh` enables this by default; a child, missing conversation, refused callback, or unreachable daemon keeps waiting in place.
+`heavy` starts a callback by default when a Root would wait; it then exits **76** with the callback id and queue position when known. End your turn and wait for the notice. Ordinary `tools/check.sh` runs do not queue; a child, missing conversation, refused callback, or unreachable daemon keeps waiting in place.
 
 **Session pause and wake.** Read `docs/session-resource-coordination.md` before ordering conflicting work. `clawdline coordination status` shows durable pause receipts. `clawdline coordination pause --reason "…" --wake "lease:heavy_compile" <target conversation id>…` accepts a request and tries to deliver it. The receiver finishes important commands, runs `clawdline coordination observed <request id>`, then `clawdline coordination safe <request id>` at a safe turn boundary and ends its model turn. Only that final receiver receipt means paused. Use `wake <request id>` after the condition holds; the receiver runs `resumed <request id>` and still acquires its lease or confirms its wait release before working. `retry <request id>` reattempts failed or uncertain delivery. A new registered Clawdfather can wake its offline predecessor's parked Session. Do not poll from a waiting model turn.
 

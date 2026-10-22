@@ -34,7 +34,7 @@ func TestHTTPRefusalTextRequiresExactWireDetailAndKnownKey(t *testing.T) {
 			t.Errorf("%+v rendered %q", test, got)
 		}
 	}
-	if translated, total := HTTPRefusalCoverage("zh-Hant"); translated != 1228 || total != 1228 {
+	if translated, total := HTTPRefusalCoverage("zh-Hant"); translated != 1248 || total != 1248 {
 		t.Fatalf("Traditional Chinese coverage = %d/%d", translated, total)
 	}
 	const updateDetail = "force needs the version it installs"
@@ -62,5 +62,14 @@ func TestHTTPRefusalCatalogRejectsBrokenPresentEntriesAtomically(t *testing.T) {
 	partial := map[string]string{"old": "名前を使う {name}\x1f名前を使わない {name}"}
 	if !validHTTPRefusalCatalog(english, partial, baseline, false) || validHTTPRefusalCatalog(english, partial, baseline, true) {
 		t.Fatal("secondary new-key fallback or Traditional Chinese completeness changed")
+	}
+}
+
+func TestNoteWithdrawalRefusalsHaveTraditionalChineseCopy(t *testing.T) {
+	for _, detail := range []string{"A withdrawal reason is required within the note text limit.", "This note is already closed; its existing outcome is preserved."} {
+		key := HTTPRefusalKey(detail)
+		if key == "" || HTTPRefusalText("zh-Hant", key, detail) == detail {
+			t.Fatalf("missing withdrawal translation: %s", detail)
+		}
 	}
 }

@@ -32,6 +32,8 @@ type Starter struct {
 	Launcher ports.Launcher
 	// Past lists what an assistant has already recorded in a place.
 	Past func(ctx context.Context, place projects.Place, assistant string) []projects.Past
+	// VerifyPast checks a selected conversation without listing its whole project.
+	VerifyPast func(context.Context, projects.Place, string, string) (bool, error)
 	// Recorded is whether the assistant's own record of a conversation is on
 	// disk for a place (projects.Recorded). Only ResumeRecorded asks it; nil
 	// admits nothing beyond Past.
@@ -244,10 +246,18 @@ func (s Starter) Resume(ctx context.Context, place projects.Place, sessionID, as
 		return Started{}, notFound("No conversation named that")
 	}
 	found := false
-	for _, p := range s.Past(ctx, place, assistant) {
-		if p.ID == id {
-			found = true
-			break
+	if s.VerifyPast != nil {
+		var err error
+		found, err = s.VerifyPast(ctx, place, assistant, id)
+		if err != nil {
+			return Started{}, err
+		}
+	} else {
+		for _, p := range s.Past(ctx, place, assistant) {
+			if p.ID == id {
+				found = true
+				break
+			}
 		}
 	}
 	if !found {

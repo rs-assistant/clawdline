@@ -18,20 +18,28 @@ import { fetchWithDeadline } from "../pages/work/fetch-deadline.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { SESSION_LIST_READ } from "../pages/work/session-assignment.ts"
 
-test("a failed send can queue a private-free phone diagnostic while reconnecting", () => {
+test("a diagnostic press waits for a receipt from the selected machine and propagates failure", async () => {
   const reader = new RelayReader("mac-a")
-  assert.equal(reader.recordSendDiagnostic("cloud_reconnecting"), false)
-  const rows: { event: string; data: Record<string, unknown> }[] = []
+  await assert.rejects(reader.recordSendDiagnostic("unexpected_error"), { code: "cloud_not_carried" })
   const client = new FakeClient()
-  client.ready = false
-  client.viewerEvents = { record(event, data) { rows.push({ event, data }); return { n: rows.length } } }
+  let finish: () => void = () => {}
+  const seen: unknown[] = []
+  Object.assign(client, { sendDiagnostic(machine: string, data: Record<string, unknown>) {
+    seen.push({ machine, data })
+    return new Promise<void>((resolve) => { finish = resolve })
+  } })
   reader.attach(client)
-  assert.equal(reader.recordSendDiagnostic("cloud_reconnecting"), true)
-  assert.deepEqual(rows[0]?.event, "cloud.send.diagnostic_requested")
-  assert.equal(rows[0]?.data.code, "cloud_reconnecting")
-  assert.equal(rows[0]?.data.connection, "not_ready")
-  assert.equal(rows[0]?.data.machine, "mac-a")
-  assert.equal(JSON.stringify(rows).includes("message"), false)
+  let delivered = false
+  const sending = reader.recordSendDiagnostic("unexpected_error").then(() => { delivered = true })
+  await Promise.resolve()
+  assert.equal(delivered, false)
+  assert.equal((seen[0] as { machine: string }).machine, "mac-a")
+  assert.equal(JSON.stringify(seen).includes("message"), false)
+  finish()
+  await sending
+  assert.equal(delivered, true)
+  Object.assign(client, { sendDiagnostic: async () => { throw Object.assign(new Error("lost receipt"), { code: "cloud_read_timeout" }) } })
+  await assert.rejects(reader.recordSendDiagnostic("unexpected_error"), { code: "cloud_read_timeout" })
 })
 
 test("Session header trail distinguishes started, observed, canceled, unavailable and reconnect without identifiers", async () => {

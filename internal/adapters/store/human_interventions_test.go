@@ -11,8 +11,54 @@ import (
 	"github.com/sainteye/clawdline/internal/domain/work"
 )
 
-// The table as it shipped before a Secret Handoff Note declared its receiving
-// command, with one such Note in it.
+func TestOlderNotesAcquireWithdrawalStateAndRetainItAcrossReopen(t *testing.T) {
+	dir := t.TempDir()
+	db, err := sql.Open("sqlite", filepath.Join(dir, DBFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(humanInterventionSchema); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now().UTC().Truncate(time.Second)
+	note := work.HumanIntervention{ID: "note", SourceConversation: "source", TargetConversation: "target", CreatedAt: at, Version: 1}
+	if err = s.WriteWorkV2(context.Background(), func(tx *WorkV2Tx) error {
+		if err := tx.AddHumanIntervention(note, at); err != nil {
+			return err
+		}
+		next := note
+		next.ResolvedAt = &at
+		next.Withdrawn = true
+		next.Resolution = "No longer needed"
+		return tx.PutHumanIntervention(note, next)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	got, err := s.HumanIntervention(context.Background(), note.ID)
+	if err != nil || !got.Withdrawn || got.Resolution != "No longer needed" || got.ResolvedAt == nil || got.ReadAt != nil {
+		t.Fatalf("persisted withdrawal: %+v %v", got, err)
+	}
+	rows, err := s.SourceHumanInterventions(context.Background(), "source")
+	if err != nil || len(rows) != 1 || !rows[0].Withdrawn {
+		t.Fatalf("source list: %+v %v", rows, err)
+	}
+}
+
 const humanInterventionsBeforeCommand = `
 CREATE TABLE human_interventions (
  id TEXT PRIMARY KEY,
@@ -38,8 +84,6 @@ INSERT INTO human_interventions (id,source_conversation,source_label,target_conv
   VALUES ('old-secret','c-source','Manager','c-target','pane-target','secret','Key','API key','Paste it.','A tool needs it.','','[]','',100);
 `
 
-// An older Secret Handoff Note reads back with no command, which the claim's
-// comparison matches with nothing; a new Note keeps the argv it declared.
 func TestAnOlderSecretHandoffNoteHasNoReceivingCommand(t *testing.T) {
 	dir := t.TempDir()
 	db, err := sql.Open("sqlite", filepath.Join(dir, DBFile))

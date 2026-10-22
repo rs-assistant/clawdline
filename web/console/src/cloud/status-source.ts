@@ -33,7 +33,7 @@ type StatusClient = CloudClientHandle & {
   transcriptForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
   transcriptPageForGeneration?(destination: SessionDestination, before: number, signal: AbortSignal): Promise<unknown>
   skillsForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
-  imageForGeneration?(destination: SessionDestination, id: string, signal: AbortSignal): Promise<unknown>
+  imageForGeneration?(destination: SessionDestination, id: string, signal: AbortSignal, size?: "thumb"): Promise<unknown>
 }
 
 function reportListFailure(client: StatusClient, machineID: string, reason: string,
@@ -154,6 +154,7 @@ function directList(client: StatusClient, machineID: string, reply: unknown, now
           status.screen_reading === "unavailable" && menu?.source === "transcript")
       return { destination: { machineID, sessionID: String(row!.id),
         executionGeneration: String(row!.execution_generation) }, state: String(status.state),
+      assistant: row!.assistant === "claude" || row!.assistant === "codex" ? row!.assistant : before?.assistant,
       parentSessionID: parentSessionID && parentSessionID !== row!.id ? parentSessionID : before?.parentSessionID,
       machineScope: status.machine_scope === true || before?.machineScope === true,
       coordinatorBound: status.coordinator_bound === true || before?.coordinatorBound === true,
@@ -430,12 +431,13 @@ export function statusSource(current: () => StatusClient | null,
             icon: typeof icon?.accent === "string" && Array.isArray(icon.cells) &&
               icon.cells.every((line: unknown) => Array.isArray(line) &&
                 line.every((cell: unknown) => cell === null || typeof cell === "string"))
-              ? { accent: icon.accent, cells: icon.cells as ((string | null)[])[] } : undefined })
+              ? { accent: icon.accent, cells: icon.cells as ((string | null)[])[],
+                  svg: typeof icon.svg === "string" ? icon.svg : undefined } : undefined })
         }
         return result
       } catch { return null }
     },
-    async readImage(destination, artifact): Promise<{ url: string; release: () => void }> {
+    async readImage(destination, artifact, size): Promise<{ url: string; release: () => void }> {
       const key = destinationKey(destination)
       const client = current()
       const controller = imageSignals.get(key)
@@ -448,7 +450,7 @@ export function statusSource(current: () => StatusClient | null,
       if (before.kind !== "ready" || destinationAvailable(destination, before) !== "ready") {
         throw Object.assign(new Error("Session execution changed"), { code: "execution_generation_changed" })
       }
-      const reply = record(await client.imageForGeneration(destination, artifact.id, controller.signal))
+      const reply = record(await client.imageForGeneration(destination, artifact.id, controller.signal, size === "thumb" ? "thumb" : undefined))
       const after = await readMachine(destination.machineID, controller.signal)
       if (controller.signal.aborted || opened.get(key) !== client || after.kind !== "ready" ||
         destinationAvailable(destination, after) !== "ready" || !supportsPinnedRead(client, destination.machineID)) {

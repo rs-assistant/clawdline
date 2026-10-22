@@ -103,6 +103,8 @@ export interface CloudClientHandle extends CloudReadClient {
   carrierFacts?(machine: string): { known: boolean; supported: boolean; open: boolean }
   /** One direct attempt the person asked for (`DirectCarrier.tryNow`). */
   tryDirect?(machine: string): Promise<DirectTry>
+  sameNetworkAvailable?(machine: string): boolean
+  enableSameNetwork?(machine: string): Promise<void>
   /** A request with a stable id, answered on the encrypted machine channel. */
   _machineRequestAs?(
     request: string, machine: string, word: string, body: Record<string, unknown>, kind: "read" | "action", timeoutMs?: number,
@@ -193,10 +195,11 @@ export function newCloudSession(options: {
   deviceKind: string
   deviceName: string
   returnTo?: string
+  onOperationsAccess?: (allowed: boolean) => void
 }): RecoverableCloudSession & { ensureSession(): Promise<EnsuredSession> } {
   // `handlers` is the Swift page's render seam (`net/handlers.js`, not copied):
   // this console draws from the client's events instead, so none is given.
-  return new CloudViewerSessionOriginal({ ...options, Client: PairedCloudClient, handlers: null }) as unknown as RecoverableCloudSession & {
+  return new CloudViewerSessionOriginal({ ...options, Client: PairedCloudClient, handlers: null, enableViewerRekey: true }) as unknown as RecoverableCloudSession & {
     ensureSession(): Promise<EnsuredSession>
   }
 }

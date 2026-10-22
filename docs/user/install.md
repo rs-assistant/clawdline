@@ -14,8 +14,12 @@ existing work folder. Each step ends with a check.
 | curl, and something that checks an Ed25519 signature: OpenSSL 3, or OpenSSH 8.1+ `ssh-keygen` (every Mac has one) | `curl --version`; `openssl version` or `ssh-keygen -Y 2>&1 \| head -1` |
 | *(optional)* a Claude Code status line that writes `~/.claude/statusline-cache/rate-limits.json` | `ls ~/.claude/statusline-cache/rate-limits.json` |
 
-You do not need Go, Node.js, Xcode, an account or `sudo`. The installer checks the assistants
-itself and prints the exact command to install a missing one.
+You do not need Go, Node.js, Xcode, a Clawdline account or `sudo`. The signature checker must
+already be installed from a source you trust; the installer never downloads a verifier. macOS's
+bundled LibreSSL cannot check Ed25519, but its OpenSSH `ssh-keygen` can. Set
+`CLAWDLINE_INSTALL_OPENSSL=/absolute/path/to/openssl` to choose a trusted OpenSSL 3. A download
+host or environment variable cannot supply a replacement release public key. The installer checks
+the assistants itself and prints the exact command to install a missing one.
 
 You do not need tmux either. Every release carries tmux 3.6a. When your machine has tmux 3.0 or
 later, that one is used, because it is where your own sessions are. When it has none, or an older
@@ -30,7 +34,15 @@ Line's right edge reads `Plan limits unknown`. [usage.md](usage.md) says what to
 ## 1. Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
+curl --proto '=https' --proto-redir '=https' -fL \
+  https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh \
+  -o clawdline-install.sh
+```
+
+Read the downloaded script, then run it:
+
+```sh
+sh ./clawdline-install.sh
 ```
 
 It downloads the latest release's manifest, checks its signature with the release key written in
@@ -63,10 +75,10 @@ autostart off or remove Clawdline, each with `--port` when you chose another por
 "Next" in `Clawdline Next.app`, `clawdline-next.service` and `~/.config/clawdline-next` is this
 generation's internal name; the product is Clawdline.
 
-Options go after `sh -s --`:
+Pass options to the downloaded script:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh -s -- --headless
+sh ./clawdline-install.sh --version v2.1.3 --headless
 ```
 
 | Option | Does |
@@ -88,6 +100,47 @@ clawdline doctor          # version, port, state directory
 ```
 
 answers with the version you installed.
+
+### Review and pin an installation
+
+The steps above follow the script on `main` and the newest release. Reading the installer does
+not amount to auditing the release's program source or proving the binary reproducible.
+
+Calling the script without `--version` selects the newest release committed within 180 days;
+using a `main` URL follows a moving script. To select a reviewed release, use a reviewed installer with pre-execution verification and pass
+the release version explicitly. Replace `REVIEWED_INSTALLER_COMMIT` with that installer's full
+commit hash and `vX.Y.Z` with the published release you reviewed. The installer can verify
+existing signed releases; its source revision does not have to be the release's revision:
+
+```sh
+clawdline_release=vX.Y.Z
+clawdline_installer_ref=REVIEWED_INSTALLER_COMMIT
+curl --proto '=https' --proto-redir '=https' -fL \
+  "https://raw.githubusercontent.com/sainteye/clawdline/$clawdline_installer_ref/install.sh" \
+  -o clawdline-install.sh
+```
+
+Read `clawdline-install.sh`, including its pinned release keys, before running it. A release tag
+alone does not make a script immutable; the full commit hash fixes the script's source. Older
+installer revisions that execute before verifying do not gain this protection retroactively.
+Keep the selected release version in the command below:
+
+```sh
+sh ./clawdline-install.sh --version "$clawdline_release"
+```
+
+The installer refuses a signed manifest whose version differs from `--version`. It verifies
+before executing with your local tools, and does not prove that a signed binary is reproducible
+from its stated source. For a separate source-based verification path, the release tooling can
+verify downloaded manifests and archives with `go run ./tools/release verify <release-dir>`
+from a reviewed source checkout with a trusted Go toolchain. That command requires every artifact
+listed in the manifest and does not run the downloaded release program.
+
+Installation normally starts a background service and enables autostart. `--no-autostart`
+starts it now without enabling login or boot startup. Cloud stays off until you enable it;
+local use still has the filesystem and terminal permissions of the account running the service.
+See the [security overview](https://clawdline.com/security/) and
+[remote permissions](remote-access.md) before pairing a browser.
 
 ## 2. Open the console
 
@@ -168,7 +221,7 @@ whole of it.
 ## Stop or remove it
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh -s -- --uninstall
+sh ./clawdline-install.sh --uninstall
 # or, with it installed:
 clawdline setup --uninstall           # service, link, app and releases
 clawdline setup --uninstall --purge   # and the state: devices, sessions, settings

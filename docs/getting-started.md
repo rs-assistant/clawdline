@@ -143,62 +143,36 @@ at login, and a mascot in the notch.
 
 ## 6. Reach it from a phone
 
-Three ways, compared in [user/remote-access.md](user/remote-access.md): an SSH port forward, your
-own cloudflared tunnel with six-digit pairing (no account; a device paired that way can only read),
-or Clawdline Cloud, below. When a device asks to pair over the tunnel, the code appears on this
-machine, in the macOS app or through `./bin/clawdline pair --watch`, and is never sent back to the
-device that asked.
+Three ways, compared in [user/remote-access.md](user/remote-access.md): an SSH port forward,
+Tailscale Serve on your own tailnet, or Clawdline Cloud, below. Clawdline no longer runs a
+Cloudflare tunnel of its own; an old setting for one starts nothing, and the **Remote** tab says
+so once. Over Serve a device pairs with a six-digit code, and like every paired device it can
+then read and send. When a device asks to pair, the code appears on this machine, in the macOS app
+or through `./bin/clawdline pair --watch`, and is never sent back to the device that asked.
+
+### Through Tailscale Serve (optional)
+
+With Tailscale installed and signed in on this machine and the
+phone, and MagicDNS and HTTPS certificates turned on for the tailnet:
+
+```sh
+tailscale serve --bg 7727             # HTTPS on https://<machine>.<tailnet>.ts.net, private to the tailnet
+tailscale serve status                # the address
+```
+
+Turn remote access on and enter that full name in **Tailscale address** (`tailscale_hostname` in
+`config.json`), then open the address on the phone and pair it. Serve is private to your tailnet;
+Funnel would make the address public and is not recommended. `tailscale serve --https=443 off` or
+`tailscale serve reset` stops it.
 
 ### Turn on Clawdline Cloud (optional)
 
-Cloud is a preview. The machine side is complete enough to pair a browser and drive sessions, and
-has been tested against a local copy of the service. It has not yet been run against the
-production service. The steps for moving to it are in [cloud-cutover.md](cloud-cutover.md).
+Follow [Cloud from a browser or phone](user/cloud-first-look.md) to sign in, connect this machine,
+and pair the browser or phone you will use. The guide covers macOS App setup, iPhone and Android;
+[remote access](user/remote-access.md) includes the terminal path and recovery steps.
 
-With the daemon running:
-
-```sh
-./bin/clawdline cloud login           # prints a code and an address to approve this machine at
-./bin/clawdline cloud on              # turn the line on in the settings file
-```
-
-`cloud login` waits up to ten minutes for you to approve the machine from your Clawdline account,
-then saves this machine's identity. The daemon reads the Cloud switch when it starts, so **restart
-`serve`** after `cloud on`.
-
-```sh
-./bin/clawdline cloud status          # the switch, the identity and the endpoints
-./bin/clawdline cloud pair            # a one-time link for the browser you want to pair
-```
-
-Open the link on your phone, in a browser signed in to the same Clawdline account. When it
-finishes, both screens show the same machine key, and the command prints the device it paired.
-
-The other way round works too, and suits a machine you reach only over SSH: in the hosted console,
-press **Pair** on the machine's row. It shows one line to run on the machine,
-`clawdline cloud pair -offer <code>`, with the browser's fingerprint beside it; the command prints
-the same fingerprint on its `browser` line, and the console then shows the one on its `machine`
-line. Inside the Mac app's Cloud tab you need not carry that line yourself: **Hand it to this Mac's
-AI** asks you first, then an assistant on the Mac reaches the machine with the access the Mac already
-has (ssh, for example) and runs the same line there.
-
-The phone can now read. To let it act on this machine too, meaning send text, answer, start or end
-a session:
-
-```sh
-./bin/clawdline cloud commands on
-```
-
-That switch is read again on every request, so turning it off takes effect at once. To see who is
-paired, and to remove one:
-
-```sh
-./bin/clawdline cloud devices
-./bin/clawdline cloud revoke <device-id>
-```
-
-**Check:** `cloud status` reports the line as connected, and app.clawdline.com lists this machine
-with its sessions.
+**Check:** the machine reports connected, both ends show matching fingerprints, and the paired
+browser or phone shows its Sessions.
 
 ## 7. Bring your projects to another machine
 

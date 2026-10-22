@@ -5,6 +5,21 @@ package capacity
 func artifactsBounds() []Entry {
 	return []Entry{
 		{
+			Name: "artifacts.report_total_image_pixels", Class: Buffer, Unit: Rows,
+			Limit: 64 * 1024 * 1024, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/documents.MaximumReportImagePixels"},
+		},
+		{
+			Name: "artifacts.report_image_side", Class: Buffer, Unit: Rows,
+			Limit: 8192, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/documents.MaximumImageSide"},
+		},
+		{
+			Name: "artifacts.report_image_pixels", Class: Buffer, Unit: Rows,
+			Limit: 16 * 1024 * 1024, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/documents.MaximumImagePixels"},
+		},
+		{
 			// Pictures behind <clawdline-image id> (limits N15). Every one
 			// was stored to be shown in a reply, so every live one is
 			// referenced. The daemon measures after each store, so warn and

@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/devstack"
@@ -333,7 +336,12 @@ func (r *Reader) servers(ctx context.Context, cwd string) []Link {
 				continue
 			}
 			row := Link{Label: label(p.Name, stack.Name), URL: url,
-				Kind: "server", Local: true}
+				Kind: "server", Local: localServerURL(url)}
+			if p.Port == 0 && !row.Local {
+				row.Kind = "site"
+				out = append(out, row)
+				continue
+			}
 			switch {
 			case p.Port > 0 && p.State == "running":
 				row.State = "ok"
@@ -366,4 +374,21 @@ func replaceUnderscores(s string) string {
 		out = append(out, r)
 	}
 	return string(out)
+}
+
+// localServerURL classifies the declared address without resolving DNS or
+// claiming that an unprobed public website is healthy.
+func localServerURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return true
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") || strings.HasSuffix(host, ".local") || !strings.Contains(host, ".") && !strings.Contains(host, ":") {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()
+	}
+	return false
 }

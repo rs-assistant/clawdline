@@ -49,6 +49,7 @@ import (
 	peercontract "github.com/sainteye/clawdline/internal/domain/agenthandoff"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	"github.com/sainteye/clawdline/internal/domain/schedulewebhook"
 	"github.com/sainteye/clawdline/internal/domain/terminal"
 )
@@ -141,6 +142,7 @@ type Status struct {
 // Viewer is one enrolled device, as the status route shows it. It carries no
 // key material: a fingerprint is what a person compares, a public key is not.
 type Viewer struct {
+	Scope       string   `json:"scope,omitempty"`
 	ID          string   `json:"id"`
 	Kind        string   `json:"kind,omitempty"`
 	Name        string   `json:"name,omitempty"`
@@ -167,6 +169,9 @@ const StateOff = "off"
 
 // LinkOptions is everything the wiring needs from the daemon.
 type LinkOptions struct {
+	// ContentKeyRuntime enables the integrated protocol only after relay/viewer acceptance.
+	// Production callers intentionally leave this false.
+	ContentKeyRuntime bool
 	// Dir is this daemon's own state directory. Keys, the identity record and
 	// the sequence fence live under it.
 	Dir string
@@ -233,19 +238,25 @@ type LinkOptions struct {
 	// lower a bound, as it may for the two above.
 	SpoolChannelBytes int
 	SpoolReceipts     int
+	// Health is the daemon's connection-health tracker, handed to the
+	// transport and used by the lanes. Nil records nothing.
+	Health *connectionhealth.Tracker
 }
 
 // Link is one machine's Cloud line.
 type Link struct {
-	opts     LinkOptions
-	file     *nextconfig.File
-	settings adaptercloud.Settings
+	contentEpoch     *domaincloud.KeyEpoch
+	contentAuthority *runtimeAuthority
+	opts             LinkOptions
+	file             *nextconfig.File
+	settings         adaptercloud.Settings
 
-	identity adaptercloud.Identity
-	keys     *cloudkeys.Files
-	deviceID string
-	pinned   *adaptercloud.PinnedStore
-	pairing  *Pairing
+	identity        adaptercloud.Identity
+	keys            *cloudkeys.Files
+	deviceID        string
+	pinned          *adaptercloud.PinnedStore
+	pairing         *Pairing
+	identityPairing *IdentityPairing
 
 	transport *adaptercloud.Transport
 	relay     *Relay
@@ -681,9 +692,21 @@ func Open(opts LinkOptions) (*Link, error) {
 		Keys:          link.pairingKeys,
 		Pinned:        link.pinned,
 		OnRevoke:      link.revokeTerminalViewer,
-		ReplaceSecret: link.replaceContentKey,
+		OnScopeChange: link.viewerScopeChanged,
 		Now:           opts.Now,
 		Log:           opts.Log,
+	}
+	// The identity pairing hands the master secret over with a recorded
+	// content-key epoch; its epoch record sits beside the key files.
+	link.identityPairing = &IdentityPairing{
+		AccountID: identity.AccountID,
+		AppOrigin: settings.AppOrigin,
+		Client: &adaptercloud.IdentityClient{BaseURL: settings.APIBase,
+			Credential: func(context.Context) (string, error) { return identity.MachineCredential, nil }},
+		Keys:   link.pairingKeys,
+		Epochs: adaptercloud.ContentEpochStore{Dir: keys.Dir()},
+		Now:    opts.Now,
+		Log:    opts.Log,
 	}
 	if err := link.wire(); err != nil {
 		link.fail(err)
@@ -713,9 +736,39 @@ func (l *Link) wire() error {
 	if err != nil {
 		return err
 	}
-	secret, err := domaincloud.LoadOrCreateMasterSecret(keys, rand.Reader)
-	if err != nil {
-		return err
+	var secret domaincloud.ContentKey
+	var epoch *domaincloud.KeyEpoch
+	keyID := adaptercloud.MasterKeyID
+	if opts.ContentKeyRuntime {
+		state, loadErr := keys.LoadOrCreateContentKey(rand.Reader)
+		if errors.Is(loadErr, domaincloud.ErrContentKeyPending) {
+			state, loadErr = keys.RecoverContentKey()
+		}
+		if loadErr != nil {
+			return loadErr
+		}
+		epoch, err = domaincloud.NewKeyEpoch(state)
+		if err != nil {
+			return err
+		}
+		secret, keyID = state.Key, state.KeyID
+		l.contentEpoch = epoch
+		if l.contentAuthority == nil {
+			l.contentAuthority = &runtimeAuthority{}
+		}
+		l.pairing.Authority = &l.contentAuthority.mu
+		l.pairing.Generation = &l.contentAuthority.generation
+		l.pairing.ContentState = epoch.Current
+		l.pairing.RevokeContent = l.revokeContentViewer
+		l.identityPairing.Authority = &l.contentAuthority.mu
+		l.identityPairing.Generation = &l.contentAuthority.generation
+		l.identityPairing.ContentState = epoch.Current
+		l.identityPairing.Pinned = l.pinned
+	} else {
+		secret, err = domaincloud.LoadOrCreateMasterSecret(keys, rand.Reader)
+		if err != nil {
+			return err
+		}
 	}
 	l.mu.Lock()
 	l.fingerprint = key.Fingerprint()
@@ -753,7 +806,8 @@ func (l *Link) wire() error {
 		MachineID: identity.MachineID,
 		Signer:    key,
 		Secret:    secret,
-		KeyID:     adaptercloud.MasterKeyID,
+		KeyID:     keyID,
+		Keys:      epoch,
 		Now:       opts.Now,
 		Log:       opts.Log,
 		Depth:     opts.QueueDepth,
@@ -774,6 +828,7 @@ func (l *Link) wire() error {
 		ReplayJournal:        l.replayJournal,
 		Inbound:              l.relay.Deliver,
 		DirectInbound:        l.relay.DeliverDirect,
+		InboundTraced:        l.relay.DeliverTraced,
 		PeerInbound:          l.enqueuePeer,
 		PeerAck:              l.enqueuePeerAck,
 		PeerTaskStartInbound: l.enqueuePeer,
@@ -789,14 +844,26 @@ func (l *Link) wire() error {
 		OnAck:                l.publicationAcked,
 		PublicKeyFor:         l.publicKeyFor,
 		ContentKey:           secret,
+		KeyEpoch:             epoch,
+		RawRekeyOffer:        l.rawRekeyCallback(),
 		Log:                  func(line string) { l.logf("%s", line) },
 		Now:                  opts.Now,
+		Health:               opts.Health,
 	})
 	if err != nil {
 		return err
 	}
 	l.transport = transport
 	l.relay.Transport = transport
+	if epoch != nil {
+		if r, pending, err := keys.PendingRevocation(); err != nil {
+			return err
+		} else if pending {
+			if err := l.resumeRevocation(r); err != nil {
+				return err
+			}
+		}
+	}
 	l.service = Service{
 		MachineID: identity.MachineID,
 		Bridge: cloudops.Bridge{
@@ -814,6 +881,7 @@ func (l *Link) wire() error {
 		Transport: l.relay,
 		Log:       opts.Log,
 	}
+	l.mu.Lock()
 	l.publisher = &Publisher{
 		MachineID:     identity.MachineID,
 		MachineName:   machineName(identity, settings, HostName(), runtime.GOOS),
@@ -837,6 +905,7 @@ func (l *Link) wire() error {
 		Publish:       l.relay.Publish,
 		Log:           opts.Log,
 	}
+	l.mu.Unlock()
 	// The publisher hears every viewer the relay hears from, which is how a
 	// viewer that arrived after this machine's last change gets the current
 	// state instead of waiting for the heartbeat (`Publisher.Seen`).
@@ -885,9 +954,18 @@ func machineName(identity adaptercloud.Identity, settings adaptercloud.Settings,
 
 // TaskListChanged is `http.CloudTaskLine`: this machine has written a task
 // row, so the list a viewer reads off the machine descriptor is not what the
-// publisher last projected. It records the fact and returns — the publisher's
-// own pass is what reads and publishes, at the cadence it always had.
-func (l *Link) TaskListChanged() { l.taskListMoved.Store(true) }
+// publisher last projected. Reuse the coalesced settle lane so the Session
+// queue change is read fresh without waiting for the five-second poll.
+// No viewers means no additional inventory work.
+func (l *Link) TaskListChanged() {
+	l.taskListMoved.Store(true)
+	l.mu.Lock()
+	publisher := l.publisher
+	l.mu.Unlock()
+	if publisher != nil && publisher.Watched() {
+		publisher.Settle()
+	}
+}
 
 // takeTaskListMoved answers whether a task row was written since it was last
 // asked, and clears the fact. Only the publisher's pass asks.
@@ -1139,26 +1217,32 @@ func (l *Link) runService(ctx context.Context) error {
 				// It waits for the publisher's next re-statement, up to one
 				// SnapshotInterval. The publisher bounds how many may wait
 				// (SessionSnapshotWaitersLimit) and answers the rest at once.
+				h := l.lanePhase(request, connectionhealth.ClassStatus, connectionhealth.LocSessionsLane)
 				answers.Add(1)
 				go func() {
 					defer answers.Done()
-					l.answer(ctx, service, request)
+					l.answerTraced(ctx, service, request, h, connectionhealth.LocSessionsHandler)
 				}()
 			case cloudops.IsRead(request.Plaintext):
 				if !l.takeReadSlot() {
 					l.refuseBusy(ctx, service, request, "read lane", CloudReadConcurrencyLimit)
 					continue
 				}
+				h := l.lanePhase(request, connectionhealth.ClassRead, connectionhealth.LocReadLane)
 				answers.Add(1)
 				go func() {
 					defer answers.Done()
 					defer l.releaseReadSlot()
-					l.answer(ctx, service, request)
+					l.answerTraced(ctx, service, request, h, connectionhealth.LocReadHandler)
 				}()
 			default:
+				// The phase begins before the send, so a command waiting
+				// behind a stuck one shows lane_queued with its own age.
+				h := l.lanePhase(request, connectionhealth.ClassControl, connectionhealth.LocCommandLane)
 				select {
-				case commands <- pending{service: service, request: request}:
+				case commands <- pending{service: service, request: request, health: h}:
 				default:
+					h.End(false)
 					l.refuseBusy(ctx, service, request, "command lane", depth)
 				}
 			}
@@ -1171,6 +1255,7 @@ func (l *Link) runService(ctx context.Context) error {
 type pending struct {
 	service Service
 	request Inbound
+	health  connectionhealth.Handle
 }
 
 // runCommands answers commands one at a time until the lane is closed. A
@@ -1179,9 +1264,10 @@ type pending struct {
 func (l *Link) runCommands(ctx context.Context, commands <-chan pending) {
 	for next := range commands {
 		if ctx.Err() != nil {
+			next.health.End(false)
 			continue
 		}
-		l.answer(ctx, next.service, next.request)
+		l.answerTraced(ctx, next.service, next.request, next.health, connectionhealth.LocCommandHandler)
 	}
 }
 
@@ -1220,8 +1306,47 @@ func (l *Link) refuseBusy(ctx context.Context, service Service, request Inbound,
 		lane, limit, request.Sender, request.Sequence)
 }
 
-// answer handles one request, counting what it answered.
-func (l *Link) answer(ctx context.Context, service Service, request Inbound) {
+// lanePhase begins the finite phase of one request as it is put on a lane.
+// The correlation is minted here: the request's own sender, sequence and
+// channel are never used as one.
+//
+// It continues the correlation the transport's frame phase handed over on
+// the request, so one logical operation reads frame_read → lane_queued →
+// handler under one id; only a request that carries none (monitoring was
+// off when it arrived, or a caller outside the transport) gets a new one.
+func (l *Link) lanePhase(request Inbound, class connectionhealth.Class, location string) connectionhealth.Handle {
+	t := l.opts.Health
+	correlation := request.Correlation
+	if !connectionhealth.ValidID(correlation) {
+		correlation = t.NewCorrelation()
+	}
+	return t.Start(connectionhealth.DaemonSpec(connectionhealth.StageLaneQueued, class, location, correlation))
+}
+
+// answerTraced is answer, moving h to the handler as it starts and ending
+// it with the answer's outcome. The answer's sealing and spooling inside
+// Service.Answer are phases of their own (Relay.PublishTracked) under the
+// same correlation, which the context hands them; the handler's phase still
+// ends only when Answer returns.
+func (l *Link) answerTraced(ctx context.Context, service Service, request Inbound, h connectionhealth.Handle, location string) {
+	_ = h.Step(connectionhealth.StageHandlerStarted, location)
+	ctx = connectionhealth.WithCorrelation(ctx, l.opts.Health, h.Correlation())
+	ok := false
+	defer func() { h.End(ok) }()
+	ok = l.answer(ctx, service, request)
+	_ = h.Progress(connectionhealth.StageHandlerCompleted)
+}
+
+// answer handles one request, counting what it answered, and reports
+// whether the answer was OK.
+func (l *Link) answer(ctx context.Context, service Service, request Inbound) bool {
+	// Read routes recheck authority before returning content; publication owns
+	// the epoch fence. Holding the mutation lock during a read serializes all
+	// eight read slots, including slow local routes and roster I/O.
+	if l.contentAuthority != nil && !cloudops.IsRead(request.Plaintext) && !cloudops.AsksForSessions(request.Plaintext) {
+		l.contentAuthority.mu.Lock()
+		defer l.contentAuthority.mu.Unlock()
+	}
 	answer := service.Answer(ctx, request)
 	l.mu.Lock()
 	l.answered++
@@ -1229,6 +1354,7 @@ func (l *Link) answer(ctx context.Context, service Service, request Inbound) {
 		l.refused++
 	}
 	l.mu.Unlock()
+	return answer.OK()
 }
 
 // allowCommands reads the write switch from the file, now.
@@ -1297,6 +1423,9 @@ func (l *Link) publicKeyFor(sender string) (ed25519.PublicKey, bool) {
 // Pairing is the handover this link drives, for the routes that start one.
 func (l *Link) Pairing() *Pairing { return l.pairing }
 
+// IdentityPairing is the content-key handover, nil before the identity loads.
+func (l *Link) IdentityPairing() *IdentityPairing { return l.identityPairing }
+
 // pairingKeys reads the two keys a handover carries, from the store, now.
 func (l *Link) pairingKeys() (domaincloud.DeviceKey, domaincloud.ContentKey, error) {
 	if l.keys == nil {
@@ -1305,6 +1434,10 @@ func (l *Link) pairingKeys() (domaincloud.DeviceKey, domaincloud.ContentKey, err
 	key, err := domaincloud.LoadOrCreateDeviceKey(l.keys, rand.Reader)
 	if err != nil {
 		return domaincloud.DeviceKey{}, domaincloud.ContentKey{}, err
+	}
+	if l.contentEpoch != nil {
+		state, err := l.contentEpoch.Current()
+		return key, state.Key, err
 	}
 	secret, err := domaincloud.LoadOrCreateMasterSecret(l.keys, rand.Reader)
 	if err != nil {
@@ -1379,6 +1512,14 @@ func (l *Link) authority(ctx context.Context, sender string, verifiedKey ed25519
 			return a
 		}
 		a.WriteGateAllows = l.allowCommands()
+		if l.pinned != nil {
+			scope, err := l.pinned.ViewerScope(sender)
+			if err != nil {
+				a.RosterAllowsSender = false
+				return a
+			}
+			a.ViewerReadOnly = scope != adaptercloud.ScopeOperate
+		}
 		return a
 	}
 	return a
@@ -1493,7 +1634,7 @@ func (l *Link) Status() Status {
 	out := Status{
 		Enabled:            l.settings.Enabled,
 		TerminalDirect:     l.settings.TerminalDirect,
-		DirectLocalNetwork: l.settings.DirectLocalNetwork,
+		DirectLocalNetwork: l.directLocalNetworkEnabled(),
 		State:              l.state,
 		RelayURL:           l.settings.RelayURL,
 		APIBase:            l.settings.APIBase,
@@ -1532,7 +1673,7 @@ func (l *Link) Status() Status {
 			seen[device.DeviceID] = len(out.Devices)
 			out.Devices = append(out.Devices, Viewer{
 				ID: device.DeviceID, Name: device.Name, Fingerprint: device.Fingerprint,
-				Pinned: true, PairedAt: device.PairedAt,
+				Scope: device.EffectiveScope(), Pinned: true, PairedAt: device.PairedAt,
 				Revoked: !device.Active(), RevokedAt: device.RevokedAt,
 			})
 		}
@@ -1838,37 +1979,6 @@ func (l *Link) rewire() bool {
 	return stop != nil
 }
 
-// replaceContentKey replaces this machine's content key — the account master
-// secret every paired browser was handed — and brings the line back on it.
-// It is Pairing.ReplaceSecret: what a revocation does after the pin.
-//
-// **Every browser still paired here has to pair again.** They all hold the
-// one secret the revoked browser holds, so there is no way to keep them and
-// lock it out; the outcome names them. Content this machine already sealed
-// stays readable to whoever kept the old key: what changes is everything
-// sealed from here on, which the relay, the spool and every carrier now get
-// under the new key, because wire() rebuilds all of them.
-//
-// The new key is written before the line is rebuilt, and the rebuild reads
-// the store, so there is no window in which the rebuilt line seals with the
-// old key. pairingKeys reads the store too, so the next pairing hands out the
-// new one.
-func (l *Link) replaceContentKey() (SecretReplacement, error) {
-	if l.keys == nil {
-		return SecretReplacement{}, ErrPairingUnavailable
-	}
-	fresh, err := domaincloud.NewContentKey(rand.Reader)
-	if err != nil {
-		return SecretReplacement{}, err
-	}
-	if err := l.keys.SaveMasterSecret(fresh); err != nil {
-		return SecretReplacement{}, err
-	}
-	l.logf("cloud: this machine's content key was replaced; every browser paired here must pair again")
-	repair := l.RotationCost()
-	return SecretReplacement{Repair: repair, Reconnected: l.rewire()}, nil
-}
-
 // setState records the line's own word for what it is doing.
 func (l *Link) setState(state string) {
 	l.mu.Lock()
@@ -1881,4 +1991,34 @@ func (l *Link) Fingerprint() string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.fingerprint
+}
+
+// TerminalViewerOperate is distinct from read access and is rechecked by the
+// terminal service after lane waits and immediately before each effect.
+func (l *Link) TerminalViewerOperate(device string) error {
+	// A local downgrade is definitive even when the account cannot be read.
+	// Check it before a retryable roster failure so Revalidate voids the lease.
+	if l.pinned != nil {
+		scope, err := l.pinned.ViewerScope(device)
+		if err != nil {
+			return terminal.Refuse(terminal.CodeForbidden, "the viewer grant cannot be verified")
+		}
+		if scope != adaptercloud.ScopeOperate {
+			return terminal.Refuse(terminal.CodeViewerReadOnly, "This device may read, and not send.")
+		}
+	}
+	return l.TerminalViewerAccess(device)
+}
+
+func (l *Link) viewerScopeChanged(_ string) error {
+	if l.opts.TerminalService != nil {
+		svc, err := l.opts.TerminalService()
+		if err != nil {
+			return err
+		}
+		if svc != nil {
+			svc.Revalidate()
+		}
+	}
+	return nil
 }

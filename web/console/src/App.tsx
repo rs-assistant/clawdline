@@ -1,4 +1,10 @@
-import { catalogWord } from "./catalog.js"
+import { QuotaBar } from "./provider-quota/QuotaBar.js"
+import { SessionStateFilterControl } from "./session/SessionStateFilter.js"
+import { matchesLocalStateFilter, stateFilterCounts, type SessionStateFilter } from "./session/state-filter.js"
+import { SurveyCoordinator } from "./onboarding/Survey.js"
+import { useCloudAccount } from "./cloud/account-context.js"
+import { catalogWord, catalogWordLanguage } from "./catalog.js"
+import { transparencyURL } from "./pages/transparency/public-url.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { SessionRow } from "@clawdline/contract"
 import { ClawdlineClient } from "@clawdline/core"
@@ -17,7 +23,7 @@ import { drawerEntries, pageNeedsUpdate, pageReady } from "./pages/registry.js"
 import { publishMachineVersion, useMachineVersion } from "./machine/NeedsUpdate.js"
 import { machineVersionFromHealth } from "./machine/needs-update-model.js"
 import { currentUpdateRead, subscribeUpdate } from "./machine/update.js"
-import { pageFromHash } from "./page-route.js"
+import { pageAdmitted, pageFromHash } from "./page-route.js"
 import { workWord } from "./pages/work/words.js"
 import { verifyWord } from "./pages/verify/words.js"
 import { nextWord } from "./next-strings.js"
@@ -28,11 +34,13 @@ import { destinationFragment, destinationFromFragment, destinationKey, identifyO
 import { notificationAddress } from "./push/navigation.js"
 import { hasDocumentIntent } from "./legacy/documents-bridge.js"
 import { NewBuild } from "./NewBuild.js"
-import { MachineDashboard } from "./machine/MachineDashboard.js"
+import { MachineDashboard, type DashboardSource } from "./machine/MachineDashboard.js"
 import { Start } from "./session/Start.js"
 import { startedRow } from "./session/started-row.js"
 import { askedSession } from "./session/asked-session.js"
 import type { StartAnswer, StartPlaceRow } from "./legacy/start-bridge.js"
+import { AdministratorSection } from "./cloud/admin/OperationsDashboardLink.js"
+import type { Attention } from "./cloud/admin/health/attention.js"
 import { SidebarIcon, type SidebarIconName } from "./SidebarIcon.js"
 import { scanRecovering, sessionCountState, sessionReadingChinese, totalSessionWords } from "./session-reading.js"
 import type { MachineOffline } from "./session/machine-offline.js"
@@ -66,7 +74,7 @@ import {
  * stylesheet is that app's. The drawer is `input/sidebar.js` and the page
  * switch is `core/pages.js`, rule for rule.
  */
-type Page = "usage" | "sessions" | "devices" | "projects" | "workflow" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
+type Page = "usage" | "sessions" | "devices" | "projects" | "workflow" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access" | "transparency"
 
 /** What became of a session the address asked for: see `openAsked`. */
 type Asked = "none" | "waiting" | "opened" | "gone"
@@ -80,10 +88,11 @@ const PAGES: { id: Page; nav: string; icon: SidebarIconName; key?: string; text?
   { id: "sessions", nav: "nav-sessions", icon: "sessions", key: "webSessions", ready: true },
   { id: "projects", nav: "nav-projects", icon: "projects", key: "webProjects", ready: false },
   { id: "usage", nav: "nav-usage", icon: "usage", ready: false },
-  { id: "workflow", nav: "nav-workflow", icon: "workflow", text: "Workflow", ready: false },
+  { id: "workflow", nav: "nav-workflow", icon: "workflow", ready: false },
   { id: "plan", nav: "nav-plan", icon: "plan", key: "webPlan", ready: false },
   { id: "devices", nav: "nav-devices", icon: "devices", key: "webDevices", ready: false },
   { id: "notifications", nav: "nav-notifications", icon: "notifications", ready: false },
+  { id: "transparency", nav: "nav-transparency", icon: "access", ready: false },
   { id: "settings", nav: "nav-settings", icon: "settings", key: "webSettings", ready: false },
 ]
 
@@ -205,14 +214,18 @@ function rowNode(id: string): HTMLElement | null {
  * light and draws both in one control (`cloud/CloudGate.tsx`) — on a phone two
  * pills beside each other left the counts no room to be read.
  */
-export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
+export default function App({ aside, cloudSessions, cloudOperationsAccess = false, cloudOperationsAttention = null, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
   fleetTargetIdentity = null, fleetReaderMachine = null, executionReadRevision = 0,
   cloudStartedRow = null, onCloudStartedObserved, cloudMachineOffline = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
-  hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved, confirmedTitle }: {
+  quotaMachineName, hideSessionCounts = false, onChooseDashboardMachine, dashboardSource, dashboardRequested = false, onDashboardClosed, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved, confirmedTitle }: {
+  quotaMachineName?: string
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
   cloudSessions?: ReactNode
+  cloudOperationsAccess?: boolean
+  /** The Cloud's operator attention list, read by the gate only for an administrator. */
+  cloudOperationsAttention?: Attention | null
   cloudPeerAccess?: ReactNode | ((active: boolean) => ReactNode)
   fleetList?: (filter: string, onFilter: (value: string) => void) => ReactNode
   executionReadRevision?: number
@@ -233,6 +246,10 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   fleetCloseIntent?: { target: SessionDestination; title: string; kind?: "end" | "archive"; recovered?: boolean } | null
   onFleetCloseIntentHandled?: () => void
   hideSessionCounts?: boolean
+  onChooseDashboardMachine?: () => void
+  dashboardSource?: DashboardSource
+  dashboardRequested?: boolean
+  onDashboardClosed?: () => void
   focusCloudSessions?: boolean
   onLeaveCloudSessions?: () => void
   onTitleSaved?: (id: string, title: string | undefined) => void
@@ -252,7 +269,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   // and says why, rather than missing (pages/registry.ts `pageNeedsUpdate`).
   const tooOld = (id: string) => pageNeedsUpdate(id, PAGE_MODULES, machineVersion.apiLevel)
   const offered = (id: string) => (id === "peer-access" ? !!cloudPeerAccess : ready(id) && !tooOld(id))
-  const knowsHere = (name: string): name is Page => name === "peer-access" ? !!cloudPeerAccess : knows(name)
+  const knowsHere = (name: string): name is Page =>
+    pageAdmitted(name, { knows, peerAccess: !!cloudPeerAccess, operationsAccess: cloudOperationsAccess })
   const tooOldTitle = (id: string) => tooOld(id) ? nextWord("machineNeedsUpdate") : undefined
   const tooOldMark = (id: string) => tooOld(id) ? <small className="sidebar-needs-update"> · {nextWord("machineNeedsUpdateShort")}</small> : null
   const [page, setPage] = useState<Page>(() => location.pathname === "/billing/done"
@@ -269,9 +287,17 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
     return () => worker.removeEventListener("message", follow)
   }, [])
   const [menu, setMenu] = useState(false)
-  // The machine dashboard, opened from the counts (machine/MachineDashboard.tsx).
+  const [statusFilter, setStatusFilter] = useState<SessionStateFilter>("all")
+  // The wordmark opens this machine, or asks Cloud to choose one from the fleet.
   const [machine, setMachine] = useState(false)
-  const closeMachine = useCallback(() => setMachine(false), [])
+  useEffect(() => {
+    if (dashboardRequested) setMachine(true)
+  }, [dashboardRequested])
+  const closeMachine = useCallback(() => {
+    setMachine(false)
+    onDashboardClosed?.()
+    document.getElementById("machine-dashboard-open")?.focus({ preventScroll: true })
+  }, [onDashboardClosed])
   const [, setLoaded] = useState(0)
   const brandRef = useRef<HTMLButtonElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
@@ -287,6 +313,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   // screen at a time, and `data-pane` is the desk's second column on or off.
   // Each is mirrored in a ref because the keyboard reads them between renders,
   // as the original reads its state object.
+  const surveyAccount = useCloudAccount()
   const [selected, setSelectedState] = useState<string | null>(null)
   const [openId, setOpenState] = useState<string | null>(null)
   const [view, setViewState] = useState<"list" | "detail">("list")
@@ -478,7 +505,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   // `move`: through the list as it is drawn, from the highlight, or from an
   // end when there is none.
   const move = (delta: number) => {
-    const list = L.orderedRows()
+    const list = L.orderedRows().filter((row) => matchesLocalStateFilter(row, statusFilter))
     if (!list.length) return
     const at = selectedRef.current ? list.findIndex((r) => r.id === selectedRef.current) : -1
     const next = at < 0 ? (delta > 0 ? 0 : list.length - 1) : Math.min(list.length - 1, Math.max(0, at + delta))
@@ -734,6 +761,10 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   useEffect(() => {
     const onPop = (event: PopStateEvent) => {
       if (!phone()) return
+      // A fragment navigation fires popstate before hashchange. The address
+      // already names the document while pageRef still names the Session;
+      // closing it here would replace that address with the Session list.
+      if (hasDocumentIntent(location.hash)) return
       // A document link from the attention card adds a browser history step.
       // Its back gesture returns to the still-open Session, not its list,
       // regardless of whether popstate or hashchange reaches us first.
@@ -760,6 +791,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   // to reverse here. The session menu answers its own Escape before this sees
   // it, as `detail-actions.js` does.
   const onKey = (ev: KeyboardEvent) => {
+    if (document.querySelector("#session-state-filter[open]")) return
     const key = ev.key
     const meta = ev.metaKey || ev.ctrlKey
     const rowsEl = document.getElementById("rows")
@@ -921,7 +953,11 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
     return () => document.removeEventListener("keydown", listener)
   }, [])
 
-  const sidebarPage = (p: typeof PAGES[number]) => (
+  const sidebarPage = (p: typeof PAGES[number]) => p.id === "transparency" ? (
+    <a key={p.id} className="sidebar-item" id={p.nav} href={transparencyURL(catalogWordLanguage("transparency", "title"))}>
+      <SidebarIcon name={p.icon} />{catalogWord("transparency", "title")}
+    </a>
+  ) : (
     <button
       key={p.id}
       className="sidebar-item"
@@ -934,7 +970,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
       title={tooOldTitle(p.id)}
     >
       <SidebarIcon name={p.icon} />
-      {p.id === "usage" ? nextWord("usageOverview") : p.id === "notifications" ? nextWord("notificationNav") : p.key ? T[p.key] : p.text}
+      {p.id === "usage" ? nextWord("usageOverview") : p.id === "notifications" ? nextWord("notificationNav") : p.id === "workflow" ? catalogWord("workflow", "workflow") : p.key ? T[p.key] : p.text}
       {tooOldMark(p.id)}
     </button>
   )
@@ -947,24 +983,41 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
           className="brand"
           id="brand"
           type="button"
-          aria-label={T.webMenu}
-          title={T.webMenu}
+          aria-label={nextWord(menu ? "sidebarHide" : "sidebarShow")}
           aria-controls="sidebar"
           aria-expanded={menu}
           ref={brandRef}
           onClick={() => (menu ? closeMenu() : setMenu(true))}
         >
-          <canvas id="brand-mark" width={0} height={0} ref={markRef} />
+          <span className="brand-handle" aria-hidden="true">
+            <canvas id="brand-mark" width={0} height={0} ref={markRef} />
+            <svg className="brand-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <path d="m10 4-4 4 4 4" />
+            </svg>
+            <svg className="brand-chevron brand-chevron-open" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <path d="m6 4 4 4-4 4" />
+            </svg>
+          </span>
+          <span className="brand-tooltip" aria-hidden="true">{nextWord(menu ? "sidebarHide" : "sidebarShow")}</span>
+        </button>
+        <button type="button" className="brand-wordmark" id="machine-dashboard-open"
+          title={catalogWord("literal", "b9fcf1d5c799")}
+          aria-label={catalogWord("literal", "b9fcf1d5c799")}
+          aria-haspopup="dialog"
+          onClick={() => onChooseDashboardMachine ? onChooseDashboardMachine() : setMachine(true)}>
           <b>clawdline</b>
         </button>
-        {!hideSessionCounts && <Counts
+        {fleetList ? <div className="counts session-state-slot" id="session-state-filter-slot" /> : !hideSessionCounts && <SessionStateFilterControl
+          value={statusFilter} onChange={setStatusFilter}
+          counts={stateFilterCounts(fleet.snapshot?.sessions ?? [], matchesLocalStateFilter)}
+          incomplete={!fleet.snapshot || !fleet.snapshot.scan.complete}
+          onRefresh={fleet.refresh} summary={<Counts
           reading={sessionCountState(fleet)}
           recovering={!!fleet.snapshot && scanRecovering(fleet.snapshot.scan)}
           partialCloudList={fleet.snapshot?.scan.provenance === "cloud" && !fleet.snapshot.scan.complete &&
             fleet.snapshot.sessions.length > 0}
           offline={!!cloudMachineOffline}
-          onOpen={() => setMachine(true)}
-        />}
+        />} />}
         {typeof aside === "function" ? aside(light) : (
           <>
             {aside}
@@ -1066,12 +1119,15 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
             {cloudPeerAccess && <button className="sidebar-item" id="nav-peer-access" type="button"
               data-page-to="peer-access" aria-current={page === "peer-access" ? "page" : undefined}
               onClick={() => go("peer-access")}>
-              <SidebarIcon name="devices" />{nextWord("cloudPeerAccessNav")}
+              <SidebarIcon name="access" />{nextWord("cloudPeerAccessNav")}
             </button>}
             {sidebarPages.filter((p) => p.id === "notifications").map(sidebarPage)}
             {sidebarPages.filter((p) => p.id === "plan").map(sidebarPage)}
             {sidebarPages.filter((p) => p.id === "settings").map(sidebarPage)}
           </section>
+          <AdministratorSection allowed={cloudOperationsAccess} attention={cloudOperationsAttention}>
+            {sidebarPages.filter((p) => p.id === "transparency").map(sidebarPage)}
+          </AdministratorSection>
           <div className="sidebar-version" role="status">
             {focusCloudSessions
               ? nextWord("sidebarChooseMachineVersion")
@@ -1088,6 +1144,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
 
       {cloudSessions ? (page === "sessions" ? cloudSessions : null) : <SessionsPage
         rows={rows}
+        statusFilter={statusFilter} onStatusFilter={setStatusFilter}
         loaded={fleet.loaded}
         arrived={fleet.snapshot !== null}
         live={fleet.live}
@@ -1123,14 +1180,19 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
       {Object.values(PAGE_MODULES).map(({ id, Component }) => (
         // Mounted once opened and kept, as the original keeps its sections in
         // the document and only hides them.
-        <Component key={id} shown={page === id} />
+        <Component key={id} shown={page === id && knowsHere(id)} />
       ))}
+      {!surveyAccount ? <SurveyCoordinator /> : null}
+      <QuotaBar mobileListShown={page === "sessions" && view === "list" && !machine} key={fleetReaderMachine ?? "local"} machineName={quotaMachineName} offline={!!cloudMachineOffline} />
       <Overlays />
       {machine ? <MachineDashboard
-        sessions={fleet.snapshot?.sessions ?? []}
+        sessions={dashboardSource?.sessions ?? fleet.snapshot?.sessions ?? []}
+        readUsage={dashboardSource?.readUsage}
+        machineName={dashboardSource?.name}
         onClose={closeMachine}
         onClawdfather={(id) => {
           closeMachine()
+          if (dashboardSource) { dashboardSource.onClawdfather(id); return }
           if (id) openSession(id)
           else Start.openMachine()
         }}
@@ -1155,22 +1217,18 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
  * `failures` part has no input here; when it does, its words need
  * `describeFailure` (`core/failure-text.js`) from the bridge.
  *
- * Pressing the counts opens the machine dashboard: how many sessions are
- * running is half of "why is everything slow", and what they are using is the
- * other half (machine/MachineDashboard.tsx).
+ * Machine load opens from the separate wordmark button.
  */
 function Counts({
   reading,
   recovering,
   partialCloudList,
   offline,
-  onOpen,
 }: {
   reading: ReturnType<typeof sessionCountState>
   recovering: boolean
   partialCloudList: boolean
   offline: boolean
-  onOpen: () => void
 }) {
   const T = L.strings
   const rows = reading.phase === "ready" ? reading.value : []
@@ -1220,28 +1278,18 @@ function Counts({
     bits.push({ cls: "part quiet", text: catalogWord("literal", "1b40e6344265") })
   }
   return (
-    <div
+    <span
       className="counts"
       id="counts"
-      role="button"
-      tabIndex={0}
       data-waiting={waiting > 0 ? "true" : undefined}
       aria-label={bits.map((bit) => bit.text).join(" · ")}
-      title={catalogWord("literal", "b9fcf1d5c799")}
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault()
-          onOpen()
-        }
-      }}
     >
       {bits.map((b, i) => (
         <span key={i} className={b.cls}>
           {b.text}
         </span>
       ))}
-    </div>
+    </span>
   )
 }
 

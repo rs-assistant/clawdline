@@ -8,12 +8,17 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
 
-// note create is the Agent's one-way entry to the person's attention panel.
+// Notes let Agents request attention and withdraw their own obsolete requests.
 // The daemon resolves both identities and owns every durable row; the CLI
 // supplies the calling conversation and reads the machine credential itself.
 func noteCommand(args []string) {
+	if len(args) > 0 && (args[0] == "list" || args[0] == "withdraw") {
+		manageNoteCommand(args)
+		return
+	}
 	if len(args) == 0 || args[0] != "create" {
 		noteUsage()
 	}
@@ -55,6 +60,7 @@ func noteCommand(args []string) {
 
 func noteUsage() {
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "note.usage_with_requested_by_person", "usage: clawdline note create --body-file <JSON path|-> [--requested-by-person] [--target <terminal id>] [--from <conversation id>] [--key k] [--port n]"))
+	fmt.Fprintln(os.Stderr, cliCopy("misc", "note.manage_usage", "  clawdline note list [--from <conversation id>] | clawdline note withdraw --id <note id> --version <n> --reason <reason>"))
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "note.the_body_names_kind_title_summary_a.642cb1ab", "  the body names kind, title, summary, action, reason and optional detail, options, document_url"))
 	os.Exit(2)
 }
@@ -135,4 +141,56 @@ func createNote(stdout, stderr io.Writer, b *broker, target, from string, raw []
 		return 1
 	}
 	return report(stdout, stderr, "note create", a)
+}
+
+func manageNoteCommand(args []string) {
+	fs := flag.NewFlagSet("note "+args[0], flag.ContinueOnError)
+	from := fs.String("from", "", "the live Root conversation id")
+	port := fs.Int("port", 0, "the daemon port")
+	id := fs.String("id", "", "the note id")
+	version := fs.Int64("version", 0, "the version returned by note list")
+	reason := fs.String("reason", "", "why this note no longer needs attention")
+	key := fs.String("key", "", "the Idempotency-Key; reuse after an uncertain result")
+	if err := fs.Parse(args[1:]); err != nil || fs.NArg() != 0 {
+		noteUsage()
+	}
+	if *from == "" {
+		var err error
+		*from, _, err = conversationFromEnv(os.Getenv)
+		if err != nil {
+			fail(err)
+		}
+	}
+	if *from == "" {
+		fail(fmt.Errorf("%s", cliCopy("misc", "note.live_root_required", "Name a live Root conversation with --from.")))
+	}
+	b, err := openBroker(*port)
+	if err != nil {
+		fail(err)
+	}
+	path := "/v1/work/v2/agent/human-interventions"
+	if args[0] == "list" {
+		a, err := b.request(http.MethodGet, path, url.Values{"source_conversation": {*from}}, nil, "")
+		if err != nil {
+			fail(err)
+		}
+		os.Exit(report(os.Stdout, os.Stderr, "note list", a))
+	}
+	if !workIDForNote(*id) || *version < 1 || *reason == "" {
+		fail(fmt.Errorf("%s", cliCopy("misc", "note.withdraw_usage", "usage: clawdline note withdraw --id <note id> --version <n> --reason <reason> [--from <conversation id>] [--key k] [--port n]")))
+	}
+	if *key == "" {
+		*key = newKey("note-withdraw")
+	}
+	fmt.Fprintf(os.Stderr, "Idempotency-Key: %s\n", *key)
+	a, err := b.request(http.MethodPost, path+"/"+url.PathEscape(*id)+"/withdraw", nil, map[string]any{"source_conversation": *from, "expected_version": *version, "reason": *reason}, *key)
+	if err != nil {
+		fail(err)
+	}
+	os.Exit(report(os.Stdout, os.Stderr, "note withdraw", a))
+}
+
+func workIDForNote(id string) bool {
+	// A path segment, never a route supplied by the caller.
+	return id != "" && !strings.ContainsAny(id, "/?#%")
 }

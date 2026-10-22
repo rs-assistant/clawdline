@@ -86,7 +86,7 @@ func (s *Server) projectFilesRoute(w http.ResponseWriter, r *http.Request, place
 	}
 	// Include the body in the receipt digest. A reused key with different text
 	// must not replay a successful write of the previous text.
-	receipt := store.ReceiptKey{Scope: scopePlaces, Actor: accessOf(r).verdict.Device, Key: key}
+	receipt := store.ReceiptKey{Scope: scopePlaces, Actor: actorOf(r), Key: key}
 	s.receipted(w, r, receipt, requestDigest([]byte(r.Method), []byte(routePath(r)), body),
 		func(status int) bool { return status != http.StatusTooManyRequests },
 		func(w http.ResponseWriter) {

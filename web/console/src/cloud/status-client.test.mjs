@@ -276,6 +276,77 @@ test("macOS is the fallback when the current Session machine cannot transcribe",
   assert.equal((await client.voiceHostFor("linux")).machine, "mac")
 })
 
+test("offline voice hosts cannot win as a saved choice, sole candidate, or Session owner", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  let rows = [
+    { id: "mac", pairing: "paired", freshness: "stale" },
+    { id: "linux", pairing: "paired", freshness: "current" },
+  ]
+  client._machineRows = () => rows
+  client.orchestratorSnapshots = new Map([
+    ["mac", { machine: { platform: "darwin", commands: ["voice"] } }],
+    ["linux", { machine: { platform: "linux", commands: ["voice"] } }],
+  ])
+  client.machineDescriptors = new Map()
+  client.machineLacks = new Map()
+  client.macCapabilities = new Map()
+  client.account = "account"
+  client.voiceHostStorage = null
+  client.voiceHostChoice = "mac"
+  const calls = []
+  client._machineRequest = async (machine) => { calls.push(machine); return { text: "heard" } }
+
+  assert.equal((await client.voiceHost()).machine, "linux")
+  assert.equal((await client.voiceHostFor("mac")).machine, "linux")
+  await client.voiceFor("mac", "AAAA", 16000)
+  assert.deepEqual(calls, ["linux"])
+  await assert.rejects(client.setVoiceHost("mac"), { code: "cloud_voice_host_unavailable" })
+  rows = rows.slice(0, 1)
+  await assert.rejects(client.voiceHost(), { code: "cloud_voice_host_unavailable" })
+  client.voiceHostChoice = null
+  await assert.rejects(client.voiceHostFor("mac"), { code: "cloud_voice_host_unavailable" })
+  rows[0] = { ...rows[0], freshness: "unknown" }
+  await assert.rejects(client.voice("AAAA", 16000), { code: "cloud_voice_host_unavailable" })
+  assert.deepEqual(calls, ["linux"], "no audio leaves for an unavailable host")
+  rows[0] = { ...rows[0], freshness: "current" }
+  assert.equal((await client.voiceHost()).machine, "mac", "a fresh report restores eligibility")
+})
+
+test("relay-confirmed offline overrides a fresh inventory even after retry backoff expires", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 1_700_000_000_000 })
+  const client = Object.create(StatusCloudClient.prototype)
+  client._knownMachines = () => ["mac"]
+  client.orchestratorSnapshots = new Map([["mac", { at: Date.now() / 1000,
+    machine: { platform: "darwin", commands: ["voice"] } }]])
+  client.machineDescriptors = new Map()
+  client.machineObservedAt = new Map()
+  client.unpairedMachines = new Set()
+  client.viewerVerified = new Map([["mac", {}]])
+  client.pairingSeen = new Set()
+  client.sessionSnapshots = new Map()
+  client.machineOffline = new Map()
+  client.now = () => 1000
+  assert.equal((await client.machines()).machines[0].freshness, "current")
+  client._rememberMachineOffline("mac")
+  let row = (await client.machines()).machines[0]
+  assert.equal(row.freshness, "stale")
+  assert.equal(row.autoSelectable, false)
+  assert.ok(row.observedAt, "keep the last-seen time for the offline explanation")
+  client.now = () => 1_000_000
+  assert.equal(client._offlineRefusal("mac"), null, "retry becomes possible without declaring recovery")
+  assert.equal((await client.machines()).machines[0].freshness, "stale")
+  client.pendingBySequence = new Map()
+  client.trail = { step() {} }
+  client._emit = () => {}
+  client._relayAnswered({ seq: 1, ch: "ctl/mac", status: "delivered" }, null)
+  assert.equal((await client.machines()).machines[0].freshness, "current")
+  t.mock.timers.tick(5 * 60 * 1000 + 1)
+  assert.equal((await client.machines()).machines[0].freshness, "stale",
+    "silence expires presence without another machine sending an event")
+  client._observeMachine("mac", Date.now())
+  assert.equal((await client.machines()).machines[0].freshness, "current")
+})
+
 test("a Linux no_whisper refusal retries the same recording on macOS and remembers the working source", async () => {
   const client = Object.create(StatusCloudClient.prototype)
   client._machineRows = () => [
@@ -1175,4 +1246,50 @@ test("the selected classic Session stays subscribed after recovery, including an
     assert.equal(client.subscriptionHolds.has("s/m/s"), false)
     assert.equal(client.socketSubscriptions.has("s/m/s"), false)
   }
+})
+
+
+test("thumbnails have a separate exact waiter and older machines keep their original image read", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  Object.assign(client, { imageReadQueue: [], imageReadsRunning: 0, imageReadsInFlight: 3 })
+  const calls = []
+  client.machineDescriptor = () => ({ machine: { image_thumbnails_v1: true } })
+  client._read = (...args) => { calls.push(args); return Promise.resolve({}) }
+  const target = { machineID: "m", sessionID: "s", executionGeneration: genA }
+  await client.imageForGeneration(target, "p", undefined, "thumb")
+  assert.equal(calls[0][2].size, "thumb")
+  assert.equal(calls[0][3], "image.p.thumb")
+  await client.imageForGeneration(target, "p")
+  assert.equal(calls[1][2].size, undefined)
+  assert.equal(calls[1][3], "image.p")
+  client.machineDescriptor = () => ({ machine: {} })
+  await client.imageForGeneration(target, "p", undefined, "thumb")
+  assert.equal(calls[2][2].size, undefined)
+  assert.equal(calls[2][3], "image.p")
+})
+
+
+test("an older carrier's pin requirement falls back only its reads and stops new direct attempts", async () => {
+  const c = Object.create(StatusCloudClient.prototype)
+  const identity = {machine: "m", session: "s"}
+  const waiters = {waiting: [], ref: null}
+  c.carrierReads = new Map([["one", {identity, type: "transcript", extra: {}, waiters}], ["two", {identity: {machine: "other"}}]])
+  c.readWaiters = new Map([["one", waiters]])
+  c.subscriptionHolds = new Map()
+  c._subscriptionRoom = () => null
+  c.subscribe = () => {}
+  const published = [], settled = []
+  c._publishCommand = async (...args) => {published.push(args)}
+  c._settleRead = (key, body, error) => settled.push([key, error?.code])
+  c._emit = () => assert.fail("a carrier refusal is not a failed relay read")
+  c.directCarriers = { for() { assert.fail("must keep this client on relay") } }
+  c._carrierDown("m", "machine_pairing_required")
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(published.length, 1)
+  assert.equal(published[0][0], "m")
+  assert.equal(published[0][1], "transcript")
+  assert.equal(c.readWaiters.get("one"), waiters, "the original caller still awaits its relay answer")
+  assert.equal(c.carrierReads.has("two"), true)
+  assert.equal(c._carrierFor("m"), null)
+  assert.deepEqual(settled, [])
 })

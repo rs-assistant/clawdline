@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/domain/persona"
 	"github.com/sainteye/clawdline/internal/domain/squad"
@@ -275,11 +276,16 @@ func (b *Broker) admit(id string, d draft, scheduled, detached bool) (Record, er
 	if isolation != IsolationNone && isolation != IsolationWorktree {
 		return bad("isolation must be one of: none, worktree")
 	}
-	// No mode named is `ask`: `full` is bypassPermissions / --ask-for-approval
-	// never, which a caller has to ask for by name.
+	// No mode named is this machine's `orchestrator_permission`, and an unset
+	// one is `ask` (nextconfig DispatchPermission): `full` is bypassPermissions
+	// / --ask-for-approval never, which somebody has to choose by name.
 	permission := d.PermissionMode
 	if permission == "" {
-		permission = "ask"
+		values, err := nextconfig.Open(b.Dir).Read()
+		if err != nil {
+			return Record{}, refuse(http.StatusServiceUnavailable, "settings_unreadable", "Dispatch permission settings could not be read")
+		}
+		permission = values.DispatchPermission()
 	}
 	switch permission {
 	case "ask", "edits", "full":

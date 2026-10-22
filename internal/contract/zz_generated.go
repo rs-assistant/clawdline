@@ -1756,6 +1756,8 @@ type BrowserDevice struct {
 // POST /v1/auth/devices/browser: `clawdline open` asking for a device of its
 // own. Local token only.
 type BrowserRequest struct {
+	// Optional local selection; omission preserves read-and-operate.
+	Permission string `json:"permission,omitempty"`
 }
 
 // One build: the commit it was built from and, when its BUILD.json said so,
@@ -2266,6 +2268,40 @@ const (
 // CloseabilityStateValues is every value the contract allows, in contract order.
 var CloseabilityStateValues = []CloseabilityState{CloseabilityStateSafe, CloseabilityStateBlocked, CloseabilityStateNeedsAttestation, CloseabilityStateUnknown}
 
+type CloudPairingOfferRequest struct {
+	Offer string `json:"offer"`
+
+	// Selected by the machine, never by the browser's encrypted offer.
+	Scope CloudViewerScope `json:"scope,omitempty"`
+}
+
+type CloudPairingRequest struct {
+	// Omitted preserves the legacy operate default.
+	Scope CloudViewerScope `json:"scope,omitempty"`
+}
+
+type CloudViewerGrantRequest struct {
+	Device string           `json:"device"`
+	Scope  CloudViewerScope `json:"scope"`
+}
+
+type CloudViewerGrantResponse struct {
+	Device string           `json:"device"`
+	Scope  CloudViewerScope `json:"scope"`
+}
+
+// The machine-local operation ceiling; the machine commands switch and account
+// identity checks remain independent requirements.
+type CloudViewerScope string
+
+const (
+	CloudViewerScopeReadonly CloudViewerScope = "readonly"
+	CloudViewerScopeOperate  CloudViewerScope = "operate"
+)
+
+// CloudViewerScopeValues is every value the contract allows, in contract order.
+var CloudViewerScopeValues = []CloudViewerScope{CloudViewerScopeReadonly, CloudViewerScopeOperate}
+
 // GET /v1/orchestrator/completions?pending=true|false. `pending=true` (the
 // default) is every envelope not yet acknowledged, dead letters included;
 // `pending=false` adds the acknowledged ones of the last seven days.
@@ -2623,6 +2659,15 @@ type DeviceList struct {
 	Password   bool           `json:"password"`
 }
 
+// Local token only. POST /v1/auth/devices/{id}/permission persists a grant;
+// POST /v1/auth/pairings/{id}/permission selects the pending pairing before
+// confirmation. Missing/invalid permission is 400 bad_request; unknown/expired
+// id is 404 not_found. Public pair/confirm fields never select a grant.
+// Repeated writes are idempotent.
+type DevicePermission struct {
+	Permission string `json:"permission"`
+}
+
 // GET /v1/diagnostics, this machine's own token only (a paired device is 403):
 // what health used to carry about the process — its state directory, its
 // ports, the clock's last pass and the broker's own account of itself.
@@ -2948,14 +2993,15 @@ const (
 // HealthReasonValues is every value the contract allows, in contract order.
 var HealthReasonValues = []HealthReason{HealthReasonBrokerBeatStalled, HealthReasonCapacityExhausted, HealthReasonCapacityBeatStalled, HealthReasonWorkSweepStalled}
 
-// A project's mark: rows of `#RRGGBB`, with null for transparent. It is derived
-// from the project path and the machine's icon registry by the same rules the
-// Swift app uses, so both apps draw the same creature — a mark somebody
-// recognises by colour and shape is not recognisable if the second app draws it
-// differently, and near-identical is worse than obviously different.
+// A project mark with an RGB accent and either bounded colour cells (null is
+// transparent) or a self-contained static SVG with empty cells. Both render
+// proportionally inside the existing icon slot.
 type Icon struct {
 	Accent string      `json:"accent"`
 	Cells  [][]*string `json:"cells"`
+
+	// Optional self-contained SVG; cells is empty when present.
+	Svg string `json:"svg,omitempty"`
 }
 
 // How a running process was tied to the conversation it is having, or — when
@@ -3563,7 +3609,8 @@ type PairStarted struct {
 }
 
 type PairedDevice struct {
-	// Paired devices have read and send access.
+	// Read-only grants have read; read-and-operate grants have read and send. Legacy
+	// rows and unselected new pairings default to read and send.
 	Caps []string `json:"caps"`
 
 	// Unix seconds.
@@ -3632,16 +3679,20 @@ type PastSession struct {
 }
 
 // GET /v1/places/{id}/sessions[/{assistant}]: what that assistant has recorded
-// in the place, newest first, at most two hundred. Dispatched children and `-p`
-// runs are not conversations and are left out.
+// in the place, newest first. Codex returns one provider page of twenty with an
+// opaque next_cursor; other assistants return at most two hundred. Dispatched
+// children and `-p` runs are not conversations and are left out.
 type PastSessionList struct {
 	Assistant string `json:"assistant"`
 	At        int64  `json:"at"`
 
 	// The list stopped at its cap and there were more.
-	More     bool          `json:"more"`
-	Place    string        `json:"place"`
-	Sessions []PastSession `json:"sessions"`
+	More bool `json:"more"`
+
+	// Opaque continuation for the next Codex page; omitted at the end.
+	NextCursor string        `json:"next_cursor,omitempty"`
+	Place      string        `json:"place"`
+	Sessions   []PastSession `json:"sessions"`
 }
 
 // One persona. `id` is what a start or resume path ends `/as/{id}` with, what a
@@ -3709,11 +3760,12 @@ type PersonaSuggestionRequest struct {
 	ExpectedVersion int64 `json:"expected_version"`
 }
 
-// A refusal from the start, resume and history routes: not_found, forbidden,
-// bad_request, invalid_launch, terminal_closed, terminal_unsupported,
-// terminal_io_failed, iterm_attention_required, capability_unavailable,
-// terminal_busy, unknown_persona (a start or resume ending `/as/{persona}` that
-// names no persona in GET /v1/personas).
+// A refusal from the start, resume and history routes: codex_unavailable (503;
+// provider read failed, retryable and never evidence of absence), not_found,
+// forbidden, bad_request, invalid_launch, terminal_closed,
+// terminal_unsupported, terminal_io_failed, iterm_attention_required,
+// capability_unavailable, terminal_busy, unknown_persona (a start or resume
+// ending `/as/{persona}` that names no persona in GET /v1/personas).
 type PlaceError struct {
 	// The terminal the refusal is about, on terminal_closed and
 	// iterm_attention_required, so a page can name it in its own language.
@@ -4487,6 +4539,35 @@ type ProposalDiagnostics struct {
 	Pending int64 `json:"pending"`
 }
 
+// An account quota observation. Empty windows means unknown, never zero.
+// Credentials and account identifiers are never included. A provider with no
+// windows is omitted from the footer.
+type ProviderQuotaRow struct {
+	ID         string                `json:"id"`
+	Label      string                `json:"label"`
+	ObservedAt int64                 `json:"observed_at,omitempty"`
+	Problem    string                `json:"problem,omitempty"`
+	Source     string                `json:"source"`
+	Stale      bool                  `json:"stale"`
+	Windows    []ProviderQuotaWindow `json:"windows"`
+}
+
+// GET /v1/provider-quotas. Current machine only; file observations for Claude
+// and Codex, cached metadata reads for Gemini and Grok. Network refreshes are
+// asynchronous and single-flight per provider; failures retain the last
+// successful snapshot marked stale.
+type ProviderQuotaSnapshot struct {
+	At        int64              `json:"at"`
+	Providers []ProviderQuotaRow `json:"providers"`
+	Updating  bool               `json:"updating"`
+}
+
+type ProviderQuotaWindow struct {
+	Name        string  `json:"name"`
+	ResetsAt    int64   `json:"resets_at,omitempty"`
+	UsedPercent float64 `json:"used_percent"`
+}
+
 // GET /v1/push/key. The application server key the page passes to `subscribe({
 // applicationServerKey })`: base64url of the uncompressed P-256 public point.
 // It is an identity rather than a session — every subscription a browser
@@ -4998,17 +5079,18 @@ type ScheduleRecord struct {
 
 // The body POST /v1/orchestrator/schedules and PATCH
 // /v1/orchestrator/schedules/:id take — the form's fields, flattened.
-// `place_id` is an id from GET /v1/places, never a path. Either `at` with
-// exactly one of `days` and `on` (`days` is not defaulted), or `trigger_only:
-// true` with none of `at`, `days` and `on` — a schedule the clock never
-// fires, run only by hand or by webhook. schedule_id, created_at,
-// when_changed_at, fired_at and project_dir are the machine's and are refused
-// as unknown fields. Writes need an Idempotency-Key and either a device that
-// may send or, for a schedule that runs once, this machine's orchestrator
-// token. A session carrying a person's recent instruction may write a repeating
-// schedule by sending both `session_id` and `via.run`; the run must have been
-// issued for a message to that conversation. Those proof fields are audit
-// evidence and are not stored in the schedule.
+// `place_id` is an id from GET /v1/places, never a path. Either `at` with one
+// of `days`, `on`, or the pair `every_days` and `start` (`days` is not
+// defaulted), or `trigger_only: true` with none of `at`, `days`, `on`,
+// `every_days` and `start` — a schedule the clock never fires, run only by
+// hand or by webhook. schedule_id, created_at, when_changed_at, fired_at and
+// project_dir are the machine's and are refused as unknown fields. Writes need
+// an Idempotency-Key and either a device that may send or, for a schedule that
+// runs once, this machine's orchestrator token. A session carrying a person's
+// recent instruction may write a repeating schedule by sending both
+// `session_id` and `via.run`; the run must have been issued for a message to
+// that conversation. Those proof fields are audit evidence and are not stored
+// in the schedule.
 type ScheduleRequest struct {
 	Assistant    string   `json:"assistant"`
 	At           string   `json:"at,omitempty"`
@@ -5016,7 +5098,11 @@ type ScheduleRequest struct {
 	CloseTab     string   `json:"close_tab,omitempty"`
 	Days         []string `json:"days,omitempty"`
 	Enabled      bool     `json:"enabled,omitempty"`
-	Instructions string   `json:"instructions"`
+
+	// Positive calendar-day interval, paired with start and at; excludes days, on and
+	// trigger_only.
+	EveryDays    int64  `json:"every_days,omitempty"`
+	Instructions string `json:"instructions"`
 
 	// No key leaves the model alone; an empty string takes it off.
 	Model           string `json:"model,omitempty"`
@@ -5036,8 +5122,11 @@ type ScheduleRequest struct {
 
 	// The conversation the person's message was sent to. Required with via for a
 	// session-authorized repeating write.
-	SessionID string            `json:"session_id,omitempty"`
-	Template  *ScheduleTemplate `json:"template,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+
+	// Inclusive anchor date, YYYY-MM-DD, for every_days. Manual runs do not move it.
+	Start    string            `json:"start,omitempty"`
+	Template *ScheduleTemplate `json:"template,omitempty"`
 
 	// The IANA zone whose wall clock at names. New console schedules use the browser's
 	// zone.
@@ -5091,7 +5180,8 @@ type ScheduleRow struct {
 
 	// Present and true for a schedule with no time (`when.trigger_only`): the clock
 	// never fires it, and it runs only by hand or by webhook. It never has next_fire.
-	TriggerOnly bool `json:"trigger_only,omitempty"`
+	TriggerOnly bool          `json:"trigger_only,omitempty"`
+	When        *ScheduleWhen `json:"when,omitempty"`
 }
 
 // One task a schedule made, newest first in the detail. `summary` is what the
@@ -5176,13 +5266,21 @@ type ScheduleUserAuthorization struct {
 
 // `when` in the file's own spelling: `at` (HH:MM, local time) and exactly one
 // of `days` (`daily`, or weekday names sun…sat) or `on` (YYYY-MM-DD, a
-// schedule that runs once) — or, alone, `trigger_only: true`, a schedule with
+// schedule that runs once), or `every_days` with `start` (an anchored
+// calendar-day interval) — or, alone, `trigger_only: true`, a schedule with
 // no time that runs only by hand or by webhook.
 type ScheduleWhen struct {
-	At          string   `json:"at,omitempty"`
-	Days        []string `json:"days,omitempty"`
-	On          string   `json:"on,omitempty"`
-	TriggerOnly bool     `json:"trigger_only,omitempty"`
+	At   string   `json:"at,omitempty"`
+	Days []string `json:"days,omitempty"`
+
+	// Positive calendar-day interval, paired with start and at; excludes days, on and
+	// trigger_only.
+	EveryDays int64  `json:"every_days,omitempty"`
+	On        string `json:"on,omitempty"`
+
+	// Inclusive anchor date, YYYY-MM-DD, for every_days. Manual runs do not move it.
+	Start       string `json:"start,omitempty"`
+	TriggerOnly bool   `json:"trigger_only,omitempty"`
 }
 
 // What the clock says about its own last pass. A pass that fired nothing and a
@@ -5832,11 +5930,11 @@ type SessionRow struct {
 	State  SessionState    `json:"state"`
 	TTY    string          `json:"tty,omitempty"`
 
-	// The live broker work that makes a broker-projected `waiting_session` row wait,
-	// collected by the same pass that decided the state. Present only on such rows; at
-	// most `session.waiting_for` entries, with `waiting_for_omitted` counting the
-	// rest. Both Cloud list scopes and the local list describe a wait from this field
-	// alone.
+	// The live broker work owned by this Session, collected by the same pass that
+	// decided the work state. Independent of the terminal state, so working and
+	// unknown rows can also name outstanding work; at most `session.waiting_for`
+	// entries, with `waiting_for_omitted` counting the rest. Both Cloud list scopes
+	// and the local list describe a wait from this field alone.
 	WaitingFor []SessionWaitTarget `json:"waiting_for,omitempty"`
 
 	// Live waited-on tasks left out of `waiting_for` by its bound.
@@ -6091,6 +6189,22 @@ type SettingsRequest struct {
 	// Empty, or a Claude Code model name used when a new Session does not name one.
 	ClaudeDefaultModel *string `json:"claude_default_model"`
 
+	// Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+	// as ciphertext only paired owner devices can open. Separate from
+	// cloud_health_upload, which never permits it. Absent or false means off, and off
+	// makes no request. Only the local token may change it.
+	CloudHealthOwnerRetention *bool `json:"cloud_health_owner_retention"`
+
+	// Whether this daemon uploads its connection-health records to Cloud. Absent or
+	// false means off, and off makes no request. Only the local token may change it.
+	// Owner diagnostics (location, age, deadline) are never sent.
+	CloudHealthUpload *bool `json:"cloud_health_upload"`
+
+	// Only `false`: dismisses the retired Cloudflare tunnel notice by removing that
+	// tunnel's old keys from the file. The old keys themselves are refused as
+	// `retired_setting`.
+	CloudflareTunnelRetired *bool `json:"cloudflare_tunnel_retired"`
+
 	// Whether a new session is named by an assistant.
 	CodexAutoName *bool `json:"codex_auto_name"`
 
@@ -6106,12 +6220,14 @@ type SettingsRequest struct {
 	// A combination the shell can register (`cmd+shift+k`), or empty for none.
 	Hotkey *string `json:"hotkey"`
 
-	// Whether this daemon asks iTerm2 for its sessions, their screens and their input
-	// over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
-	// setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
-	// sessions are refused before any Apple Event; opening a viewer tab for a tmux
-	// session, Reveal and closing a child tab this daemon opened still send their one
-	// Apple Event each. It takes effect on the next reading, without a restart.
+	// Explicit opt-in to reading and controlling iTerm2; absent is off, including
+	// existing installations.
+	ItermIntegration *bool `json:"iterm_integration"`
+
+	// Legacy polling preference inside an explicitly enabled iterm_integration. Absent
+	// means true. This preference never grants integration consent. Off, background
+	// listing and screen sampling stop; requested actions are allowed only while
+	// integration is enabled.
 	ItermScan *bool `json:"iterm_scan"`
 
 	// Existing agent and Board authoring language and voice auto fallback.
@@ -6203,20 +6319,18 @@ type SettingsRequest struct {
 	// Whether anything but this Mac may read the session list.
 	Remote *bool `json:"remote"`
 
-	// A hostname, or empty.
-	RemoteHostname *string `json:"remote_hostname"`
-
-	// `off`, `quick` or `named`.
-	RemoteTunnel *string `json:"remote_tunnel"`
-
 	// Whether the bar comes back with the terminal.
 	ReopenOnReturn *bool `json:"reopen_on_return"`
 
 	// Bundle identifiers separated by commas, or empty for every app.
-	ScopeApp *string `json:"scope_app"`
+	ScopeApp             *string `json:"scope_app"`
+	SessionAutoDiscovery *bool   `json:"session_auto_discovery"`
 
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
+
+	// A full Tailscale name ending in `.ts.net`, or empty.
+	TailscaleHostname *string `json:"tailscale_hostname"`
 
 	// `auto`, `iterm`, `iterm_native` or `tmux`.
 	Terminal *string `json:"terminal"`
@@ -6269,6 +6383,23 @@ type SettingsSnapshot struct {
 	// Empty leaves the choice to Claude Code.
 	ClaudeDefaultModel *string `json:"claude_default_model"`
 
+	// Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+	// as ciphertext only paired owner devices can open. Separate from
+	// cloud_health_upload, which never permits it. Absent or false means off, and off
+	// makes no request. Only the local token may change it.
+	CloudHealthOwnerRetention *bool `json:"cloud_health_owner_retention"`
+
+	// Whether this daemon uploads its connection-health records to Cloud. Absent or
+	// false means off, and off makes no request. Only the local token may change it.
+	// Owner diagnostics (location, age, deadline) are never sent.
+	CloudHealthUpload *bool `json:"cloud_health_upload"`
+
+	// True while the file still holds the built-in Cloudflare tunnel's settings
+	// (`remote_tunnel`, `remote_tunnel_name`, `remote_hostname`, `cloudflared_path`),
+	// removed on 2026-10-20. They start nothing; the settings page explains once, and
+	// writing `cloudflare_tunnel_retired: false` takes them out of the file.
+	CloudflareTunnelRetired bool `json:"cloudflare_tunnel_retired,omitempty"`
+
 	// Whether a new session is named by an assistant. The Swift app's spelling, kept
 	// so a line copied between the two files means the same thing.
 	CodexAutoName *bool `json:"codex_auto_name"`
@@ -6292,12 +6423,14 @@ type SettingsSnapshot struct {
 	// does; an empty string means the person asked for none, and registers nothing.
 	Hotkey *string `json:"hotkey"`
 
-	// Whether this daemon asks iTerm2 for its sessions, their screens and their input
-	// over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
-	// setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
-	// sessions are refused before any Apple Event; opening a viewer tab for a tmux
-	// session, Reveal and closing a child tab this daemon opened still send their one
-	// Apple Event each. It takes effect on the next reading, without a restart.
+	// Explicit opt-in to reading and controlling iTerm2; absent is off, including
+	// existing installations.
+	ItermIntegration *bool `json:"iterm_integration"`
+
+	// Legacy polling preference inside an explicitly enabled iterm_integration. Absent
+	// means true. This preference never grants integration consent. Off, background
+	// listing and screen sampling stop; requested actions are allowed only while
+	// integration is enabled.
 	ItermScan *bool `json:"iterm_scan"`
 
 	// Existing agent and Board authoring language and voice auto fallback. Its stored
@@ -6400,21 +6533,20 @@ type SettingsSnapshot struct {
 	// Whether anything but this Mac may read the session list.
 	Remote *bool `json:"remote"`
 
-	// The hostname a named tunnel answers on.
-	RemoteHostname *string `json:"remote_hostname"`
-
-	// `off`, `quick` or `named`.
-	RemoteTunnel *string `json:"remote_tunnel"`
-
 	// Whether the bar comes back with the terminal.
 	ReopenOnReturn *bool `json:"reopen_on_return"`
 
 	// The file's `scope_app`, or null when absent — which the shell reads as
 	// com.googlecode.iterm2. Empty is every app.
-	ScopeApp *string `json:"scope_app"`
+	ScopeApp             *string `json:"scope_app"`
+	SessionAutoDiscovery *bool   `json:"session_auto_discovery"`
 
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
+
+	// This machine's full Tailscale name (`<machine>.<tailnet>.ts.net`) that Tailscale
+	// Serve answers on; accepted only while `remote` is on.
+	TailscaleHostname *string `json:"tailscale_hostname"`
 
 	// Where a new session opens: `auto`, `iterm`, `iterm_native` or `tmux`. With tmux
 	// installed, `auto` and `iterm` run the session in tmux and show it in an iTerm2
@@ -7335,11 +7467,12 @@ const (
 	TerminalRefusalCodeTerminalAccessRevoked     TerminalRefusalCode = "terminal_access_revoked"
 	TerminalRefusalCodeTerminalCloudNotSupported TerminalRefusalCode = "terminal_cloud_not_supported"
 	TerminalRefusalCodeTerminalSocketPathTooLong TerminalRefusalCode = "terminal_socket_path_too_long"
+	TerminalRefusalCodeViewerReadOnly            TerminalRefusalCode = "viewer_read_only"
 	TerminalRefusalCodeTerminalInvalid           TerminalRefusalCode = "terminal_invalid"
 )
 
 // TerminalRefusalCodeValues is every value the contract allows, in contract order.
-var TerminalRefusalCodeValues = []TerminalRefusalCode{TerminalRefusalCodeTerminalForbidden, TerminalRefusalCodeNotController, TerminalRefusalCodeTerminalControlled, TerminalRefusalCodeLeaseSuperseded, TerminalRefusalCodeLeaseExpired, TerminalRefusalCodeInputGap, TerminalRefusalCodeInputStateUnknown, TerminalRefusalCodeInputTooLarge, TerminalRefusalCodeTerminalBusy, TerminalRefusalCodeTerminalClosed, TerminalRefusalCodeTerminalUnreachable, TerminalRefusalCodeTerminalUnsupported, TerminalRefusalCodeTerminalsFull, TerminalRefusalCodeTerminalViewersFull, TerminalRefusalCodeTerminalAccessRevoked, TerminalRefusalCodeTerminalCloudNotSupported, TerminalRefusalCodeTerminalSocketPathTooLong, TerminalRefusalCodeTerminalInvalid}
+var TerminalRefusalCodeValues = []TerminalRefusalCode{TerminalRefusalCodeTerminalForbidden, TerminalRefusalCodeNotController, TerminalRefusalCodeTerminalControlled, TerminalRefusalCodeLeaseSuperseded, TerminalRefusalCodeLeaseExpired, TerminalRefusalCodeInputGap, TerminalRefusalCodeInputStateUnknown, TerminalRefusalCodeInputTooLarge, TerminalRefusalCodeTerminalBusy, TerminalRefusalCodeTerminalClosed, TerminalRefusalCodeTerminalUnreachable, TerminalRefusalCodeTerminalUnsupported, TerminalRefusalCodeTerminalsFull, TerminalRefusalCodeTerminalViewersFull, TerminalRefusalCodeTerminalAccessRevoked, TerminalRefusalCodeTerminalCloudNotSupported, TerminalRefusalCodeTerminalSocketPathTooLong, TerminalRefusalCodeViewerReadOnly, TerminalRefusalCodeTerminalInvalid}
 
 // POST /v1/terminals/{id}/resize. The holder only; the newest size asked for
 // wins.
@@ -7580,70 +7713,6 @@ type TranscriptUnread struct {
 
 	// How much of the record's end one read looks at.
 	WindowBytes int64 `json:"windowBytes"`
-}
-
-// `off`; `quick`, an address made up per run under trycloudflare.com; `named`,
-// the person's own tunnel (`remote_tunnel_name`) and hostname
-// (`remote_hostname`).
-type TunnelMode string
-
-const (
-	TunnelModeOff   TunnelMode = "off"
-	TunnelModeQuick TunnelMode = "quick"
-	TunnelModeNamed TunnelMode = "named"
-)
-
-// TunnelModeValues is every value the contract allows, in contract order.
-var TunnelModeValues = []TunnelMode{TunnelModeOff, TunnelModeQuick, TunnelModeNamed}
-
-// `off`; `starting`, launched or waiting to retry and not yet registered with
-// the edge; `up`; `failed`, with a reason — including a refusal to start.
-type TunnelState string
-
-const (
-	TunnelStateOff      TunnelState = "off"
-	TunnelStateStarting TunnelState = "starting"
-	TunnelStateUp       TunnelState = "up"
-	TunnelStateFailed   TunnelState = "failed"
-)
-
-// TunnelStateValues is every value the contract allows, in contract order.
-var TunnelStateValues = []TunnelState{TunnelStateOff, TunnelStateStarting, TunnelStateUp, TunnelStateFailed}
-
-// One reading of the tunnel.
-type TunnelStatus struct {
-	At int64 `json:"at"`
-
-	// Launches in a row that have died, while it is retrying; absent when none have.
-	Attempts int64 `json:"attempts,omitempty"`
-
-	// The cloudflared the next launch would run: `cloudflared_path` when it is set and
-	// executable, else where a package manager puts it, else PATH. Absent when there
-	// is none.
-	Binary string `json:"binary,omitempty"`
-
-	// When state, url or reason last moved.
-	Changed int64 `json:"changed"`
-
-	// The command line of the child that is running or was last started, binary first.
-	// It always carries `--config` and this daemon's own file, never the person's
-	// ~/.cloudflared/config.yml.
-	Command []string `json:"command,omitempty"`
-
-	// The configuration file cloudflared is pointed at, in this daemon's state
-	// directory.
-	Config    string     `json:"config"`
-	Installed bool       `json:"installed"`
-	Mode      TunnelMode `json:"mode"`
-
-	// Why it failed or refused, in the tunnel's own sentence. Present when state is
-	// failed.
-	Reason string      `json:"reason,omitempty"`
-	State  TunnelState `json:"state"`
-
-	// The address, once a connection to Cloudflare's edge is registered. Present when
-	// state is up.
-	URL string `json:"url,omitempty"`
 }
 
 // The last update of a release install, as the updater recorded it in the state
@@ -9314,6 +9383,24 @@ const (
 
 // WorkStateValues is every value the contract allows, in contract order.
 var WorkStateValues = []WorkState{WorkStateReady, WorkStateWorking, WorkStateHolding, WorkStateWaitingYou, WorkStateWaitingSession, WorkStateUnknown, WorkStateMilestoneComplete, WorkStateWorkComplete}
+
+type WorkflowSettingsRequest struct {
+	DispatchFullPermission *bool `json:"dispatch_full_permission"`
+
+	// Explicit opt-in to iTerm2 access. False by default; older daemons omit this
+	// field.
+	ItermIntegration     *bool `json:"iterm_integration"`
+	SessionAutoDiscovery *bool `json:"session_auto_discovery"`
+}
+
+type WorkflowSettingsSnapshot struct {
+	DispatchFullPermission bool `json:"dispatch_full_permission"`
+
+	// Explicit opt-in to iTerm2 access. False by default; older daemons omit this
+	// field.
+	ItermIntegration     *bool `json:"iterm_integration"`
+	SessionAutoDiscovery bool  `json:"session_auto_discovery"`
+}
 
 type WorktreeCanonical struct {
 	Error      *WorktreeIssue           `json:"error"`

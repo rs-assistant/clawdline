@@ -83,7 +83,7 @@ const (
 // terminal contents to diagnostics.
 func (l *Link) TerminalCapacity(name string) capacity.Reading {
 	if name == capacity.CloudTerminalDirectPeers {
-		// directMu and terminalMu are never nested, so this row is read on its own.
+		// This row needs only the direct-peer table.
 		l.directMu.Lock()
 		defer l.directMu.Unlock()
 		r := capacity.Reading{Known: true}
@@ -516,18 +516,24 @@ func (l *Link) deliverTerminal(in Inbound) {
 		if l.terminalAuthenticated == nil {
 			l.terminalAuthenticated = make(map[string]ed25519.PublicKey)
 		}
-		// Keep proofs only for viewers with a live connection and the one
-		// envelope being admitted. The existing connection capacity bounds this
-		// map without accumulating every viewer that ever sent a request.
+		// Keep proofs for terminal connections, direct peers (including offers
+		// still being answered), and the envelope being admitted. Both connection
+		// tables are bounded. Hold terminalMu before directMu so a peer cannot
+		// be installed between checking its lifetime and pruning its proof.
 		active := make(map[string]bool, len(l.terminalConnections))
 		for _, connection := range l.terminalConnections {
 			active[connection.viewer] = true
+		}
+		l.directMu.Lock()
+		for viewer := range l.directPeers {
+			active[viewer] = true
 		}
 		for viewer := range l.terminalAuthenticated {
 			if viewer != in.Sender && !active[viewer] {
 				delete(l.terminalAuthenticated, viewer)
 			}
 		}
+		l.directMu.Unlock()
 		l.terminalAuthenticated[in.Sender] = append(ed25519.PublicKey(nil), in.VerifiedKey...)
 		l.terminalMu.Unlock()
 	}
@@ -760,6 +766,10 @@ func (l *Link) terminalService() (*terminals.Service, error) {
 // handleTerminal handles only the dedicated termi rail. It is deliberately
 // separate from cloudops.Bridge and Router, which cannot grant terminal access.
 func (l *Link) handleTerminal(ctx context.Context, in Inbound) {
+	if l.contentAuthority != nil {
+		l.contentAuthority.mu.Lock()
+		defer l.contentAuthority.mu.Unlock()
+	}
 	if in.Channel != "termi/"+l.identity.MachineID+"/"+in.Sender || in.Class != string(domaincloud.ClassCtl) {
 		return
 	}
@@ -1434,6 +1444,27 @@ func (l *Link) publishTerminal(ctx context.Context, out Outbound) error {
 
 func (l *Link) terminalOperation(ctx context.Context, svc *terminals.Service, p terminals.Principal,
 	c *terminalConnection, req terminalRequest) (any, error) {
+	// Carrier choice does not grant operation authority. The shared service
+	// repeats this check after its lane waits; this check also protects custom
+	// in-process terminal providers that predate the operation callback.
+	effect := req.Operation == "open" || req.Operation == "input" || req.Operation == "paste" || req.Operation == "resize" || req.Operation == "close"
+	if req.Operation == "control" {
+		var body struct {
+			Action string `json:"action"`
+		}
+		if json.Unmarshal(req.Body, &body) == nil {
+			effect = body.Action != ""
+		}
+	}
+	if effect && l.pinned != nil {
+		scope, err := l.pinned.ViewerScope(p.Device)
+		if err != nil {
+			return nil, terminal.Refuse(terminal.CodeForbidden, "the viewer grant cannot be verified")
+		}
+		if scope != adaptercloud.ScopeOperate {
+			return nil, terminal.Refuse(terminal.CodeViewerReadOnly, "This device may read, and not send.")
+		}
+	}
 	id := terminal.ID(req.TerminalID)
 	if req.Operation != "list" && req.Operation != "open" && req.Operation != "renew_connection" && req.Operation != "activate_connection" && req.Operation != "release_connection" &&
 		(!id.Valid() || req.TerminalID == "") {

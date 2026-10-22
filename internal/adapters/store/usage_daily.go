@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS usage_daily_evictions (date TEXT PRIMARY KEY, evicted
 CREATE TABLE IF NOT EXISTS usage_daily (
  assistant TEXT NOT NULL, conversation TEXT NOT NULL, date TEXT NOT NULL, project TEXT NOT NULL,
  input REAL NOT NULL, cache_read REAL NOT NULL, cache_write REAL NOT NULL, output REAL NOT NULL,
+ project_key TEXT NOT NULL DEFAULT '',
  PRIMARY KEY(assistant,conversation,date));
 CREATE INDEX IF NOT EXISTS usage_daily_date ON usage_daily(date);
 CREATE TABLE IF NOT EXISTS usage_daily_meta (id INTEGER PRIMARY KEY CHECK(id=1), evicted INTEGER NOT NULL DEFAULT 0);
@@ -41,10 +42,11 @@ func (s *Store) PruneUsageDaily(ctx context.Context, now time.Time) error {
 
 func saveUsageDaily(ctx context.Context, tx *sql.Tx, r UsageRow) error {
 	var state struct {
-		Version int                          `json:"daily_version"`
-		Daily   map[string]transcript.Tokens `json:"daily"`
-		Project string                       `json:"daily_project"`
-		Cutoff  string                       `json:"daily_cutoff"`
+		Version    int                          `json:"daily_version"`
+		Daily      map[string]transcript.Tokens `json:"daily"`
+		Project    string                       `json:"daily_project"`
+		ProjectKey string                       `json:"daily_project_key"`
+		Cutoff     string                       `json:"daily_cutoff"`
 	}
 	if err := json.Unmarshal(r.State, &state); err != nil {
 		return nil
@@ -64,7 +66,7 @@ func saveUsageDaily(ctx context.Context, tx *sql.Tx, r UsageRow) error {
 		if date < state.Cutoff {
 			continue
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO usage_daily VALUES(?,?,?,?,?,?,?,?)`, r.Assistant, r.Conversation, date, state.Project, t.Input, t.CacheRead, t.CacheWrite1h+t.CacheWrite5m, t.Output); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO usage_daily(assistant,conversation,date,project,input,cache_read,cache_write,output,project_key) VALUES(?,?,?,?,?,?,?,?,?)`, r.Assistant, r.Conversation, date, state.Project, t.Input, t.CacheRead, t.CacheWrite1h+t.CacheWrite5m, t.Output, state.ProjectKey); err != nil {
 			return err
 		}
 	}
@@ -102,14 +104,54 @@ type UsageDailyRow struct {
 
 // UsageDaily reads only persisted primitive summaries, never transcript state.
 func (s *Store) UsageDaily(ctx context.Context, since, until string) ([]UsageDailyRow, error) {
-	rows, err := s.rd.QueryContext(ctx, `SELECT d.date,d.assistant,d.conversation,u.parent,u.task_id,
- COALESCE(NULLIF(t.repository,''),NULLIF(t.project,''),NULLIF(pd.project,''),d.project,''),d.input,d.cache_read,d.cache_write,d.output
+	rows, err := s.rd.QueryContext(ctx, usageProjectSQL+`,
+ cwd_prefixes(path,prefix,rest) AS (
+ SELECT DISTINCT project,'',replace(project,char(92),'/')||'/' FROM usage_daily WHERE project<>''
+ UNION ALL
+ SELECT path,prefix||substr(rest,1,instr(rest,'/')),substr(rest,instr(rest,'/')+1)
+ FROM cwd_prefixes WHERE instr(rest,'/')>0
+ ),
+ worktree_paths AS (
+ SELECT DISTINCT worktree,replace(worktree,char(92),'/') normalized FROM task_sources WHERE worktree<>''
+ ),
+ cwd_projects AS (
+ SELECT DISTINCT c.path,COALESCE(p.project,'') project FROM cwd_prefixes c
+ JOIN worktree_paths w ON w.normalized=rtrim(c.prefix,'/')
+ LEFT JOIN resolved_paths p ON p.path=w.worktree
+ ),
+ lineage(assistant,conversation,ancestor) AS (
+ SELECT DISTINCT assistant,conversation,conversation FROM usage_daily WHERE date>=? AND date<?
+ UNION SELECT l.assistant,l.conversation,u.parent FROM lineage l
+ JOIN usage_transcripts u ON u.assistant=l.assistant AND u.conversation=l.ancestor WHERE u.parent<>''
+ ),
+ candidates(assistant,conversation,priority,project) AS (
+ SELECT l.assistant,l.conversation,0,COALESCE(t.project,'') FROM lineage l
+ JOIN usage_transcripts u ON u.assistant=l.assistant AND u.conversation=l.ancestor
+ LEFT JOIN task_projects t ON t.id=u.task_id WHERE u.task_id<>''
+ UNION ALL
+ SELECT l.assistant,l.conversation,1,c.project FROM lineage l
+ JOIN conversation_projects c ON c.assistant=l.assistant AND c.conversation=l.ancestor
+ UNION ALL
+ SELECT l.assistant,l.conversation,2,p.project FROM lineage l
+ JOIN usage_daily d ON d.assistant=l.assistant AND d.conversation=l.ancestor
+ JOIN cwd_projects p ON p.path=d.project
+ UNION ALL
+ SELECT l.assistant,l.conversation,3,COALESCE(p.project,'') FROM lineage l
+ JOIN usage_daily d ON d.assistant=l.assistant AND d.conversation=l.ancestor
+ LEFT JOIN resolved_paths p ON p.path=d.project
+ WHERE EXISTS(SELECT 1 FROM path_seeds s WHERE s.path=d.project)
+ ),
+ priorities AS (SELECT assistant,conversation,MIN(priority) priority FROM candidates GROUP BY assistant,conversation),
+ owners AS (
+ SELECT c.assistant,c.conversation,CASE WHEN COUNT(DISTINCT c.project)=1 THEN MIN(c.project) ELSE '' END project
+ FROM candidates c JOIN priorities p USING(assistant,conversation,priority) GROUP BY c.assistant,c.conversation
+ )
+ SELECT d.date,d.assistant,d.conversation,u.parent,u.task_id,
+ COALESCE(o.project,''),d.input,d.cache_read,d.cache_write,d.output
  FROM usage_daily d JOIN usage_transcripts u USING(assistant,conversation)
- LEFT JOIN usage_transcripts p ON p.assistant=u.assistant AND p.conversation=u.parent
- LEFT JOIN (SELECT assistant,conversation,MAX(project) project FROM usage_daily WHERE project<>'' GROUP BY assistant,conversation) pd ON pd.assistant=u.assistant AND pd.conversation=u.parent
- LEFT JOIN broker_tasks t ON t.id=CASE WHEN u.parent<>'' THEN p.task_id ELSE u.task_id END
+ LEFT JOIN owners o ON o.assistant=d.assistant AND o.conversation=d.conversation
  WHERE d.date>=? AND d.date<?
- ORDER BY d.date,d.assistant,d.conversation`, since, until)
+ ORDER BY d.date,d.assistant,d.conversation`, since, until, since, until)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +193,7 @@ type UsageOverviewTask struct {
 
 // UsageOverviewTasks projects only timing and outcome fields: no task text.
 func (s *Store) UsageOverviewTasks(ctx context.Context, since, until time.Time) ([]UsageOverviewTask, error) {
-	rows, err := s.rd.QueryContext(ctx, `SELECT COALESCE(NULLIF(repository,''),project),created_at,json_object('spawned_at',json_extract(record,'$.spawned_at'),'finished_at',json_extract(record,'$.finished_at'),'result',json_object('status',json_extract(record,'$.result.status'))) FROM broker_tasks WHERE (created_at>=? AND created_at<?) OR (unixepoch(json_extract(record,'$.finished_at'))>=? AND unixepoch(json_extract(record,'$.finished_at'))<?) ORDER BY created_at DESC,id LIMIT ?`, since.Unix(), until.Unix(), since.Unix(), until.Unix(), UsageOverviewTaskLimit)
+	rows, err := s.rd.QueryContext(ctx, usageProjectSQL+` SELECT p.project,t.created_at,json_object('spawned_at',json_extract(t.record,'$.spawned_at'),'finished_at',json_extract(t.record,'$.finished_at'),'result',json_object('status',json_extract(t.record,'$.result.status'))) FROM broker_tasks t JOIN task_projects p ON p.id=t.id WHERE COALESCE(json_extract(t.record,'$.kind'),'')<>'callback' AND ((t.created_at>=? AND t.created_at<?) OR (unixepoch(json_extract(t.record,'$.finished_at'))>=? AND unixepoch(json_extract(t.record,'$.finished_at'))<?)) ORDER BY t.created_at DESC,t.id LIMIT ?`, since.Unix(), until.Unix(), since.Unix(), until.Unix(), UsageOverviewTaskLimit)
 	if err != nil {
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/adapters/taskdir"
+	"github.com/sainteye/clawdline/internal/adapters/transcript"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"os"
 	"path/filepath"
@@ -190,5 +191,112 @@ func TestOverviewIncludesWorkCreatedBeforeTheWindowAndCompletedInsideIt(t *testi
 	}
 	if got.Totals.Dispatches != 0 || got.Totals.DurationSamples != 1 || got.Daily[6].DurationSamples != 1 || got.Totals.DurationMedianSeconds == nil || *got.Totals.DurationMedianSeconds != 3600 {
 		t.Fatalf("completion cohort: %+v", got)
+	}
+}
+
+func TestOverviewCountsAgentDispatchesWithoutBackgroundCallbacks(t *testing.T) {
+	h := newUsageHarness(t)
+	now := time.Date(2026, 10, 19, 12, 0, 0, 0, time.Local)
+	h.u.Now = func() time.Time { return now }
+	at := now.AddDate(0, 0, -1)
+	for _, kind := range []string{"callback", "implementation"} {
+		raw, err := json.Marshal(orchestrator.Record{Kind: kind, SpawnedAt: at, FinishedAt: at.Add(10 * time.Minute), Result: &taskdir.Result{Status: "success"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.SaveBrokerTask(context.Background(), store.BrokerRow{ID: kind, Project: "example", Assistant: "claude", State: "success", CreatedAt: at, UpdatedAt: at, Record: raw}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := h.u.Overview(context.Background(), 7, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Totals.Dispatches != 1 || got.Totals.DurationSamples != 1 || got.Daily[6].Dispatches != 1 || got.Daily[6].DurationSamples != 1 {
+		t.Fatalf("background callbacks are not agent dispatches: totals=%+v day=%+v", got.Totals, got.Daily[6])
+	}
+}
+
+func TestOverviewReturnsHistoricalWorktreeUsageToItsSourceProject(t *testing.T) {
+	h := newUsageHarness(t)
+	ctx := context.Background()
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.Local)
+	h.u.Now = func() time.Time { return now }
+	for _, task := range []store.BrokerRow{
+		{ID: "first", Assistant: "claude", Project: "/example/source", Repository: "/example/source", Record: json.RawMessage(`{"child_conversation_id":"from-conversation","worktree":{"path":"/removed/first"}}`)},
+		{ID: "next", Assistant: "codex", Project: "/removed/first", Repository: "/removed/first", Record: json.RawMessage(`{"worktree":{"path":"/removed/next"}}`)},
+	} {
+		task.CreatedAt, task.UpdatedAt, task.State = now.AddDate(0, 0, -1), now, "success"
+		if err := h.store.SaveBrokerTask(ctx, task, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, session := range []struct{ id, assistant, task, parent, cwd string }{
+		{"from-id", "claude", "first", "", "/removed/first"},
+		{"from-conversation", "claude", "", "", "/removed/first"},
+		{"from-path", "codex", "", "", "/removed/next/subdirectory"},
+		{"native", "claude", "", "from-id", ""},
+		{"nested-native", "claude", "", "native", ""},
+		{"from-nested-task", "codex", "next", "", "/removed/next"},
+		{"unknown", "codex", "", "", "/removed/orphan"},
+		{"missing-task", "codex", "no-record", "", "/removed/first"},
+	} {
+		raw, _ := json.Marshal(map[string]any{"daily_version": 1, "daily_project": session.cwd,
+			"daily": map[string]any{"2026-10-19": map[string]any{"input": 10}, "2026-10-10": map[string]any{"input": 5}}})
+		if err := h.store.SaveUsageRow(ctx, store.UsageRow{Assistant: session.assistant, Conversation: session.id, TaskID: session.task, Parent: session.parent, State: raw}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// No transcript or checkout exists; attribution must survive restart and
+	// recover existing summaries without replaying or duplicating token events.
+	h.open()
+	h.u.Now = func() time.Time { return now }
+	all, err := h.u.Overview(ctx, 7, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if all.Totals.Tokens == nil || *all.Totals.Tokens != 80 || *all.PreviousTotals.Tokens != 40 || len(all.Projects) != 2 || len(all.ProjectOptions) != 2 {
+		t.Fatalf("historical totals or project options: %+v", all)
+	}
+	source, err := h.u.Overview(ctx, 7, overviewProject("/example/source").ID)
+	if err != nil || source.Totals.Tokens == nil || *source.Totals.Tokens != 60 || *source.PreviousTotals.Tokens != 30 || source.Totals.Dispatches != 2 || len(source.Projects) != 1 || source.Projects[0].Name != "source" {
+		t.Fatalf("source project: %+v, %v", source, err)
+	}
+	unknown, err := h.u.Overview(ctx, 7, "unattributed")
+	if err != nil || unknown.Totals.Tokens == nil || *unknown.Totals.Tokens != 20 || *unknown.PreviousTotals.Tokens != 10 {
+		t.Fatalf("unattributed: %+v, %v", unknown, err)
+	}
+	if *source.Totals.Tokens+*unknown.Totals.Tokens != *all.Totals.Tokens || *source.Daily[6].Tokens != 60 {
+		t.Fatal("project filtering changed the included tokens")
+	}
+}
+
+func TestOverviewBackfillsProjectIdentityWithoutReplayingMissingSources(t *testing.T) {
+	h := newUsageHarness(t)
+	repo := t.TempDir()
+	if err := os.Mkdir(filepath.Join(repo, ".git"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	canonical, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, _ := json.Marshal(transcript.LedgerState{DailyVersion: 1, ClassificationVersion: transcript.LedgerClassificationVersion,
+		DailyProject: repo, Daily: map[string]transcript.Tokens{"2026-10-19": {Input: 23}}})
+	old := store.UsageRow{Assistant: "claude", Conversation: "gone", State: state, Reason: store.UsageTranscriptMissing, Measured: json.RawMessage(`{"input":23}`)}
+	f := usageFile{assistant: old.Assistant, conversation: old.Conversation, gone: true}
+	if !usageDue(f, old, true) {
+		t.Fatal("old attribution never becomes due when a source is gone")
+	}
+	row, _, err := h.u.read(f, old, true, time.Now())
+	if err != nil || string(row.Measured) != string(old.Measured) || usageDue(f, row, true) {
+		t.Fatalf("attribution must preserve billing and settle once: %+v, %v", row, err)
+	}
+	if err := h.store.SaveUsageRow(context.Background(), row); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := h.store.UsageDaily(context.Background(), "2026-10-19", "2026-10-20")
+	if err != nil || len(rows) != 1 || rows[0].Project != canonical || rows[0].Input != 23 {
+		t.Fatalf("backfilled project: %+v, %v", rows, err)
 	}
 }

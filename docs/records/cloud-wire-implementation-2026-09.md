@@ -133,6 +133,9 @@ advertise 哪些字時讀得到）：
    daemon 自己的 `http://127.0.0.1`，而那正是 iOS declarative notification 用來解析網址的那個 origin。
    要修的不是這四個字，而是「viewer 自己的身分要到得了路由」，這條 wire 上沒有任何字帶得了它。
    量在 `internal/transport/http` 的 `TestEveryCloudViewerIsTheSameDeviceHere`（2026-09-20）。
+   Superseded on 2026-10-19: the bridge now carries the envelope's verified sender to the route
+   (`LocalRequest.Viewer` → `cloud.CloudViewerOf`), and each Cloud viewer owns its rows as
+   `cloud:<viewer>`; see docs/push.md, "Each Cloud viewer is its own device".
 
 其餘兩個較小的：`transcript` 的 `priority` 收下不用（這裡只有一條 lane），`info` 的 `parts` 兩半回同一個
 body（`summary` 在這裡其實是 full）。

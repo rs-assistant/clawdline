@@ -41,14 +41,6 @@ func (s *Server) authRoute(w http.ResponseWriter, r *http.Request) {
 	// read the way the gate read them (routePath, gate.go).
 	p := routePath(r)
 	post := r.Method == http.MethodPost
-	// Every change to who is let in — a pairing, a password, a browser
-	// device, a revocation — is one of these POSTs, and the tunnel's refusal
-	// waits on exactly that answer (tunnel.go). Asked after the route has
-	// answered, whatever it answered: a refused request changed nothing, and
-	// applying an unchanged tunnel is a no-op.
-	if post && changesWhoIsLetIn(p) {
-		defer s.applyTunnel()
-	}
 	switch {
 	case post && p == "/v1/auth/pair":
 		g.beginPairing(w, r)
@@ -62,6 +54,16 @@ func (s *Server) authRoute(w http.ResponseWriter, r *http.Request) {
 		g.logout(w, r)
 	case r.Method == http.MethodGet && p == "/v1/auth/open":
 		openPage(w)
+	case post && strings.HasPrefix(p, "/v1/auth/pairings/") && strings.HasSuffix(p, "/permission"):
+		if !requireLocal(w, r) {
+			return
+		}
+		readOnly, ok := readPermission(w, r)
+		if !ok {
+			return
+		}
+		id := strings.TrimSuffix(strings.TrimPrefix(p, "/v1/auth/pairings/"), "/permission")
+		writeDeviceChange(w, g.auth.SetPairingPermission(decodeSegment(id), readOnly))
 	case r.Method == http.MethodGet && p == "/v1/auth/pairings":
 		g.pairings(w, r)
 	case post && p == "/v1/auth/pairings/reset":
@@ -71,18 +73,6 @@ func (s *Server) authRoute(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeNoSuchRoute(w, r)
 	}
-}
-
-// changesWhoIsLetIn is whether a POST under /v1/auth/ can change the answer
-// to "is anybody but this machine let in": a finished pairing, a password
-// sign-in (which adds a device), a sign-out (which revokes one), and every
-// device route.
-func changesWhoIsLetIn(p string) bool {
-	switch p {
-	case "/v1/auth/pair/confirm", "/v1/auth/password", "/v1/auth/logout":
-		return true
-	}
-	return strings.HasPrefix(p, "/v1/auth/devices/")
 }
 
 // readBody is the Swift app's reading of a body: a JSON object or nothing.
@@ -245,8 +235,8 @@ func (g *gate) logout(w http.ResponseWriter, r *http.Request) {
 
 // signedIn sends the token twice: in the body for a script that will keep it,
 // and in an HttpOnly cookie for a page, because the event stream cannot carry
-// a header. Secure only when the request came through HTTPS — which through a
-// tunnel it did, and at the desk it did not; set always, the cookie would be
+// a header. Secure only when the request came through HTTPS — which through
+// Tailscale Serve it did, and at the desk it did not; set always, the cookie would be
 // dropped on http://127.0.0.1 and nothing would work there.
 func signedIn(w http.ResponseWriter, r *http.Request, token string) {
 	setSessionCookie(w, r, token)
@@ -386,6 +376,12 @@ func (g *gate) devicesRoute(w http.ResponseWriter, r *http.Request, rest string)
 			return
 		}
 		writeAuthJSON(w, contract.AuthOK{OK: true})
+	case post && len(parts) == 2 && parts[0] != "" && parts[1] == "permission":
+		readOnly, ok := readPermission(w, r)
+		if !ok {
+			return
+		}
+		writeDeviceChange(w, g.auth.SetPermission(parts[0], readOnly))
 	case post && len(parts) == 2 && parts[0] != "" && parts[1] == "revoke":
 		writeDeviceChange(w, g.auth.Revoke(parts[0]))
 	default:
@@ -422,7 +418,19 @@ func (g *gate) browserDevice(w http.ResponseWriter, r *http.Request) {
 			"Too many browser addresses are waiting to be opened. Open one, or wait five minutes.")
 		return
 	}
-	id, token, err := g.auth.AddDevice(browserName, auth.NewCaps(auth.Read, auth.Send), false)
+	body := readBody(r)
+	readOnly := false
+	if permission, exists := body["permission"]; exists {
+		switch permission {
+		case "read-only":
+			readOnly = true
+		case "read-and-operate":
+		default:
+			writeAuthRefusal(w, http.StatusBadRequest, "bad_request", "Could not read that request")
+			return
+		}
+	}
+	id, token, err := g.auth.AddDeviceWithPermission(browserName, readOnly)
 	if err != nil {
 		writeStoreFailure(w, err)
 		return
@@ -521,4 +529,17 @@ func openPage(w http.ResponseWriter) {
 })();
 </script></body></html>
 `)
+}
+
+// readPermission accepts only the two explicit local choices.
+func readPermission(w http.ResponseWriter, r *http.Request) (bool, bool) {
+	permission, _ := stringField(readBody(r), "permission")
+	switch permission {
+	case "read-only":
+		return true, true
+	case "read-and-operate":
+		return false, true
+	}
+	writeAuthRefusal(w, http.StatusBadRequest, "bad_request", "Could not read that request")
+	return false, false
 }

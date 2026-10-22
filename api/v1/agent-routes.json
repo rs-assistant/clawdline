@@ -31,6 +31,7 @@
       "pattern": "/v1/board/tracks",
       "guide": "board"
     },
+    {"method": "*", "pattern": "/v1/provider-quotas", "guide": "connect"},
     {
       "method": "*",
       "pattern": "/v1/capacity",
@@ -39,6 +40,11 @@
     {
       "method": "*",
       "pattern": "/v1/cloud/commands",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/cloud/devices/grant",
       "guide": "cloud"
     },
     {
@@ -84,6 +90,16 @@
     {
       "method": "*",
       "pattern": "/v1/cloud/pairing/agent/",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/cloud/pairing/identity",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/cloud/pairing/identity/decision",
       "guide": "cloud"
     },
     {
@@ -140,6 +156,11 @@
       "method": "*",
       "pattern": "/v1/cloud/viewer/sessions",
       "guide": "cloud"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/connection-health/",
+      "guide": "connect"
     },
     {
       "method": "*",
@@ -478,6 +499,21 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/settings/workflow",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/skill",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/skill/install",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/snippets",
       "guide": "connect"
     },
@@ -494,32 +530,32 @@
     {
       "method": "*",
       "pattern": "/v1/squad/",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/events",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/events/head",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/session-bindings",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/session-events",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/session-snapshots/",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
@@ -543,27 +579,12 @@
     },
     {
       "method": "*",
-      "pattern": "/v1/tunnel",
-      "guide": "cloud"
-    },
-    {
-      "method": "*",
       "pattern": "/v1/update",
       "guide": "connect"
     },
     {
       "method": "*",
       "pattern": "/v1/update/apply",
-      "guide": "connect"
-    },
-    {
-      "method": "*",
-      "pattern": "/v1/skill",
-      "guide": "connect"
-    },
-    {
-      "method": "*",
-      "pattern": "/v1/skill/install",
       "guide": "connect"
     },
     {

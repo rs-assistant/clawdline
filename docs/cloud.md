@@ -18,9 +18,21 @@ An envelope carries routing metadata the relay needs, while its payload is encry
 
 ## Starting the line and pairing
 
-`clawdline cloud login` registers this machine and waits for account approval. `clawdline cloud on` sets `cloud_enabled`; restart `serve` to open the line. The daemon checks the switch before loading Cloud identity or keys. `clawdline cloud status` and local `GET /v1/cloud/status` distinguish off, unconfigured, connected and reconnecting states and expose typed failure information and counters. Default endpoints are defined in [`settings.go`](../internal/adapters/cloud/settings.go); configured endpoints can differ.
+`clawdline cloud login` registers this machine and waits for account approval. `clawdline cloud on` sets `cloud_enabled` and asks the running daemon to apply it immediately. If no daemon is running, the switch applies at its next start. The daemon checks the switch before loading Cloud identity or keys. `clawdline cloud status` and local `GET /v1/cloud/status` distinguish off, unconfigured, connected and reconnecting states and expose typed failure information and counters. Default endpoints are defined in [`settings.go`](../internal/adapters/cloud/settings.go); configured endpoints can differ.
 
-The machine can create a one-time pairing link with `clawdline cloud pair`, or accept a browser-originated offer with `clawdline cloud pair --offer <code>`. Pairing transfers the content key and trust information through the handover protocol. Compare the fingerprints shown at both ends. `clawdline cloud devices` lists viewers known to the machine, and `clawdline cloud revoke <device-id>` revokes one locally. Local pairing and revoke routes require this machine's own credential. The [remote access guide](user/remote-access.md) gives setup steps.
+The machine can create a one-time pairing link with `clawdline cloud pair`, or accept a browser-originated offer with `clawdline cloud pair --offer <code>`. Pairing transfers the content key and trust information through the handover protocol. Compare the fingerprints shown at both ends. A browser that retains old account or key records can appear paired while the machine lacks its local pin. The machine list therefore keeps the normal pairing action under each machine’s more menu even when it appears paired. Repeating the authenticated handover repairs that browser without deleting the machine or admitting it from roster membership alone. `clawdline cloud devices` lists viewers known to the machine, and `clawdline cloud revoke <device-id>` revokes one locally. Local pairing and revoke routes require this machine's own credential. The [remote access guide](user/remote-access.md) gives setup steps.
+
+### Per-browser machine grants
+
+A local pin can carry `scope: "readonly"` or `scope: "operate"`. A pin written by an older daemon with no scope retains `operate`; an unknown scope never grants operations. The machine's `cloud_commands` switch remains an independent prerequisite. Account roster membership, revocation and signing-key checks still apply, but legacy account `send_prompt` bits do not override the machine's local grant. A roster cannot expand a readonly pin. Content-key rotation is not part of this grant change. Older daemons ignore the new scope field: rolling back to a pre-scope daemon restores its legacy operation rules. Keep a scope-aware daemon installed when relying on readonly grants; this migration does not make older executables enforce a new policy.
+
+Select scope on the machine with `clawdline cloud pair --scope readonly`, including `--offer <code>` for a browser-originated offer. An omitted scope is not a choice of `operate`: a device this machine already holds a pin for keeps that pin's scope, so pairing a readonly browser again after its keys drift leaves it readonly. Only a device with no pin row takes the old `operate` default. The scope kept is read before the handover leaves and written under the pin store's own lock, so a grant made while the handover is in flight survives. A pin file that cannot be read, or a row whose scope this build does not know, refuses the pairing before any content key leaves. Only an explicit `--scope operate` raises a readonly device. To change an existing active pin, use `clawdline cloud grant <device-id> readonly` or `operate`. `cloud devices` and local `GET /v1/cloud/status` expose the nonsecret effective scope; pairing responses also return it.
+
+Local APIs are `POST /v1/cloud/pairing` with optional `{ "scope": "readonly" }`, `POST /v1/cloud/pairing/offer` with `{ "offer": "…", "scope": "readonly" }`, and `POST /v1/cloud/pairing/agent` with an optional `"scope"` (same rules; it is refused with `invalid_viewer_scope` when the offer is handed to another machine, because the hand-off brief carries no scope and dropping it would hand that machine's default to the browser), and `POST /v1/cloud/devices/grant` with `{ "device": "…", "scope": "readonly" }`. Only the machine's own token can manage grants. In-process Cloud requests are refused even when their router carries that token; remote directly paired operators cannot manage grants either. Missing or revoked pins cannot be promoted through the grant API. Scope changes are idempotent and persisted before lease revalidation; write failures leave the previous in-memory and on-disk grant intact.
+
+A readonly ceiling is persisted **before** releasing a pairing handover. Otherwise a failed final pin write could turn an explicitly readonly browser into a legacy roster-only operator. A failed readonly handover can therefore leave a visible readonly pin; it never grants operate. The reservation only lowers an existing row's ceiling: it keeps that row's key, pairing time and any refusal, written under the pin store's lock, so a failed or cancelled handover never re-admits a browser this machine revoked. Only the pin written after a completed handover restores a revoked browser, which is what pairing it again on this machine means. Ordinary legacy/default pairings continue to pin after successful handover.
+
+Readonly viewers retain Session, document, image and terminal-screen reads and notification registration. Terminal reads still require the existing machine commands switch; this does not widen that switch. Session effects return `viewer_read_only`, separately from `cloud_commands_disabled`; the console closes the Session composer on it (as on the older spelling `cloud_read_only`, still recognised) instead of failing every press. Terminal routes answer the same code, now in the closed `TerminalRefusalCode` list with its own English and Traditional Chinese sentence. Terminal create, input, paste, resize, close and control-lease mutations are also refused. Downgrading voids existing control leases and keeps read streams open. The original viewer's pin is rechecked after terminal lane and pasteboard waits, using request-local authorization rather than the router's local bearer. An effect already committed before a downgrade cannot be recalled.
 
 The [local CLI viewer authorization contract](cloud-local-viewer.md) records the separate viewer device flow and its current integration boundary.
 
@@ -31,6 +43,12 @@ Machine-to-machine Agent messages and work handoffs require a signed, revocable 
 An Agent-owned cross-machine task also needs a machine-targeted start before a target Session exists and a durable result path back to the source Session. Its contract and acceptance scenario are in [remote Agent work](remote-agent-work.md).
 
 The hosted Console's **Cross-machine access** sidebar page lists the machines and one switch per machine pair. Turning it on establishes signed pairs in both directions, allowing all current Sessions on those two machines to exchange Agent messages and hand off work. Turning it off revokes both directions. The page reads both machines and shows a connection only when their fresh, locally pinned records agree; a partial result has a recovery action. An offline, unpaired, unreadable, or write-disabled machine cannot be changed from the page. Pairing this browser as a viewer remains a separate prerequisite in the machine switcher. Legacy Session grants are retained for in-flight compatibility but are not part of this setting flow.
+
+Measured internal queue costs and the unchanged delivery contract are recorded in [live spool sorting](performance/cloud-spool-sorting.md).
+
+The [independent-reader baseline](performance/cloud-independent-reads.md) separates per-viewer reads from same-reader coalescing and documents its local-only measurement boundary.
+
+The [Go CPU attribution](performance/cloud-read-cpu.md) measures the parser and independent-reader cost separately from Node and network waiting.
 
 ## Publications, reads and commands
 
@@ -70,6 +88,16 @@ An opened Session's named `info` and `transcript` reads may likewise precede the
 
 **A status row is published when that row changed, not when the set did.** The pass id names the set: the listed terminal ids and the execution each row speaks for. While both stand still it stands still, so an unchanged row is not re-sent and the one the relay retains remains what the newest marker means; a Session that closes leaves the set and a restarted one brings a new execution, and either way the pass id moves and every row states the new one before the marker does. That is the property the marker exists for — a relay-cached row cannot satisfy a marker of a different set merely because it has the same terminal id — and it no longer rests on the id being drawn fresh each pass. Each row then has its own volatile window (`cloud.session_row_volatile_seconds` in [`internal/domain/capacity`](../internal/domain/capacity)) and its own heartbeat. Measured on the running daemon for 2026-10-10: the busiest hour sent 3,725 `ss/` frames for 13 listed Sessions, 287 per Session-hour, because one working Session's elapsed time or token count restated the whole set every 15 to 30 seconds. Replaying half an hour of ten Sessions, two working and eight idle, that publisher sent 1,331 status frames and this one sends 337 — 266 down to 67 per Session-hour, with the idle rows down to their heartbeats (`session_status_coalesce_test.go`).
 
+**Presence and voice use the same availability facts.** A recent authenticated inventory is
+usable for the existing five-minute freshness window; silence alone cannot reveal the instant a
+machine sleeps. An exact relay `machine_offline` receipt overrides that inventory immediately,
+refreshes the machine roster, and excludes the machine from every voice selection path, including
+a saved preference and a sole candidate. Expiring the retry backoff permits another request; it
+does not prove the machine returned. A delivered receipt or verified live envelope clears that
+offline evidence, while retained replay does not. Voice candidates must still have current
+inventory data. If none qualifies, source lookup and dictation return
+`cloud_voice_host_unavailable` without sending audio to a stale host.
+
 **Nobody connected, no Session rows.** Each relay receipt says how many sockets a publication reached. When the newest `ss/` or `orch/` receipt reached nobody and no viewer has been heard from since, a pass builds no Session list and sends no row; the descriptor alone keeps its 240-second heartbeat, so a viewer that arrives does not see the machine as stale. A page that connects asks `sessions.snapshot` first and is answered by a pass built then, and any envelope from a viewer, or any receipt that reached one, resumes ordinary passes. Measured on 2026-10-17: in ten minutes, 409 publications all reached nobody, and with no local console open each 5-second pass built the whole list (about 90 ms of CPU) to send them (`publish_idle_test.go`).
 
 `presentation_generation` is the hash of the machine's display facts — the work line, work state, shells, attention — and carries none of their words. A viewer re-reads one pinned machine list per machine when it changes, which is where the list's titles, icons and work notes come from. It is additive: a page without it keys that read on `snapshot_generation` as before, and against a machine without it `snapshot_generation` still moves with every display change, so a new page falls back to the same behaviour (`presentationPass` in [`all-machine-sessions.ts`](../web/console/src/cloud/all-machine-sessions.ts)).
@@ -86,6 +114,9 @@ An incoming request arrives on `ctl/<machine>`. The transport verifies and decry
 
 Every signed-in viewer paired with the target machine may send. The machine verifies the viewer's account identity and decrypts its request with that machine's content key before handling it. A machine-local key pin, when present, takes precedence over the account roster; a local or account revocation refuses the viewer. This also admits older browsers that hold the machine key from a pairing completed before local pins existed. `cloud_commands` is checked for each effectful request. `clawdline cloud commands on|off` changes that machine switch without restarting the daemon. A Cloud command uses the same in-process HTTP handler and authorization gate as a direct request.
 
+Conversation picture previews, original reads, capacity boundaries and the relay follow-up are described in
+[Conversation image delivery](image-transfers.md).
+
 The separate `cloud_terminal_direct` switch controls the WebRTC carrier for Terminal and Session
 reads. It defaults on; `clawdline cloud direct on|off` or this machine's local Settings → Remote
 page changes it. The local-only `POST /v1/cloud/direct` route persists the choice and replaces the
@@ -95,7 +126,17 @@ direct connections are on, `clawdline cloud direct local on|off`, or the local-o
 `POST /v1/cloud/direct/local-network`) lets the direct carrier use RFC 1918 IPv4 host addresses so a
 phone on the same network connects without hairpinning through the router; on macOS its first use
 shows the Local Network permission prompt once, and a denial leaves the public path or the relay
-([terminal-direct-path.md](terminal-direct-path.md)). An EC2 instance can additionally set `cloud_direct_udp_port` and
+([terminal-direct-path.md](terminal-direct-path.md)). The hosted Devices connection sheet offers
+**Enable same-network connections** after a failed direct negotiation when both encrypted SDPs
+contain the same public IPv4 server-reflexive address and the machine reports the opt-in is off.
+It says **Possibly on the same network**: sharing a public exit does not prove a shared LAN.
+Only a paired viewer with operation permission can enable this one setting through
+`direct-local-network-enable`; it cannot disable it or change other Cloud settings. The machine
+persists the opt-in without replacing the relay, so the successful setting receipt arrives before
+the browser retries direct ICE. Each candidate exchange reads the persisted policy. The prompt
+explains that macOS may ask for Local Network access on the target machine. A successful setting
+change and a successful direct connection are reported separately; denying system permission
+still leaves the encrypted relay available. An EC2 instance can additionally set `cloud_direct_udp_port` and
 `cloud_direct_public_ip` together to multiplex direct ICE on one inbound UDP port; see
 [Linux setup](linux.md#let-a-cloud-browser-connect-directly-to-ec2).
 
@@ -144,6 +185,13 @@ The hosted console also records a content-free `cloud.write.failed` viewer event
 The browser's Cloud line reconnects in the background after a temporary failure. Reaching the consecutive-attempt limit changes it to one probe per maximum backoff interval; it does not leave an open Session waiting indefinitely for a visibility or network event. Returning to the page or regaining network can advance the probe, subject to the minimum spacing between attempts. A person's retry on a retained message card also wakes the line before the card reads the transcript and considers resending. The card still preserves its request key and checks for an already visible turn, so reconnection never licenses a blind duplicate. Permanent protocol and authorization refusals keep their terminal handling; repeated relay `forbidden` refusals remain bounded rather than being probed continuously.
 
 ## Which machine the hosted console is on
+
+The header machine menu opens and closes around its top-right origin in 200 ms. Fleet machine
+groups expand and collapse their intrinsic content height in 220 ms, keeping Session text at its
+normal size. Both transitions reverse on repeated presses and become immediate under reduced
+motion. Closed content is inert and hidden from accessibility immediately; menu focus returns to
+the trigger when it was inside the menu. Collapsed groups stay current but do not register their
+spinner canvases with the drawing clock.
 
 An account with more than one readable machine opens on **all of them**: the fleet list is the
 way in, and the machine list — which is where pairing, renaming and forgetting live — is one press
@@ -218,6 +266,8 @@ each row on both the local and Cloud console; it hides that directory from the P
 lists without deleting files or sessions. Re-adding it restores visibility.
 The Project list refreshes as soon as removal succeeds; an open session start sheet refreshes automatically.
 
+The proposed [connection health administration](admin-connection-health.md) covers durable cross-source timelines, independent stall capture and agent investigation evidence. It is a product plan, not a shipped monitoring capability.
+
 For a machine that appears offline, inspect `clawdline cloud status` or the local status route first: the switch, identity, connection state, last error and publication counters narrow down which side has evidence. Then inspect the hosted build using [hosted-console.md](hosted-console.md). The status route and logs expose this machine's observations; they do not prove that a particular browser decrypted or displayed a frame. [cloud-cutover.md](cloud-cutover.md) records local preflight and stand-in tests, not a fresh production validation.
 
 ## Limits of this overview
@@ -244,3 +294,29 @@ After the automatic window expires, the manual read remains available. Stale mod
 options stay disabled during that gap, including after the ordinary press hold expires.
 No follow-up replays an answer key. Switching Session or execution cancels the old
 follow-up; ordinary unread questions stop following when the Session resumes.
+
+The [static HTML report reader](html-artifacts.md) describes the document format, isolation, compatibility and measurement boundary for self-contained artifacts.
+
+
+### Recovering a browser that can sign in but cannot read
+
+An account session and a machine's cryptographic pairing are separate. A cached
+machine list can survive a missing local pin. A read timeout alone does not prove
+that pairing is broken: the read alert therefore offers both retry and pairing,
+without silently deleting a device, changing its permissions, or trusting the
+account roster as a replacement for the machine's pin.
+
+The pairing card offers a complete CLI command containing the short-lived offer.
+Run it on the named machine, keep the requesting browser open, and compare the
+fingerprints. The code is sensitive until it expires; do not publish it. On phones,
+Safari and the Home Screen app have distinct keys: complete the flow in the same
+browser container that failed to read.
+
+A macOS shell exposing `clawdlinePairLocal` also offers a direct handover when the
+requested machine matches the authenticated local daemon. A native confirmation
+names that machine and explains access before the ordinary pairing offer route
+runs. The bridge accepts only the Cloud main frame, never exports the local token,
+never launches an assistant, and retains existing access by omitting a new scope.
+The existing fingerprint comparison still completes in the browser. Older shells
+continue to use the copied command; hosted deployment alone cannot add a native
+message handler to an installed App.

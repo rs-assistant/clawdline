@@ -1,8 +1,8 @@
 import type { WorkflowSource } from "./legacy/snippets-bridge.js"
 import type { ProjectFile } from "./pages/projects/project-files-api.js"
-import { workflowWordFor } from "./workflow-words.js"
+import { workflowWord, workflowWordFor } from "./workflow-words.js"
 
-type Language = "en" | "zh-Hant"
+import type { CatalogTag } from "./catalog.js"
 const commandName = (file: ProjectFile) => file.name.replace(/\.md$/i, "")
 
 export function workflowSourceTitle(file: ProjectFile): string {
@@ -11,11 +11,12 @@ export function workflowSourceTitle(file: ProjectFile): string {
     : file.title || file.location.split("/").filter(Boolean).at(-2) || file.name
 }
 
-export function workflowSourceText(file: ProjectFile, language: Language): { title: string; body: string } {
+export function workflowSourceText(file: ProjectFile, language?: CatalogTag): { title: string; body: string } {
   const title = workflowSourceTitle(file)
+  const format = language ? (key: "commandPrompt" | "skillPrompt", holes: Record<string, string>) => workflowWordFor(language, key, holes) : workflowWord
   return { title, body: file.kind === "command"
-    ? workflowWordFor(language, "commandPrompt", { name: commandName(file) })
-    : workflowWordFor(language, "skillPrompt", { name: title }) }
+    ? format("commandPrompt", { name: commandName(file) })
+    : format("skillPrompt", { name: title }) }
 }
 
 export function workflowSourceMatches(saved: { source: WorkflowSource }, file: ProjectFile): boolean {

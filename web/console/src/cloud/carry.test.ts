@@ -280,12 +280,15 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("usage.work-units" in CARRIED)
   assert.ok("usage.work-samples" in CARRIED)
   assert.ok("capacity" in CARRIED)
+  assert.ok("provider-quotas" in CARRIED)
   assert.ok("default-models" in CARRIED)
   assert.ok("default-models-update" in CARRIED)
   assert.ok("notification-rules" in CARRIED)
   assert.ok("notification-rules-update" in CARRIED)
   assert.ok("work-gate-settings" in CARRIED)
+  assert.ok("workflow-settings" in CARRIED)
   assert.ok("work-gate-settings-update" in CARRIED)
+  assert.ok("workflow-settings-update" in CARRIED)
   assert.ok("machine-usage" in CARRIED)
   assert.ok("update" in CARRIED)
   assert.ok("update-apply" in CARRIED)
@@ -319,7 +322,8 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("sessions.row" in CARRIED)
   assert.ok("session-snippets" in CARRIED)
   assert.ok("usage.overview" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 161)
+  assert.ok("direct-local-network-enable" in CARRIED)
+  assert.equal(Object.keys(CARRIED).length, 165)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {
@@ -772,7 +776,9 @@ test("the work-gate block stays visible on Cloud and asks only its narrow route"
   const api = readFileSync(resolve(console_, "src/pages/settings/api.ts"), "utf8")
   assert.match(page, /<GateSettingsBlock shown=\{shown && tab === 1\} \/>/)
   assert.equal(writeRoute("GET", "/v1/settings/work-gates")?.word, "work-gate-settings")
+  assert.equal(writeRoute("GET", "/v1/settings/workflow")?.word, "workflow-settings")
   assert.equal(writeRoute("POST", "/v1/settings/work-gates")?.word, "work-gate-settings-update")
+  assert.equal(writeRoute("POST", "/v1/settings/workflow")?.word, "workflow-settings-update")
 })
 
 test("full browser machine settings stay on the local console", () => {
@@ -785,9 +791,9 @@ test("full browser machine settings stay on the local console", () => {
 
 
 test("usage overview query carries only a real period and one unmodified opaque project", () => {
-  assert.deepEqual(usageOverviewQuery(new URLSearchParams()), { days: 7 })
-  assert.deepEqual(usageOverviewQuery(new URLSearchParams("days=28&project=a%2Fb%26c")), { days: 28, project: "a/b&c" })
-  assert.deepEqual(usageOverviewQuery(new URLSearchParams("days=7&project=")), { days: 7 })
+  assert.deepEqual(usageOverviewQuery(new URLSearchParams()), { days: "7" })
+  assert.deepEqual(usageOverviewQuery(new URLSearchParams("days=28&project=a%2Fb%26c")), { days: "28", project: "a/b&c" })
+  assert.deepEqual(usageOverviewQuery(new URLSearchParams("days=7&project=")), { days: "7" })
   for (const query of ["days=", "days=7.0", "days=-7", "days=28&days=28", "project=a&project=", "machine=b", "project=%1F"]) {
     assert.equal(usageOverviewQuery(new URLSearchParams(query)), null, query)
   }

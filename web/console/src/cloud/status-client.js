@@ -1,8 +1,10 @@
 // This subclass accepts the new content-free ss/ channel without changing the
 // copied Cloud client or weakening its validation for any existing channel.
+import { imageAnswerBytes } from "../legacy/js/net/cloud-client.js"
 import { CatalogCloudClient } from "./refusal-client.js"
 import { SESSION_INVENTORY_ID, SESSION_INVENTORY_LIMIT, channelSegment, decodedChannelSegment } from "../legacy/js/net/client.js"
 import { base64Bytes, bytesBase64, envelopeSigningBytes, importMasterSecret, openEnvelope, sealEnvelope, validateEnvelope } from "../legacy/js/net/cloud-crypto.js"
+import { classifyViewerError, viewerHealthBegin, viewerHealthFailed } from "../legacy/js/net/viewer-health-hook.js"
 
 const decoder = new TextDecoder()
 const STATUS = /^ss\/([^/]+)\/([^/]+)$/u
@@ -27,6 +29,10 @@ const PINNED_LIST_READ_TIMEOUT_MS = 10_000
 const STATUS_MARKER_RECOVERY_TIMEOUT_MS = 5_000
 /** Whisper may load a model before it can answer the first recording. */
 const VOICE_TIMEOUT_MS = 6 * 60 * 1000
+// Total encoded envelopes held before authentication, across this viewer's machines.
+// Byte and row budgets are registered as console.carrier_receive_*.
+export const CARRIER_RECEIVE_BYTES = 33554432
+export const CARRIER_RECEIVE_ROWS = 32
 
 function refused(code, message) {
   return Object.assign(new Error(message), { code })
@@ -56,7 +62,7 @@ function pinnedReadName(type, body) {
       ? "agent:" + body.agent + ".before." + body.before : null
   }
   if (type === "shell" && typeof body?.shell === "string" && body.shell) return "shell:" + body.shell
-  if (type === "image" && typeof body?.id === "string" && body.id) return "image." + body.id
+  if (type === "image" && typeof body?.id === "string" && body.id) return "image." + body.id + (body.size === "thumb" ? ".thumb" : "")
   if (type === "transcript") {
     if (body?.before === undefined) return "transcript"
     return Number.isSafeInteger(body.before) && body.before > 0 ? "transcript.before." + body.before : null
@@ -430,15 +436,28 @@ export class StatusCloudClient extends CatalogCloudClient {
     return carrier.tryNow()
   }
 
+  sameNetworkAvailable(machine) {
+    const descriptor = this.machineDescriptor(machine)?.machine
+    return this.allowWrites === true && descriptor?.commands?.includes("direct-local-network-enable") === true &&
+      descriptor.operation_allowed === true && this._carrierFor(machine)?.canEnableSameNetwork === true
+  }
+
+  async enableSameNetwork(machine) {
+    const result = await this._machineRequestAs(crypto.randomUUID(), machine,
+      "direct-local-network-enable", {}, "action")
+    if (result?.direct_local_network !== true) throw refused("bad_response", "The machine did not confirm the setting.")
+    this._carrierFor(machine)?.sameNetworkEnabled()
+  }
+
   /** The carrier for this machine, or null when this page has none to offer. */
   _carrierFor(machine) {
-    if (!this.directCarriers || typeof machine !== "string" || !machine) return null
+    if (!this.directCarriers || typeof machine !== "string" || !machine || this.carrierPairingRefusals?.has(machine)) return null
     let carrier = null
     try { carrier = this.directCarriers.for(machine) } catch { return null }
     if (carrier && !this.carrierWatched.has(carrier)) {
       this.carrierWatched.add(carrier)
       this.carrierMachines.add(machine)
-      carrier.whenDown(() => this._carrierDown(machine))
+      carrier.whenDown((code) => this._carrierDown(machine, code))
     }
     return carrier
   }
@@ -463,6 +482,12 @@ export class StatusCloudClient extends CatalogCloudClient {
     return super._machineImplements(machine, type, options)
   }
 
+  /** Retry backoff expiring permits another request; only live evidence restores presence. */
+  _machineRows() {
+    return super._machineRows().map((row) => this.machineOffline?.has(row.id)
+      ? Object.freeze({ ...row, freshness: "stale", autoSelectable: false }) : row)
+  }
+
   _machinesFor(type) {
     let found = super._machinesFor(type)
     if (type !== "voice") return found
@@ -478,14 +503,16 @@ export class StatusCloudClient extends CatalogCloudClient {
     if (this.voiceUnavailable instanceof Set && this.voiceUnavailable.size) {
       found = { ...found, capable: found.capable.filter((row) => !this.voiceUnavailable.has(row.id)) }
     }
-    return found
+    // Capability is not availability. This also gates saved choices, sole
+    // candidates and the Session-owner path before any recording is sent.
+    return { ...found, capable: found.capable.filter((row) => row.freshness === "current") }
   }
 
   /** A saved choice wins; otherwise one current Mac is the fleet fallback. */
   _voiceHost() {
     const choice = this._voiceHostChoice()
-    if (choice) return super._voiceHost()
     const found = this._machinesFor("voice")
+    if (found.capable.some((row) => row.id === choice)) return super._voiceHost()
     const macs = found.capable.filter((row) => row.freshness === "current" &&
       ["darwin", "macos"].includes(String(this.machineDescriptor(row.id)?.machine?.platform || "").toLowerCase()))
     if (macs.length === 1) {
@@ -537,7 +564,8 @@ export class StatusCloudClient extends CatalogCloudClient {
       !answer.sdp_sealed || answer.carrier !== offer.connection) {
       throw refused("carrier_bad_answer", "this machine's carrier answer is not usable")
     }
-    return { sdpSealed: answer.sdp_sealed, directReceipts: answer.direct_receipts === true }
+    return { sdpSealed: answer.sdp_sealed, directReceipts: answer.direct_receipts === true,
+      directLocalNetwork: typeof answer.direct_local_network === "boolean" ? answer.direct_local_network : undefined }
   }
 
   /** Seals and signs the `termi` offer. The frozen sealer validates only ctl/, so sign the renamed bytes. */
@@ -590,7 +618,36 @@ export class StatusCloudClient extends CatalogCloudClient {
    * replaced another starts at one again, and one number is only comparable with another from
    * the same channel (`DirectCarrier.channelGeneration`).
    */
-  async receiveCarrierEnvelope(machine, envelope, channelGeneration = 0) {
+  receiveCarrierEnvelope(machine, envelope, channelGeneration = 0) {
+    this.carrierReceiveQueues ??= new Map()
+    this.carrierReceiveBytes ??= 0
+    this.carrierReceiveRows ??= 0
+    const bytes = JSON.stringify(envelope).length
+    if (this.carrierReceiveRows >= CARRIER_RECEIVE_ROWS ||
+      bytes > CARRIER_RECEIVE_BYTES - this.carrierReceiveBytes) {
+      const error = refused("carrier_receive_full", "the viewer's authenticated receive queue is full")
+      this._recordReceiveFailure(error, envelope, false, { stage: "receive_queue" })
+      this._carrierFor(machine)?.failed(channelGeneration, "carrier_receive_full")
+      return Promise.resolve()
+    }
+    const key = JSON.stringify([machine, channelGeneration])
+    const previous = this.carrierReceiveQueues.get(key) ?? Promise.resolve()
+    this.carrierReceiveBytes += bytes
+    this.carrierReceiveRows++
+    // The ordered DataChannel is not an ordered WebCrypto completion queue. Keep
+    // pairing lookup, authentication, replay admission and application in wire order.
+    const next = previous.catch(() => {}).then(() => {
+      if (!this.retired) return this._receiveCarrierEnvelope(machine, envelope, channelGeneration)
+    }).finally(() => {
+      this.carrierReceiveBytes -= bytes
+      this.carrierReceiveRows--
+      if (this.carrierReceiveQueues.get(key) === next) this.carrierReceiveQueues.delete(key)
+    })
+    this.carrierReceiveQueues.set(key, next)
+    return next
+  }
+
+  async _receiveCarrierEnvelope(machine, envelope, channelGeneration) {
     const probe = { stage: "channel_parse", original: null, cause: null, senderKeyFound: null,
       senderKeySource: null, senderKeyLookupMs: null, routedMachine: machine,
       pairing: undefined, pairingSource: null, pairingLookupMs: null, pairingFoundBefore: null }
@@ -644,6 +701,11 @@ export class StatusCloudClient extends CatalogCloudClient {
       this._applySnapshot(channel, payload, envelope, false)
     } catch (error) {
       this._recordReceiveFailure(error, envelope, false, probe)
+      // The same words the relay's receive path records (`cloud-client.js` `_receiveEnvelope`): an
+      // envelope that arrived on the carrier and did not open or apply is this page's failure,
+      // whatever the relay socket is doing.
+      viewerHealthFailed("viewer_decrypt_apply", error && error.code === "replay" ? "replay_rejected"
+        : probe.stage === "apply" ? "apply_failed" : "decrypt_failed", { class: "read" })
       // This channel delivered something this page cannot use, and it will deliver the next
       // answer the same way. Nothing has failed from the read's point of view — the carrier is
       // open and its request was written to it — so it is this that has to end the channel, and
@@ -683,7 +745,11 @@ export class StatusCloudClient extends CatalogCloudClient {
       }
       const waiters = { waiting: [waiter], timer: null, ref: null, machine: identity.machine, type,
         request: extra && typeof extra.request === "string" ? extra.request : null,
-        action: false, channel: null, retireUncertain: !!(readOptions && readOptions.retireUncertain) }
+        action: false, channel: null, retireUncertain: !!(readOptions && readOptions.retireUncertain),
+        // The read's connection-health trace, as a relay read's (`_read`): issued now, settled by
+        // `_settleRead` under the same correlation, so a read the carrier holds and never answers
+        // is a timed-out read, not a silence behind an open relay socket.
+        health: viewerHealthBegin("viewer_request_issued", "read") }
       self.readWaiters.set(key, waiters)
       self._watchReadAbort(key, waiters, waiter)
       if (self.readWaiters.get(key) !== waiters) return
@@ -723,6 +789,12 @@ export class StatusCloudClient extends CatalogCloudClient {
     this.carrierReads.delete(key)
     const waiters = flight.waiters
     if (this.readWaiters.get(key) !== waiters) return
+    // The read's carrier gave up and the relay takes it over: recorded under the read's own
+    // correlation, before the answer the relay brings settles it.
+    if (waiters.health) {
+      waiters.health.mark("viewer_carrier_replace", "viewer_stage_failed",
+        { error: cause ? classifyViewerError(cause, "read") : "carrier_closed", outcome: "error" })
+    }
     // The sequence the carrier was given is spent. Nothing on the relay will ever
     // acknowledge it, so stop waiting for an ACK under that number before the
     // resend pins a new one.
@@ -749,7 +821,15 @@ export class StatusCloudClient extends CatalogCloudClient {
   }
 
   /** The carrier went: every read it was holding is asked again on the relay. */
-  _carrierDown(machine) {
+  _carrierDown(machine, code) {
+    if (code === "machine_pairing_required") {
+      // Older daemons require a strong local pin only on the direct path.
+      // A transport refusal does not prove the authenticated relay is unusable.
+      // Keep this client on the relay until pairing is refreshed or it renews.
+      this.carrierPairingRefusals ??= new Set()
+      this.carrierPairingRefusals.add(machine)
+      this.viewerEvents?.record?.("cloud.carrier.fallback", { machine, code, stage: "carrier_refused" })
+    }
     for (const [key, flight] of [...this.carrierReads]) {
       if (flight.identity.machine === machine) this._relayAfterCarrier(key, null)
     }
@@ -911,6 +991,10 @@ export class StatusCloudClient extends CatalogCloudClient {
   }
 
   _settleRead(key, body, error) {
+    const waiters = this.readWaiters.get(key)
+    if (waiters && !waiters.action && error?.code === "cloud_read_timeout") {
+      this._emit({ type: "error", machine: waiters.machine, error: this._withRef(error, waiters.ref) })
+    }
     this.pinnedReadProofs?.delete(key)
     this.carrierReads?.delete(key)
     return super._settleRead(key, body, error)
@@ -1275,17 +1359,44 @@ export class StatusCloudClient extends CatalogCloudClient {
     }, "skills", undefined, { signal })
   }
 
+  /** The original one-machine page can ask for the same bounded thumbnail. */
+  image(value, id, size) {
+    const identity = this._sessionIdentity(value)
+    if (size !== "thumb" || this.machineDescriptor?.(identity.machine)?.machine?.image_thumbnails_v1 !== true) {
+      return super.image(value, id)
+    }
+    const key = identity.machine + "\u0000thumb\u0000" + id
+    const cached = this._cachedImage(key)
+    if (cached) return Promise.resolve(cached)
+    return this._whenImageSlotFree(async () => {
+      const filled = this._cachedImage(key)
+      if (filled) return filled
+      const body = await this._read(identity, "image", { id, size: "thumb" }, "image." + id + ".thumb")
+      const answer = imageAnswerBytes(id, body)
+      this._rememberImage(key, answer)
+      return answer
+    })
+  }
+
   /** Transcript image bytes use the selected execution and the same r/ reply proof. */
-  imageForGeneration(destination, id, signal) {
+  imageForGeneration(destination, id, signal, size) {
     const { machineID, sessionID, executionGeneration } = destination
     if (!machineID || !sessionID || !GENERATION.test(executionGeneration) ||
       typeof id !== "string" || !id || signal?.aborted) {
       return Promise.reject(refused("execution_target_required", "an exact Session image is required"))
     }
+    const thumb = size === "thumb" && this.machineDescriptor?.(machineID)?.machine?.image_thumbnails_v1 === true
+    const fields = { id, machine_id: machineID, expected_generation: executionGeneration, ...(thumb ? { size: "thumb" } : {}) }
     return this._whenImageSlotFree(() => this._read(
-      { machine: machineID, session: sessionID }, "image",
-      { id, machine_id: machineID, expected_generation: executionGeneration },
-      "image." + id, undefined, { signal }))
+      { machine: machineID, session: sessionID }, "image", fields,
+      pinnedReadName("image", fields), undefined, { signal })).catch((error) => {
+      try {
+        this.viewerEvents?.record?.("cloud.image.failed", { machine: machineID,
+          code: error?.code ?? "read_failed", size: thumb ? "thumb" : "full" })
+        this._scheduleViewerEvents?.()
+      } catch { /* diagnostics cannot change the image failure */ }
+      throw error
+    })
   }
 
   /** The original detail panels share this exact read adapter. */

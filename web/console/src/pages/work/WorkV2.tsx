@@ -1,3 +1,5 @@
+import { LoadingSkeleton } from "../../LoadingSkeleton.js"
+import { ProjectPicker } from "../../ui/ProjectPicker.js"
 import { catalogFormat } from "../../catalog.js"
 import { focusModalContainer } from "../../modal-focus.js"
 import { catalogWord, catalogWordLanguage } from "../../catalog.js"
@@ -408,12 +410,13 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
   <section ref={board} id="work" className="page board-page work-page" data-page-view="work" hidden={!shown} aria-labelledby="work-v2-title"
     aria-busy={loading || refreshing || paging ? "true" : undefined}>
     <header className="board-head">
-      <div><p className="board-eyebrow">{catalogWord("inline", "68441095f928")}</p><h1 id="work-v2-title">{catalogWord("inline", "0072da457a09")}</h1></div>
+      <div><h1 id="work-v2-title">{catalogWord("inline", "0072da457a09")}</h1></div>
       <div className="work-head-tools">
         <button className="board-button" type="button" onClick={() => { setFailure(""); setCreatedItem(null); setCreateDraft({}); setCreating(true) }}>{catalogWord("inline", "e5a0a01cc43c")}</button>
-        <button className="board-button" type="button" disabled={!!busy || loading || refreshing || paging}
-          aria-busy={refreshing ? "true" : undefined} aria-label={refreshing ? catalogWord("literal", "8e0d15ad92d4") : undefined}
-          onClick={() => { rearrange.current = true; void load(true) }}>{L.strings.webInfoRefresh}</button>
+        <button className="board-button work-refresh" type="button" disabled={!!busy || loading || refreshing || paging}
+          aria-busy={refreshing ? "true" : undefined} aria-label={refreshing ? catalogWord("literal", "8e0d15ad92d4") : L.strings.webInfoRefresh}
+          title={L.strings.webInfoRefresh}
+          onClick={() => { rearrange.current = true; void load(true) }}><WorkIcon name="refresh" /></button>
       </div>
     </header>
     <div className="work-wrap">
@@ -449,7 +452,16 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
         <div className="work-cards">{done.map((item) => <CompactWorkCard key={item.id} item={item}
           sessions={sessions} nowSeconds={nowSeconds} decisions={decisionsForWorkItem(decisions, item.id)} onOpen={() => openItem(item)} />)}</div>
       </details>}
-      {loaded && !failure && visibleItems.length === 0 && <p className="work-empty work-filter-empty" role="status">
+      {loaded && !failure && visibleItems.length === 0 && !search && status !== "done" && (showPlans || hiddenPlans === 0) &&
+        <div className="work-first-empty" role="status">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4" width="5" height="16" rx="1.5" /><rect x="10" y="4" width="5" height="10" rx="1.5" /><rect x="17" y="4" width="4" height="7" rx="1.5" /></svg>
+          <h2>{nextWord("workEmptyTitle")}</h2>
+          <p>{nextWord("workEmptyBody")}</p>
+          <button className="work-first-create" type="button" onClick={() => { setFailure(""); setCreatedItem(null); setCreateDraft({}); setCreating(true) }}>
+            {nextWord("workCreateItem")}
+          </button>
+        </div>}
+      {loaded && !failure && visibleItems.length === 0 && !(!search && status !== "done" && (showPlans || hiddenPlans === 0)) && <p className="work-empty work-filter-empty" role="status">
         {!showPlans && hiddenPlans > 0
           ? search ? catalogWord("literal", "f653840acc04") : catalogWord("literal", "000c45f69d2f")
           : search ? catalogFormat("template", "1619c02fca4b", [search]) : status === "done" ? catalogWord("literal", "6bb45a6f3d11") : catalogWord("literal", "9c2aa7fb1748")}
@@ -1245,7 +1257,7 @@ function SessionAssignmentPicker({ choices, onRetry, value, onChange, autoFocus 
         selected={session.id === value} onChoose={() => choose(session.id)} />)}
       {/* Only a complete answer says the Project has none; loading, failed and
           incomplete lists say so instead (session-assignment.ts). */}
-      {said && <p className={"work-project-empty" + (choices.phase === "loading" ? " work-session-loading" : "")}
+      {said && choices.phase === "loading" && sessions.length === 0 ? <LoadingSkeleton id="SK-22" label={said} /> : said && <p className={"work-project-empty" + (choices.phase === "loading" ? " work-session-loading" : "")}
         role={choices.phase === "failed" ? "alert" : "status"} aria-busy={choices.phase === "loading" || undefined}>
         {choices.phase === "loading" && <span className="work-assignment-spinner" aria-hidden="true" />}{said}</p>}
       {choices.phase === "failed" && <button className="chip work-session-retry" type="button" onClick={onRetry}>{workWord("assignSessionsRetry")}</button>}
@@ -1281,7 +1293,7 @@ function SessionAssignmentDetail({ session, reading }: { session: SessionRow; re
   return <section className="work-session-detail" aria-label={catalogFormat("template", "ecd25f9c83f5", [session.label || session.id])} aria-live="polite">
     <div className="work-session-detail-head"><strong>{catalogWord("inline", "3f44b79c30e6")}</strong><span>{sessionActivityName(session.state)} · {sessionWorkLabel(session)}</span></div>
     {(session.line || session.work_note) && <p>{session.line || session.work_note}</p>}
-    {reading?.loading && !page ? <p>{catalogWord("inline", "926adfdf9989")}</p> : reading?.update ? <NeedsUpdate update={reading.update} /> : reading?.error ? <p className="work-note" role="alert">{catalogLabel("inline", "e85c2c330c2e")}{reading.error}</p> : page ? <>
+    {reading?.loading && !page ? <LoadingSkeleton id="SK-23" label={catalogWord("inline", "926adfdf9989")} /> : reading?.update ? <NeedsUpdate update={reading.update} /> : reading?.error ? <p className="work-note" role="alert">{catalogLabel("inline", "e85c2c330c2e")}{reading.error}</p> : page ? <>
       <p>{catalogFormat("count", "unfinishedWork", [counts?.board ?? 0, counts?.todos ?? 0])}</p>
       <SessionWorkList title={catalogWord("inline", "7cd8f523be1c")} empty={catalogWord("literal", "4a085d55298e")} rows={page.assigned_items.map((item) => ({
         id: item.id, title: item.title, meta: `${item.project.label} · ${phaseName(item.phase)}${item.condition ? ` · ${conditionWords(item)}` : ""}`,
@@ -1523,59 +1535,6 @@ function WorkReferenceImage({ item, image, busy, run }: {
   </figure>
 }
 
-function ProjectPicker({ places, value, onChange, onOpen, allowAll = false }: {
-  places: ProjectPlace[]
-  value: string
-  onChange: (id: string) => void
-  onOpen?: () => Promise<void>
-  allowAll?: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const root = useRef<HTMLDivElement>(null)
-  const selected = places.find((place) => place.id === value)
-  useEffect(() => {
-    if (!open) return
-    const closeOutside = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false)
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false)
-    }
-    document.addEventListener("pointerdown", closeOutside)
-    document.addEventListener("keydown", closeOnEscape)
-    return () => {
-      document.removeEventListener("pointerdown", closeOutside)
-      document.removeEventListener("keydown", closeOnEscape)
-    }
-  }, [open])
-  const choose = (id: string) => { onChange(id); setOpen(false) }
-  const toggle = () => {
-    const opening = !open
-    setOpen(opening)
-    if (!opening || !onOpen) return
-    setRefreshing(true)
-    void onOpen().catch(() => {}).finally(() => setRefreshing(false))
-  }
-  return <div className="work-project-picker" ref={root}>
-    <button className="work-project-trigger" type="button" aria-label={catalogWord("inline", "985959785319")} aria-haspopup="listbox"
-      aria-expanded={open} onClick={toggle}>
-      {selected ? <Mark icon={selected.icon as SessionRow["icon"]} cellPx={3} /> : <span className="work-project-placeholder" aria-hidden="true">▦</span>}
-      <span>{selected?.label || (allowAll ? catalogWord("literal", "b2ee45d95857") : catalogWord("literal", "ef8fe1c8ac54"))}</span>
-      <span className="work-project-chevron" aria-hidden="true">⌄</span>
-    </button>
-    {open && <div className="work-project-menu" role="listbox" aria-label={catalogWord("inline", "985959785319")}>
-      {allowAll && <button type="button" role="option" aria-selected={!value} className="work-project-option"
-        onClick={() => choose("")}><span className="work-project-placeholder" aria-hidden="true">▦</span><span>{catalogWord("inline", "24926b27517e")}</span></button>}
-      {places.map((place) => <button type="button" role="option" aria-selected={place.id === value}
-        className="work-project-option" key={place.id} onClick={() => choose(place.id)}>
-        <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} /><span>{place.label}</span>
-        {place.id === value && <span className="work-project-check"><WorkIcon name="check" /></span>}
-      </button>)}
-      {!places.length && <p className="work-project-empty">{refreshing ? catalogWord("literal", "eec20299e1b1") : catalogWord("literal", "dc9a2139ef07")}</p>}
-    </div>}
-  </div>
-}
 
 function NewWorkModal({ places, initialProject, initialDraft, busy, failure, onRefreshPlaces, onClose, onCreate }: { places: ProjectPlace[]; initialProject: string; initialDraft: NewWorkItemDraft; busy: boolean; failure: string; onRefreshPlaces: () => Promise<void>; onClose: () => void; onCreate: (body: Parameters<typeof createWorkV2>[0], images: File[], decisionKey: string) => void }) {
   const [projectID, setProjectID] = useState(initialDraft.projectID || initialProject)

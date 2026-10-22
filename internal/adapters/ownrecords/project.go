@@ -121,9 +121,9 @@ type Work struct {
 	PersonNeeded *bool
 	Owed         *contract.WorkOwed
 	Disposition  *contract.WorkDisposition
-	// Waiting is the live tasks that made a broker-decided waiting_session,
-	// in store order; nil for every other state and for a declared or
-	// coordination wait.
+	// Waiting is the live broker work owned by this Session, in store order.
+	// It is independent of the terminal state: a moving or unreadable
+	// terminal does not cancel its outstanding work.
 	Waiting []*Task
 }
 
@@ -264,10 +264,7 @@ func (s Snapshot) Work(l Live, terminalState string) Work {
 		hasOutstandingChild: len(outstanding) > 0,
 	}
 	state := projectWorkState(in)
-	out := Work{State: state, Provenance: "broker"}
-	if state == "waiting_session" && !in.hasWait {
-		out.Waiting = outstanding
-	}
+	out := Work{State: state, Provenance: "broker", Waiting: outstanding}
 
 	if state != "milestone_complete" && state != "work_complete" {
 		return out

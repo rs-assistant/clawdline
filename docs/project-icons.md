@@ -1,6 +1,7 @@
 # Project icons
 
-A project icon is a colour grid (`accent`, `cells`). The daemon resolves it for
+A project icon has an RGB `accent` and either a colour grid (`cells`) or a
+self-contained SVG (`svg`, with empty `cells`). The daemon resolves it for
 the console's project, Session and Board views. Application and assistant marks
 are separate assets.
 
@@ -49,3 +50,40 @@ matches checkouts by their portable git `origin` and carries the source's name
 and icon to each mirror. A receiving machine follows later source changes when
 the Projects page is opened. A local path, folder name or generated path hash
 is not a cross-machine project identity.
+
+## SVG and pixel input
+
+The compatibility registry accepts SVG in an entry's `art` object:
+
+```json
+{
+  "projects": {
+    "/path/to/project": {
+      "art": {
+        "accent": "#D97757",
+        "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"#D97757\"/></svg>"
+      }
+    }
+  }
+}
+```
+
+SVG needs a finite, positive-size `viewBox`. Static shapes, groups, gradients,
+clipping, masks, text and local `#fragment` references are supported. Scripts,
+event handlers, external resources, embedded HTML, stylesheets and animation
+are refused. Use presentation attributes or simple inline styles. An SVG is
+limited by the existing 96 KiB icon request budget. The console decodes it as
+an isolated image, never inserts its markup into the page, and discards a late
+image decode if the canvas has since been assigned another icon.
+
+Pixel grids accept at most 64 rows and 64 columns (4096 cells), with RGB colours
+or transparent cells. Legacy palette art follows the same dimensions and colour
+validation; shorter legacy rows retain transparent/background padding. Invalid
+registry edits keep the last valid marks and make refresh report an error.
+
+All views fit project marks proportionally into the existing eight-cell slot
+at the caller's scale. Ordinary small pixel marks keep their original size;
+larger marks shrink without cropping. SVG uses the same slot with smooth
+rendering. The accent remains independent of the SVG's fills. Storage and
+project-settings sync carry SVG alongside the accent; receiving machines need
+a version that supports SVG to draw it.

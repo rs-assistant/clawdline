@@ -288,14 +288,14 @@ export const ActionConfirm = {
   async loadOpenWork(pending: Pending): Promise<void> {
     try {
       const page = await readSessionWorkV2(pending.id)
-      if (this.pending !== pending || !this.isOpen()) return
+      if (this.pending !== pending || !this.isOpen() || pending.ask) return
       pending.work = page.assigned_items
       pending.recentWork = page.recent_items
       pending.directTodos = page.direct_todos
       pending.workTruncated = page.truncated
       pending.workState = "ready"
     } catch {
-      if (this.pending !== pending || !this.isOpen()) return
+      if (this.pending !== pending || !this.isOpen() || pending.ask) return
       pending.workState = "unreadable"
     }
     easeHeight(node("action-confirm-sheet"), () => this.renderEnd(pending))
@@ -429,7 +429,7 @@ export const ActionConfirm = {
       statusClass = "is-warning"
       const notes = closeNotes.map((note) => note.count > 1 ? `${note.text} (${note.count})` : note.text)
       statusCopy = notes.join(" ")
-    } else if (recordedWorkClear) {
+    } else if (closeability === "unknown" || recordedWorkClear) {
       statusClass = "is-warning"
       statusCopy = help ? help.explanation : nextWord("endWorkCloseUnknown")
     }
@@ -571,8 +571,11 @@ export const ActionConfirm = {
       } catch { /* Keep the refusal visible below if a fresh reading is unavailable. */ }
     }
     if (!version || known.length === 0) {
-      host.refresh()
-      toast(nextWord("endWorkCloseUnknown"), true)
+      this.openUnknownClose(id, kind, row, version)
+      return
+    }
+    if ((row?.closeability as { state?: string } | undefined)?.state === "unknown") {
+      this.openUnknownClose(id, kind, row, version)
       return
     }
     this.open(kind, id)
@@ -596,6 +599,24 @@ export const ActionConfirm = {
     this.sync()
   },
 
+  /** Keep an unreadable close decision in a modal, with an explicit override. */
+  openUnknownClose(id: string, kind: CloseKind, row: Record<string, unknown> | null, version: string | null): void {
+    this.open(kind, id, undefined, undefined, undefined, row ?? undefined)
+    const pending = this.pending
+    if (!pending) return
+    pending.force = true
+    pending.help = null
+    pending.closeability = "unknown"
+    pending.closeabilityVersion = version
+    pending.reconfirmed = false
+    pending.ask = { say: nextWord("endWorkCloseUnknown") }
+    // No asynchronous work read may replace this warning with a ready message.
+    pending.workState = "unreadable"
+    this.renderSay(nextWord("endWorkCloseUnknown"), null, [])
+    this.sync()
+    node<HTMLButtonElement>("action-confirm-cancel")?.focus({ preventScroll: true })
+  },
+
   /** A stale close is a new decision about a fresh reading, never a retry of the old press. */
   async reopenEndNotProven(id: string, kind: CloseKind): Promise<void> {
     try {
@@ -614,8 +635,9 @@ export const ActionConfirm = {
       node<HTMLButtonElement>("action-confirm-cancel")?.focus({ preventScroll: true })
     } catch (error) {
       host.refresh()
-      if (error instanceof RefusalError) toastFailure(error, nextWord("endWorkCloseUnknown"))
-      else toast(nextWord("endWorkCloseUnknown"), true)
+      const row = byId(id) as Record<string, unknown> | null
+      const version = (row?.closeability as { version?: string } | undefined)?.version ?? null
+      this.openUnknownClose(id, kind, row, version)
     }
   },
 
@@ -689,8 +711,12 @@ export const ActionConfirm = {
       const archiving = this.pending?.kind === "archive"
       go.textContent = this.pending?.reconfirmed
         ? archiving ? nextWord("archiveAnyway") : T.webConfirmEndAnyway
+        : this.pending?.force && this.pending.closeability === "unknown" && !archiving
+          ? nextWord("endWorkForceClose")
         : this.pending?.release.length
         ? archiving ? nextWord("endWorkReleaseAndArchive") : nextWord("endWorkReleaseAndClose")
+        : this.pending?.force && !this.pending.processOnly
+          ? archiving ? nextWord("archiveAnyway") : T.webConfirmEndAnyway
         : help
         ? archiving
           ? recordedWorkClear ? nextWord("archiveGo") : nextWord("archiveAnyway")
@@ -773,7 +799,7 @@ function finishEnd(id: string, ticket: number, ok: boolean, error?: unknown): vo
     endTicket += 1
     const attemptedVersion = ActionConfirm.pending?.closeabilityVersion ?? null
     ActionConfirm.finish()
-    if (!ok && error instanceof RefusalError && error.code === "close_blocked") {
+    if (!ok && error instanceof RefusalError && (error.code === "close_blocked" || error.code === "closeability_unknown")) {
       endWasOpen = false
       void ActionConfirm.reopenEndBlocked(id, error.reasons, endKind, attemptedVersion)
       return

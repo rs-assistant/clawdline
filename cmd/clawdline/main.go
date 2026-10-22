@@ -10,14 +10,13 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/release/updater"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/app"
@@ -195,8 +194,6 @@ func main() {
 		cloudCommand(os.Args[2:])
 	case "remote":
 		remoteCommand(os.Args[2:])
-	case "tunnel":
-		tunnelCommand(os.Args[2:])
 	case "board":
 		boardCommand(os.Args[2:])
 	case "project":
@@ -218,6 +215,10 @@ func main() {
 		// Run a commit of this checkout in place of the installed release,
 		// to test it (dev.go, docs/updates.md).
 		devCommand(os.Args[2:])
+	case "health":
+		// The connection-health watchdog and journal, read from the local
+		// daemon with this machine's token (health.go).
+		healthCommand(os.Args[2:])
 	case "update":
 		// Whether this machine trails the cloud's latest build, and on Linux
 		// deploying it (update.go, docs/updates.md).
@@ -255,10 +256,9 @@ func serve() {
 		os.Exit(1)
 	}
 	// The port before anything else is done. Everything below writes: the
-	// stable binary, the store, the broker's beat, the cloud line, the tunnel's
-	// Reclaim — which stops the cloudflared this state directory's pid file
-	// names, whoever started it. A daemon that loses the port to another one
-	// over the same directory must not have done any of that first.
+	// stable binary, the store, the broker's beat, the cloud line. A daemon
+	// that loses the port to another one over the same directory must not
+	// have done any of that first.
 	ln, err := httptransport.Listen(cfg)
 	if err != nil {
 		refuseHeldPort(cfg.Host, cfg.Port, err)
@@ -279,6 +279,13 @@ func serve() {
 		refuseToServe(1, err.Error())
 	}
 	srv.SetVersion(version)
+	// One connection-health runtime per boot, before anything it instruments
+	// starts and whether or not Cloud is on (health.go).
+	// A stopping daemon stops it first, so the durable store is flushed and
+	// closed rather than abandoned mid-write.
+	cloudCtx, stopCloud := context.WithCancel(context.Background())
+	defer stopCloud()
+	go stopConnectionHealthOnSignal(startConnectionHealth(cfg.Dir, srv), stopCloud)
 	// A device file that cannot be read stops the daemon here, rather than
 	// letting it listen and refuse everybody.
 	if err := srv.AuthReady(); err != nil {
@@ -303,35 +310,11 @@ func serve() {
 	// Things waiting to be verified: the records this daemon owes are planted
 	// once (docs/verifications.md "The first one").
 	srv.StartVerifications(context.Background())
-	startCloudLine(context.Background(), cfg, srv)
-	// The account-free tunnel, if the settings ask for one and something is
-	// paired: a cloudflared an earlier run left behind is stopped first.
-	srv.StartTunnel()
-	stopTunnelOnSignal(srv)
+	startCloudLine(cloudCtx, cfg, srv)
 	if err := srv.Serve(ln); err != nil {
+		stopCloud()
 		refuseToServe(1, err.Error())
 	}
-}
-
-// stopTunnelOnSignal takes cloudflared down before the daemon goes, then lets
-// the signal do what it would have done. Without this an interrupt or a
-// SIGTERM ends the daemon at once and leaves its tunnel up: a public address
-// that nothing on screen admits to. A SIGKILL cannot be caught, which is what
-// the tunnel's pid file and Reclaim are for.
-func stopTunnelOnSignal(srv *httptransport.Server) {
-	caught := make(chan os.Signal, 1)
-	signal.Notify(caught, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		sig := <-caught
-		srv.StopTunnel()
-		signal.Reset(os.Interrupt, syscall.SIGTERM)
-		if p, err := os.FindProcess(os.Getpid()); err == nil && p.Signal(sig) == nil {
-			// Give the re-raised signal a moment to land; the exit status is
-			// then the one the sender expected.
-			time.Sleep(time.Second)
-		}
-		os.Exit(1)
-	}()
 }
 
 // startCloudLine brings up the line to app.clawdline.com, if the settings say
@@ -344,14 +327,19 @@ func stopTunnelOnSignal(srv *httptransport.Server) {
 // behind. Each of those is recorded where `/v1/cloud/status` can say it, which
 // is the difference between a quiet failure and a legible one.
 func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.Server) {
+	admit := cloudAdmission(cfg.Dir)
+	httptransport.SetCloudUnavailable(cfg.Dir)
 	opts := cloudtransport.LinkOptions{
-		Dir:            cfg.Dir,
-		ForeignDirs:    foreignDirs(),
-		Receipts:       srv.CloudSessionReceipts(),
-		AdmitExecution: srv.CloudAdmitExecution,
-		Sessions:       srv.CloudSessions,
-		SessionsFresh:  srv.CloudSessionsFresh,
-		SessionLook:    srv.CloudSessionLook,
+		// Receivers ship first; update admission keeps this off until this
+		// executable is accepted and cannot automatically return to v2.0.0.
+		ContentKeyRuntime: true,
+		Dir:               cfg.Dir,
+		ForeignDirs:       foreignDirs(),
+		Receipts:          srv.CloudSessionReceipts(),
+		AdmitExecution:    srv.CloudAdmitExecution,
+		Sessions:          srv.CloudSessions,
+		SessionsFresh:     srv.CloudSessionsFresh,
+		SessionLook:       srv.CloudSessionLook,
 		// The daemon's own routes, gate and all. A Cloud request is answered by
 		// exactly the handler a paired browser on this machine's own network
 		// reaches — one set of permission checks, not two.
@@ -387,6 +375,9 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		SpoolBytes:        int(httptransport.CapacityLimit(capacity.CloudSpoolBytes)),
 		SpoolChannelBytes: int(httptransport.CapacityLimit(capacity.CloudSpoolChannelBytes)),
 		SpoolReceipts:     int(httptransport.CapacityLimit(capacity.CloudSpoolReceipts)),
+		// The lanes and the transport record their phases here; nil when
+		// connection-health monitoring is off.
+		Health: srv.ConnectionHealth().Probe(),
 	}
 	var mu sync.Mutex
 	var stop context.CancelFunc
@@ -414,9 +405,15 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 			stop, done = nil, nil
 			webhooksDone = nil
 		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		link, err := cloudtransport.Open(opts)
 		if err != nil {
 			httptransport.SetCloudLine(cfg.Dir, nil)
+			return err
+		}
+		if err := ctx.Err(); err != nil {
 			return err
 		}
 		httptransport.SetCloudLine(cfg.Dir, link)
@@ -438,11 +435,17 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		}()
 		return nil
 	}
-	srv.SetCloudReload(reload)
-	if err := reload(); err != nil {
+	gate := &cloudUpdateGate{ctx: ctx, ready: admit, open: reload}
+	srv.SetCloudReload(gate.reload)
+	if err := gate.reload(); err != nil {
 		// A malformed setting is loud, but never takes the local daemon down.
 		log.Printf("cloud: the line is off: %v", err)
 	}
+	go func() {
+		ticker := time.NewTicker(updater.AppSwapPollSecondsLimit * time.Second)
+		defer ticker.Stop()
+		gate.resume(ticker.C)
+	}()
 }
 
 func doctor() {
@@ -530,8 +533,9 @@ func terminalCommand(op string, args []string) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_usage_with_memory", "usage: clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|tunnel|cloud|board|project|memory|task|webhook|setup|update|version>"))
+	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_usage_with_memory", "usage: clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|cloud|board|project|squad|memory|task|webhook|setup|update|version>"))
 	fmt.Fprintln(os.Stderr, "  "+cliCopy("core", "language_option", cliLanguageOptionEnglish))
+	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_squad_help", "  squad <catalog|definition|scopes|settings|save|bind|icon>   private roles, skills and pixel robots; guide squad has a complete example"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_guide_topic_guide_list_the_agent", "  guide [topic] | guide -list   the agent guide this build carries; no daemon needed"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_skill_dual_install", "  skill <install|uninstall>     put this build's skill stub in ~/.claude/skills/clawdline and ~/.agents/skills/clawdline, or put back what was there"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_report_status_file_repo_dir_open", "  report --status <file> [--repo dir] [--open] <commit>…   a turn's status report as one local HTML file; prints its file:// address last"))
@@ -560,7 +564,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_open_print_sign_a_browser_in", "  open [--print]   sign a browser in with permission to read and send"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_pair_watch_show_the_code_when", "  pair [--watch]            show the code when a device asks to pair"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_devices_revoke_id_the_browsers_and", "  devices [revoke <id>]     the browsers and devices signed in to this machine directly; revoke one"))
-	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_tunnel_json_what_the_cloudflared_tunnel", "  tunnel [--json]           what the cloudflared tunnel is doing; remote_tunnel in the settings turns it on"))
+	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_health_status_events_trace_export_history", "  health <status|events|trace|export|history>   this machine's connection-health watchdog, journal, saved history and Cloud upload; local only"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_cloud_status_on_off_login_connect", "  cloud <status|on|off|login|connect>   the line to app.clawdline.com; off by default"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_remote_agent_tasks", "  remote <machines|dispatch|show|send|finish|ack|retry>   work with a paired Agent on another machine"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_board_tracks_rows_json_the_old", "  board tracks [--rows] [--json]   the old cards on the three tracks, read-only"))

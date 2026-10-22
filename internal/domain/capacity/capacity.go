@@ -425,6 +425,7 @@ const (
 	// reading cheap.
 	SessionsAgentRows = "sessions.agent_rows"
 	// The waited-on tasks one Session row names (transport/http/session_wait_targets.go).
+	SessionCodexPastPage  = "session.codex_past_page"
 	SessionWaitingFor     = "session.waiting_for"
 	CacheBackgroundAgents = "cache.background_agents"
 	// SessionsShellOutputBytes is the most of one background command's
@@ -486,6 +487,7 @@ const (
 	// change to any of them is a change to this register.
 	ConsoleTranscriptSafetySeconds    = "console.transcript_safety_seconds"
 	ConsoleTranscriptFollowSeconds    = "console.transcript_follow_seconds"
+	ConsoleTranscriptFillPages        = "console.transcript_fill_pages"
 	ConsoleTranscriptMergedRows       = "console.transcript_merged_rows"
 	ConsoleTranscriptBackoffSeconds   = "console.transcript_backoff_seconds"
 	ConsoleRelayTranscriptExpectReask = "console.relay_transcript_expect_reask_seconds"
@@ -495,13 +497,16 @@ const (
 	ConsolePersonaRetry               = "console.persona_retry_seconds"
 	ConsoleStatusMarkerRetry          = "console.status_marker_retry_seconds"
 	ConsolePinnedListReadTimeout      = "console.pinned_list_read_timeout_seconds"
-	ConsoleStatusMarkerRecoveryWait   = "console.status_marker_recovery_wait_seconds"
-	ConsoleTranscriptFollowFast       = "console.transcript_follow_fast_seconds"
-	ConsoleTranscriptFollowLater      = "console.transcript_follow_later_seconds"
-	ConsoleHealthLive                 = "console.health_live_seconds"
-	ConsoleSessionNotesSafety         = "console.session_notes_safety_seconds"
-	ConsoleOpenedRowRestate           = "console.opened_row_restate_seconds"
-	ConsoleOpenedRowQuiet             = "console.opened_row_quiet_seconds"
+	// One save of a pairing's permission by the macOS shell
+	// (shell/darwin/Pairing.swift saveTimeoutSeconds).
+	ConsoleNativePairingSaveSeconds = "console.native_pairing_save_seconds"
+	ConsoleStatusMarkerRecoveryWait = "console.status_marker_recovery_wait_seconds"
+	ConsoleTranscriptFollowFast     = "console.transcript_follow_fast_seconds"
+	ConsoleTranscriptFollowLater    = "console.transcript_follow_later_seconds"
+	ConsoleHealthLive               = "console.health_live_seconds"
+	ConsoleSessionNotesSafety       = "console.session_notes_safety_seconds"
+	ConsoleOpenedRowRestate         = "console.opened_row_restate_seconds"
+	ConsoleOpenedRowQuiet           = "console.opened_row_quiet_seconds"
 	// This browser's own record of direct attempts per machine, drawn on the
 	// machine sheet (web/console/src/cloud/direct-history.ts), and how often
 	// the open machine list re-reads (pages/devices/AccountMachines.tsx).

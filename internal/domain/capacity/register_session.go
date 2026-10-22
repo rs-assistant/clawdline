@@ -5,6 +5,13 @@ package capacity
 func sessionBounds() []Entry {
 	return []Entry{
 		{
+			// One provider page per explicit history request; older rows remain on
+			// disk and are reached only by following the opaque continuation.
+			Name: SessionCodexPastPage, Class: Observation, Unit: Rows,
+			Limit: 20, AtLimit: EvictOldest, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/projects.CodexPastPageLimit"},
+		},
+		{
 			// One durable identity per terminal id on this machine. Full
 			// refuses a newly observed id; no generation is silently evicted.
 			Name: SessionExecutions, Class: Evidence, Unit: Rows,

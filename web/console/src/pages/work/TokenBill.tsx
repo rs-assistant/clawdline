@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../LoadingSkeleton.js"
 import { catalogWord } from "../../catalog.js"
 import { useEffect, useRef, useState, type RefObject } from "react"
 import type { UsageBill, UsageComposition, UsageGap, UsageItem, UsageSession, UsageTokens } from "@clawdline/contract"
@@ -101,7 +102,7 @@ export function SessionUsage({ conversation }: { conversation: string }) {
 }
 
 function ReadingState<T>({ reading, retry }: { reading: Reading<T>; retry: () => void }) {
-  if (reading.phase === "loading") return <p className="work-usage-note" role="status">{workWord("usageLoading")}</p>
+  if (reading.phase === "loading") return <LoadingSkeleton id="SK-21" kind="detail" label={workWord("usageLoading")} />
   if (reading.phase !== "failed") return null
   return <p className="work-usage-note" role="alert">
     {workWord("usageUnreadable", { reason: reading.words })}{" "}

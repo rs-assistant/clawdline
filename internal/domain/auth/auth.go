@@ -2,10 +2,10 @@
 // for. It is a port of the Swift app's Sources/RemoteAuth.swift, rule for rule;
 // where it differs, the difference is written beside it.
 //
-// **The thing to understand before reading any of this: once a tunnel is
-// running, every request arrives from 127.0.0.1.** cloudflared connects to the
-// local port like any other program on the machine, so a phone in another
-// country and a curl in another terminal have the same socket address.
+// **The thing to understand before reading any of this: through a proxy such
+// as Tailscale Serve, every request arrives from 127.0.0.1.** The proxy
+// connects to the local port like any other program on the machine, so a phone
+// on the tailnet and a curl in another terminal have the same socket address.
 // Loopback is therefore not an authorisation signal, and there is no exception
 // for it anywhere in this package.
 //
@@ -97,18 +97,20 @@ type Device struct {
 	ID   string
 	Name string
 	// Hash is the SHA-256 of the token, hex. Never the token itself.
-	Hash     string
-	Caps     Caps
-	Created  time.Time
-	LastSeen time.Time // zero when never seen
+	Hash string
+	Caps Caps
+	// PermissionSelected distinguishes an explicit local grant from a legacy row.
+	PermissionSelected bool
+	Created            time.Time
+	LastSeen           time.Time // zero when never seen
 	// Approved on the Mac. The Swift store keeps the flag; this port only ever
 	// stores approved devices, and reads the flag so a file written by either
 	// means the same thing.
 	Approved bool
 	// Local is the one this machine made for itself, so that a script or the
 	// shell running as this user can talk to the daemon. It counts for
-	// authentication and not for the tunnel interlock: a token this app wrote
-	// for its own use is not somebody deciding to be reachable.
+	// authentication and not for IsConfigured: a token this app wrote for its
+	// own use is not somebody deciding to be reachable.
 	Local bool
 }
 
@@ -184,11 +186,12 @@ const (
 // pairing route, and only somebody who can see this machine's screen can
 // finish it.
 type pairing struct {
-	ID      string
-	Name    string
-	Code    string
-	token   string
-	Expires time.Time
+	ReadOnly bool
+	ID       string
+	Name     string
+	Code     string
+	token    string
+	Expires  time.Time
 }
 
 // Hash is the stored form of a token.

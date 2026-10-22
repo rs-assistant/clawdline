@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../LoadingSkeleton.js"
 import { useEffect, useRef, useState } from "react"
 import { focusModalContainer } from "../modal-focus.js"
 import type { Snippet, WorkflowSource } from "../legacy/snippets-bridge.js"
@@ -17,8 +18,7 @@ const blank = (global: boolean): Draft => ({ id: "", title: "", body: "", global
 const machineOf = (place: ProjectPlace): string => (place as ProjectPlace & { machine?: string }).machine ?? ""
 const availableSkills = (files: ProjectFile[]) => files.filter((file) => (file.kind === "skill" || file.kind === "command") && file.status === "ready")
 const skillTitle = workflowSourceTitle
-const launchTextFor = (file: ProjectFile) => workflowSourceText(file,
-  document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en")
+const launchTextFor = (file: ProjectFile) => workflowSourceText(file)
 
 function GlobalMark() {
   return <svg className="workflow-global-mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
@@ -271,7 +271,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
   </div>
 
   return <section className="page workflow-page" id="workflow" data-page-view="workflow" hidden={!shown}>
-    <header className="workflow-head"><div><h1 tabIndex={-1}>Workflow</h1><p>{W("intro")}</p></div>
+    <header className="workflow-head"><div><h1 tabIndex={-1}>{W("workflow")}</h1><p>{W("intro")}</p></div>
       <div className="workflow-head-tools"><div className="workflow-project" ref={projectPicker}><span>{W("scopeLabel")}</span>
         <button type="button" className="workflow-project-trigger" aria-label={`${W("scopeLabel")}: ${globalView ? W("global") : place?.label || place?.path || ""}`} aria-expanded={projectOpen}
           onClick={() => setProjectOpen(!projectOpen)}>{globalView ? <GlobalMark /> : place && <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} />}
@@ -340,7 +340,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
         {selectedSkill ? <>
           <div className="workflow-skill-content">
             <p className="workflow-skill-description">{selectedSkill.description || W("skillNoDescription")}</p>
-            {skillBusy && <p role="status">{W("loading")}</p>}
+            {skillBusy && <LoadingSkeleton id="SK-30" kind="text" label={W("loading")} />}
             {skillError && <p role="alert" className="workflow-error">{skillError}</p>}
             {skillText && <pre>{skillText}</pre>}
           </div>
@@ -359,7 +359,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
       onPointerDown={(event) => { if (event.target === event.currentTarget) closeSource() }}>
       <div className="workflow-skill-dialog" ref={sourceDialog}><header><div><h2>{W("sourceDetail")}</h2><p>{sourcePreview.kind === "command" ? W("claudeCommand") : "Skill"} · {sourcePreview.name}</p></div>
         <button type="button" onClick={closeSource} aria-label={W("cancel")}>×</button></header>
-        <div className="workflow-skill-content">{sourceBusy && <p role="status">{W("loading")}</p>}
+        <div className="workflow-skill-content">{sourceBusy && <LoadingSkeleton id="SK-30" kind="text" label={W("loading")} />}
           {sourceError && <p role="alert" className="workflow-error">{sourceError}</p>}
           {sourceText && <>{sourceVersion !== sourcePreview.version && <p role="status">{W("sourceChanged")}</p>}<pre>{sourceText}</pre></>}</div>
       </div>

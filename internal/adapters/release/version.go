@@ -28,6 +28,9 @@ func ParseVersion(s string) (Version, error) {
 	}
 	var n [3]int
 	for i, p := range parts {
+		if p == "" || strings.Trim(p, "0123456789") != "" {
+			return bad()
+		}
 		v, err := strconv.Atoi(p)
 		if err != nil || v < 0 || (len(p) > 1 && p[0] == '0') {
 			return bad()
@@ -37,9 +40,10 @@ func ParseVersion(s string) (Version, error) {
 	if strings.Contains(s, "-") && pre == "" {
 		return bad()
 	}
-	// A version names directories and files (install.Layout.ReleaseDir),
-	// so its pre-release is semver's identifiers and nothing that can be a
-	// path: no `/`, no `\`, no `..`.
+	// A version names release directories and URL path segments
+	// (install.Layout.ReleaseDir), so its pre-release is semver's dot-separated
+	// identifiers and nothing that can be a path: no `/`, no `\`, no `..`, no
+	// empty field, no query or control character.
 	if pre != "" && !preRelease(pre) {
 		return bad()
 	}

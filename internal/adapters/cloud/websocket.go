@@ -31,6 +31,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 )
 
 // The WebSocket GUID from RFC 6455 §1.3. The server hashes it with the key we
@@ -107,6 +109,12 @@ type Conn struct {
 
 	writeMu sync.Mutex
 	closed  bool
+
+	// health records the wait for writeMu and the socket write as two
+	// stages of one phase, so a writer stuck behind the lock and a writer
+	// stuck in the kernel's send are told apart. Nil records nothing. It is
+	// set once by the transport before the socket is shared.
+	health *connectionhealth.Tracker
 
 	// readBuf accumulates a fragmented message across continuation frames.
 	readBuf []byte
@@ -271,12 +279,19 @@ func Dial(rawURL string, opts DialOptions) (*Conn, error) {
 
 // WriteText sends one whole text message.
 func (c *Conn) WriteText(data []byte, deadline time.Time) error {
-	return c.writeFrame(opText, data, deadline)
+	return c.writeFrame(opText, data, deadline, "")
+}
+
+// WriteTextTraced is WriteText whose writer-lock and socket-write phase
+// continues correlation, the logical operation the frame belongs to. Each
+// call is its own attempt, with its own phase; only the correlation is shared.
+func (c *Conn) WriteTextTraced(data []byte, deadline time.Time, correlation string) error {
+	return c.writeFrame(opText, data, deadline, correlation)
 }
 
 // WritePing sends a ping with an empty payload.
 func (c *Conn) WritePing(deadline time.Time) error {
-	return c.writeFrame(opPing, nil, deadline)
+	return c.writeFrame(opPing, nil, deadline, "")
 }
 
 // WriteClose sends a close frame and does not wait for the peer's answer. The
@@ -286,15 +301,24 @@ func (c *Conn) WriteClose(code int, reason string, deadline time.Time) error {
 	payload := make([]byte, 2, 2+len(reason))
 	binary.BigEndian.PutUint16(payload, uint16(code))
 	payload = append(payload, reason...)
-	return c.writeFrame(opClose, payload, deadline)
+	return c.writeFrame(opClose, payload, deadline, "")
 }
 
-func (c *Conn) writeFrame(op byte, payload []byte, deadline time.Time) error {
+func (c *Conn) writeFrame(op byte, payload []byte, deadline time.Time, correlation string) (err error) {
+	// The phase begins before the lock, so a write that never gets the lock
+	// is visible as writer_lock_waiting at cloud.websocket.writer_lock.
+	if correlation != "" && !connectionhealth.ValidID(correlation) {
+		correlation = ""
+	}
+	h := c.health.Start(connectionhealth.DaemonSpec(connectionhealth.StageWriterLockWaiting,
+		connectionhealth.ClassTransport, connectionhealth.LocWriterLock, correlation))
+	defer func() { h.End(err == nil) }()
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	if c.closed {
 		return ErrConnClosed
 	}
+	_ = h.Step(connectionhealth.StageSocketWriteStarted, connectionhealth.LocSocketWrite)
 	if err := c.conn.SetWriteDeadline(deadline); err != nil {
 		return err
 	}
@@ -334,6 +358,7 @@ func (c *Conn) writeFrame(op byte, payload []byte, deadline time.Time) error {
 			return err
 		}
 	}
+	_ = h.Progress(connectionhealth.StageSocketWriteEnded)
 	return nil
 }
 
@@ -356,7 +381,7 @@ func (c *Conn) Read(deadline time.Time) ([]byte, error) {
 			// A pong echoes the ping's payload (RFC 6455 §5.5.3). Its deadline
 			// is the read deadline: a peer that pings and then stops reading
 			// must not be able to block this side for ever.
-			if err := c.writeFrame(opPong, payload, deadline); err != nil {
+			if err := c.writeFrame(opPong, payload, deadline, ""); err != nil {
 				return nil, err
 			}
 			continue

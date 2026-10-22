@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../LoadingSkeleton.js"
 import { localizedLiteralMap } from "../../catalog.js"
 import { catalogFormat } from "../../catalog.js"
 import { catalogWord } from "../../catalog.js"
@@ -178,7 +179,7 @@ export function ProjectFiles({ place, onState }: { place: ProjectPlace; onState(
       <button type="button" disabled={loading || busy || dirty} onClick={() => void reloadList()}>{catalogWord("inline", "db1659dac0df")}</button>
     </div>
     {listError && <p role="alert">{catalogLabel("inline", "5751fdee7531")}{listError}{catalogWord("inline", "fdf3ba351a22")}</p>}
-    {loading && <p role="status">{catalogWord("inline", "2b3d59f666b3")}</p>}
+    {loading && (list ? <p role="status">{catalogWord("inline", "2b3d59f666b3")}</p> : <div className="project-files-layout"><div className="project-files-nav"><LoadingSkeleton id="SK-16" label={catalogWord("inline", "2b3d59f666b3")} /></div><div className="project-files-detail"><LoadingSkeleton id="SK-16" kind="text" label={catalogWord("inline", "2b3d59f666b3")} /></div></div>)}
     {list && <>
       <div className="project-files-layout">
         <nav className="project-files-nav" aria-label={catalogWord("inline", "d4d68a08e0e6")}>
@@ -201,6 +202,7 @@ export function ProjectFiles({ place, onState }: { place: ProjectPlace; onState(
             <p className="project-files-location">{chosen.source === "global" ? catalogWord("literal", "23bf8eafeef3") : catalogWord("literal", "450e5d731947")} · <code>{chosen.location}</code></p>
             {chosen.source === "global" && <p>{catalogWord("inline", "bb3ee00241a5")}</p>}
             {chosen.status !== "ready" && <p role="status">{STATUS[chosen.status]}{fullStop()}{wordGap()}{chosen.status === "missing" ? catalogWord("literal", "ddc43085429e") : catalogWord("literal", "565085a5da03")}</p>}
+            {loading && !content && <LoadingSkeleton id="SK-16" kind="text" label={catalogWord("inline", "2b3d59f666b3")} />}
             {error && <p role="alert">{error}</p>}
             {notice && <p role="status">{notice}</p>}
             {content && <>

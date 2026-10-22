@@ -1,8 +1,45 @@
 package capacity
 
-// cloudBounds is every registered row named cloud.*.
+// cloudBounds is every registered row named cloud.*. The cloud.health_*
+// rows are declared in register_connection_health.go, and the
+// cloud.health_store_* rows in register_healthjournal.go.
 func cloudBounds() []Entry {
-	return []Entry{
+	return append(append(append(append(connectionHealthBounds(), healthJournalBounds()...), healthUploadBounds()...), healthSealedBounds()...), append(healthInvestigationBounds(), []Entry{
+		{
+			Name: "cloud.viewer_rekey_pending", Class: Buffer, Unit: Rows,
+			Limit: 1, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			Name: "cloud.viewer_rekey_cooldown", Class: Cache, Unit: Seconds,
+			Limit: 120, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			Name: "cloud.rekey_pending", Class: Buffer, Unit: Rows,
+			Limit: 8, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/cloud.RawRekeyPendingLimit", "internal/adapters/cloud.(*Transport).dispatchRawRekey:chan(RawRekeyPendingLimit)"},
+		},
+		{
+			Name: "cloud.rekey_interval", Class: Buffer, Unit: Seconds,
+			Limit: 2, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.RawRekeyIntervalSecondsLimit"},
+		},
+		{
+			Name: "cloud.envelope_key_id", Class: Buffer, Unit: Bytes,
+			Limit: 128, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/cloud.MaxKeyIDBytes"},
+		},
+		{
+			Name: "cloud.rekey_lifetime", Class: Cache, Unit: Seconds,
+			Limit: 120, AtLimit: Expire, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/cloud.RekeyLifetimeMSLimit"},
+		},
+		{
+			Name: "cloud.rekey_body", Class: Buffer, Unit: Bytes,
+			Limit: 4096, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/cloud.MaxRekeyBodyBytes"},
+		},
 		{
 			// A Cloud Session row (s/), status row (ss/) or status marker
 			// whose only change is its activity time, its sub-agents or its
@@ -597,5 +634,5 @@ func cloudBounds() []Entry {
 			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/transport/cloud.CloudTerminalReceiptBusyRetrySecondsLimit"},
 		},
-	}
+	}...)...)
 }

@@ -70,8 +70,10 @@ shared local token. Launch mints a random per-session capability, stores its
 hash against `launch_id`, and binds its terminal ID after terminal creation and
 its conversation ID at first observation. The CLI sends that capability for
 agent dispatch, child creation, and assignment. The server derives the actor
-persona and Project from the binding; a supplied conversation ID is only an
-equality check. Missing, invalid, unbound, revoked, or cross-session actor
+persona and launch Project from the binding; a supplied conversation ID is only an
+equality check. A bound Session may dispatch another role into a different
+Project. The launch Project does not restrict dispatch destinations; automatic
+assignment still honors the target Project's role settings. Missing, invalid, unbound, revoked, or cross-session actor
 capabilities fail with a typed refusal for a snapshotted Session. A pre-feature
 Session, or a Session opened without a role, retains the legacy dispatch route;
 it has no snapshot identity and cannot claim the new management-role candidate

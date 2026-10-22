@@ -37,6 +37,7 @@ import { ImageMarkup } from "./ImageMarkup.js"
 import { ComposerBox } from "./ComposerBox.js"
 import { voiceSource } from "./voice-source.js"
 import "./voice-source.css"
+import "./drop-target.css"
 
 /**
  * The composer, as the original's `form#composer` is built.
@@ -141,6 +142,10 @@ export function Composer({
     matches: [],
     selected: 0,
   })
+  // Retain only the last displayed rows for the exit picture. Selection logic
+  // still uses `skills`, which is cleared immediately when the picker closes.
+  const skillPicture = useRef(skills)
+  if (skills.shown) skillPicture.current = skills
   const skillMenu = useRef<HTMLDivElement>(null)
   // The session a catalog that arrives late is compared against.
   const rowRef = useRef(row)
@@ -170,6 +175,7 @@ export function Composer({
     Shots.clear()
     setEditingShot(null)
     // The menu was about the session that was open; `session/open.js` closes it.
+    skillPicture.current = { shown: false, matches: [], selected: 0 }
     setSkills({ shown: false, matches: [], selected: 0 })
   }, [openId])
 
@@ -585,19 +591,20 @@ export function Composer({
       <div
         ref={skillMenu}
         className="skill-menu"
+        data-motion-id="AN-009"
         id="skill-menu"
         role="listbox"
         aria-label={`${(remote?.assistant ?? row?.assistant) === "codex" ? "Codex" : "Claude Code"} skills`}
         hidden={!skills.shown}
+        inert={!skills.shown}
       >
-        {skills.shown &&
-          skills.matches.map((skill, i) => (
+        {skillPicture.current.matches.map((skill, i) => (
             <button
               key={skill.name}
               type="button"
               className="skill-option"
               role="option"
-              aria-selected={i === skills.selected ? "true" : "false"}
+              aria-selected={i === skillPicture.current.selected ? "true" : "false"}
               // Keep the soft keyboard open: the click still arrives, only the focus stays.
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => acceptSkill(i)}

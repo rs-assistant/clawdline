@@ -2,7 +2,27 @@ package capacity
 
 // consoleBounds is every registered row named console.*.
 func consoleBounds() []Entry {
-	return []Entry{
+	return append(append(append(connectionHealthUIBounds(), viewerHealthBounds()...), ownerRetentionBounds()...), []Entry{
+		{
+			// Encoded DataChannel answers waiting for authentication in wire order.
+			// Shared by this browser's machines; overflow closes only the affected carrier.
+			Name: "console.carrier_receive_bytes", Class: Buffer, Unit: Bytes,
+			Limit: 32 << 20, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+		},
+		{
+			Name: "console.carrier_receive_rows", Class: Buffer, Unit: Rows,
+			Limit: 32, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+		},
+		{
+			// HISTORY_FILL_PAGES in session/history-fill.ts bounds automatic
+			// older reads while the transcript does not fill its viewport.
+			// Polling and resize do not reset it; a manual request does.
+			Name: ConsoleTranscriptFillPages, Class: Buffer, Unit: Rows,
+			Limit: 32, AtLimit: Refuse,
+			Told: []Channel{Sender, Diagnostics}, EvictedBy: Person,
+		},
 		{
 			// Both opened-detail readers share one automatic recovery per
 			// user opening (SessionExecutionRecovery). At the limit the
@@ -158,6 +178,17 @@ func consoleBounds() []Entry {
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
 		{
+			// The macOS shell's one save of the permission the person chose
+			// for a pairing (shell/darwin/Pairing.swift
+			// PairingPermissionClient.saveTimeoutSeconds). At the limit the
+			// shell abandons the request, shows no code and asks the person
+			// to retry or ignore; native_pairing_test.go holds the two sides
+			// together.
+			Name: ConsoleNativePairingSaveSeconds, Class: Cache, Unit: Seconds,
+			Limit: 15, AtLimit: Expire,
+			Told: []Channel{Sender, Diagnostics}, EvictedBy: Daemon,
+		},
+		{
 			// One retained marker replay yields after five seconds of
 			// silence (STATUS_MARKER_RECOVERY_TIMEOUT_MS, status-client.js).
 			Name: ConsoleStatusMarkerRecoveryWait, Class: Cache, Unit: Seconds,
@@ -201,5 +232,5 @@ func consoleBounds() []Entry {
 			Limit: 60, AtLimit: Expire,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
-	}
+	}...)
 }

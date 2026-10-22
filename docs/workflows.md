@@ -57,6 +57,106 @@ assistant to use a Skill, but Clawdline does not interpret that instruction.
 Global Workflow availability does not make a Project-specific source available
 in another Project; the source reference is historical attribution only.
 
+## Agent API
+
+Agents can create, edit, delete and reorder Workflow definitions through the
+machine's existing `/v1/snippets` routes. A Workflow is a record with
+`scope: "workflow"`; there is no separate `/v1/workflows` route or dedicated
+Workflow CLI command. Saving a definition does not start a Session or send its
+message. See [the agent connection guide](../skills/clawdline/guide.md#2-reaching-the-daemon)
+for credential handling and `clawdline guide routes` for the installed build's
+route inventory.
+
+| Method and path | Request / result |
+|---|---|
+| `GET /v1/snippets` | Returns `{ "snippets": [...] }`, including other reusable-text scopes. Filter records by `scope == "workflow"`. |
+| `GET /v1/snippets?session=<URL-encoded terminal ID>` | Returns the resolved `project: {key, label}` and visible `snippets`, including global Workflows. Use the returned Project key rather than a worktree path. |
+| `POST /v1/snippets` | Create with `title`, `body`, `scope: "workflow"`, optional `project` and `source`. Returns the saved record. |
+| `PATCH /v1/snippets/<id>` | Change only the supplied writable fields; omitted fields retain their values. Returns the saved record. |
+| `DELETE /v1/snippets/<id>` | Returns `{ "ok": true, "deleted": "<id>" }`. |
+| `POST /v1/snippets/order` | Send `{ "scope": "workflow", "project": "<key>", "order": ["<id>", ...] }` with every member of that group exactly once. Omit `project` for the global group. Returns `ok`, `scope`, optional `project`, and the ordered `snippets`. |
+
+Reads require a valid machine or paired-device credential. Writes require the
+machine's `X-Clawdline-Orchestrator` token or a paired device allowed to send.
+Do not send the orchestrator token as `Authorization: Bearer`. Every write,
+including DELETE and reorder, requires an `Idempotency-Key` of at most 200
+characters. Send JSON with `Content-Type: application/json`.
+
+For example, in Bash or Zsh on the target machine, read the credential inside
+the shell and pass it through a header file descriptor so it does not appear
+in process arguments. Do not enable shell tracing or print the token:
+
+```sh
+WORKFLOW_STATE="${CLAWDLINE_NEXT_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/clawdline-next}"
+WORKFLOW_URL="http://127.0.0.1:${CLAWDLINE_NEXT_PORT:-7727}"
+workflow_auth() { printf 'X-Clawdline-Orchestrator: %s\n' "$(cat "$WORKFLOW_STATE/orchestrator-token")"; }
+
+# Discover this Session's canonical Project key; encode terminal IDs such as %47.
+curl --fail-with-body -sS -H @<(workflow_auth) --get \
+  --data-urlencode 'session=<terminal-id>' "$WORKFLOW_URL/v1/snippets"
+
+# Save create.json using the Project key returned above.
+cat > create.json <<'JSON'
+{"title":"Review changes","body":"Review the current changes and report findings.","scope":"workflow","project":"<resolved-project-key>"}
+JSON
+WORKFLOW_CREATE_KEY="$(uuidgen)"
+curl --fail-with-body -sS -H @<(workflow_auth) \
+  -H 'Content-Type: application/json' -H "Idempotency-Key: $WORKFLOW_CREATE_KEY" \
+  --data-binary @create.json "$WORKFLOW_URL/v1/snippets"
+
+# Use the returned id. Each new logical operation gets its own key.
+WORKFLOW_EDIT_KEY="$(uuidgen)"
+curl --fail-with-body -sS -X PATCH -H @<(workflow_auth) \
+  -H 'Content-Type: application/json' -H "Idempotency-Key: $WORKFLOW_EDIT_KEY" \
+  --data-binary '{"body":"Review the changes, prioritizing correctness and regressions."}' \
+  "$WORKFLOW_URL/v1/snippets/<returned-id>"
+
+WORKFLOW_DELETE_KEY="$(uuidgen)"
+curl --fail-with-body -sS -X DELETE -H @<(workflow_auth) \
+  -H "Idempotency-Key: $WORKFLOW_DELETE_KEY" \
+  "$WORKFLOW_URL/v1/snippets/<returned-id>"
+```
+
+Replace placeholders before running. To create a global Workflow, omit the
+`project` key entirely; an empty string or null is invalid. A title-only or
+body-only PATCH preserves the existing Project and source link. Writable keys
+are exactly `title`, `body`, `scope`, `project`, and `source`; do not send an
+entire returned record back (it includes read-only fields such as `id`,
+`position`, `created_at`, `updated_at`, and sometimes `builtin`). Title and body
+must be nonblank. Limits are UTF-8 bytes: title 200, body 4,000, Project path
+1,024; the HTTP write body is at most 64 KiB.
+
+`source` is optional attribution, not executable content. If supplied, it has
+exactly six string fields: `kind` (`skill` or `command`), `file_id` (32 lowercase
+hex characters), `place_id` (1–200 bytes), `scope` (`project` or `global`),
+`name` (1–200 bytes), and `version` (1–200 bytes). Use values from the authorized
+source listing rather than inventing IDs. `source: null` clears the link;
+omitting it on PATCH keeps the link. Only Workflow records accept a source.
+
+After an uncertain write, reuse the same key, method, path and exact body bytes.
+A stored response is replayed with `Idempotent-Replayed: true`, including across
+daemon restarts. Reusing a key for a changed request returns 409
+`idempotency_key_reused`. Do not generate a new create key merely because the
+connection dropped. Read the saved list to verify the resulting definition.
+
+Validation refusals use `{ "error": "<code>", "detail": "...", "counts": {...} }`
+(`counts` is optional); authentication and receipt refusals may use the nested
+`error.code` envelope described in the connection guide. Branch on codes:
+
+- 400: `idempotency_key_required`, `malformed_snippet`, `snippet_too_long`,
+  `snippet_scope_mismatch`.
+- 401/403: missing or invalid credentials / insufficient send permission.
+- 404: `snippet_not_found` (or `not_found` for an unresolved Session).
+- 409: `snippet_limit_reached`, `idempotency_key_reused`, `receipt_expired`.
+- 413: `body_too_large`.
+- 429: `rate_limited`, `busy`, `receipts_full`; do not retry in a tight loop.
+- 5xx: store or write failure; reconcile the saved state and receipt before
+  deciding whether to retry. Route-level 429 and 5xx answers are not retained
+  as completed snippet-write receipts.
+
+Implementation references: `internal/transport/http/snippets.go`,
+`internal/domain/snippet/snippet.go`, and `internal/transport/http/receipts.go`.
+
 ## Acceptance
 
 - A Project Workflow can be created blank or from a Skill or Claude command,

@@ -39,9 +39,6 @@ func TestSecretHandoffOnlyTargetMayClaimOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := result.Note.ID
-	if strings.Join(result.Note.Command, " ") != strings.Join(secretFixtureCommand, " ") {
-		t.Fatalf("the Note does not carry its receiving command: %q", result.Note.Command)
-	}
 	base := "/v1/work/v2/human-interventions/conversation:" + target + "/" + id + "/handoff"
 	secret := "SAFE_FIXTURE_DONT_STORE_123"
 	wrong := httptest.NewRecorder()
@@ -63,13 +60,28 @@ func TestSecretHandoffOnlyTargetMayClaimOnce(t *testing.T) {
 	var waiting struct {
 		Rows []humanInterventionWire `json:"rows"`
 	}
-	if err := json.Unmarshal(listed.Body.Bytes(), &waiting); err != nil || len(waiting.Rows) != 1 || !waiting.Rows[0].SecretReceived ||
-		strings.Join(waiting.Rows[0].Command, " ") != strings.Join(secretFixtureCommand, " ") {
-		t.Fatalf("received state missing after reload: %+v %v", waiting, err)
+	if err := json.Unmarshal(listed.Body.Bytes(), &waiting); err != nil || len(waiting.Rows) != 1 || waiting.Rows[0].ResolvedAt == nil {
+		t.Fatalf("completed state missing after reload: %+v %v", waiting, err)
 	}
 	note, err := s.store.HumanIntervention(t.Context(), id)
 	if err != nil || strings.Contains(note.Title+note.Summary+note.Action+note.Reason+note.Detail+note.Resolution, secret) {
 		t.Fatalf("Note stored value: %v", err)
+	}
+	if note.ResolvedAt == nil || note.ReadAt == nil {
+		t.Fatalf("handoff did not complete the Note before claim: %+v", note)
+	}
+	if !s.secretHandoffs.Pending(id, target) {
+		t.Fatal("completing the Note discarded the unclaimed value")
+	}
+	replayed := httptest.NewRecorder()
+	s.workV2Route(replayed, personWorkV2Request(http.MethodPost, base, secretSubmitBody(secret, secretFixtureCommand), "secret-submit"))
+	if replayed.Code != http.StatusOK || replayed.Body.String() != submitted.Body.String() {
+		t.Fatalf("completed handoff replay: %d %s", replayed.Code, replayed.Body)
+	}
+	duplicate := httptest.NewRecorder()
+	s.workV2Route(duplicate, personWorkV2Request(http.MethodPost, base, secretSubmitBody("replacement", secretFixtureCommand), "secret-resubmit"))
+	if duplicate.Code != http.StatusNotFound {
+		t.Fatalf("completed Note accepted a new submission: %d %s", duplicate.Code, duplicate.Body)
 	}
 	claimPath := "/v1/work/v2/agent/human-interventions/" + id + "/claim"
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
@@ -157,8 +169,57 @@ func TestSecretHandoffOnlyTargetMayClaimOnce(t *testing.T) {
 	}
 }
 
-// The command a Secret Handoff Note in these tests declares. It is never run:
-// the claim route only compares it.
+func TestSecretHandoffRejectedSubmissionKeepsNotePending(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		value  string
+		full   bool
+		status int
+	}{
+		{"empty", "", false, http.StatusUnprocessableEntity},
+		{"too large", strings.Repeat("x", app.MaxSecretHandoffBytes+1), false, http.StatusRequestEntityTooLarge},
+		{"full", "SAFE_FIXTURE", true, http.StatusServiceUnavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, source, target := humanInterventionTestServer(t)
+			s.secretHandoffs = app.NewSecretHandoffs()
+			created := httptest.NewRecorder()
+			body, _ := json.Marshal(map[string]any{
+				"source_conversation": source, "target_session": "pane-target", "kind": "secret",
+				"title": "Credential", "summary": "Tool credential", "action": "Hand off the value.", "reason": "The tool needs it.",
+				"command": secretFixtureCommand,
+			})
+			s.workV2Route(created, agentWorkV2Request(http.MethodPost, "/v1/work/v2/agent/human-interventions", string(body), "create"))
+			var result struct {
+				Note humanInterventionWire `json:"note"`
+			}
+			if err := json.Unmarshal(created.Body.Bytes(), &result); err != nil || created.Code != http.StatusCreated {
+				t.Fatalf("create: %d %s %v", created.Code, created.Body, err)
+			}
+			if tc.full {
+				for i := 0; i < app.MaxSecretHandoffPending; i++ {
+					if err := s.secretHandoffs.Put(fmt.Sprint(i), target, []byte("SAFE_FIXTURE")); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			payload, _ := json.Marshal(map[string]any{"value": tc.value, "command": secretFixtureCommand})
+			submitted := httptest.NewRecorder()
+			s.workV2Route(submitted, personWorkV2Request(http.MethodPost, "/v1/work/v2/human-interventions/conversation:"+target+"/"+result.Note.ID+"/handoff", string(payload), "submit"))
+			if submitted.Code != tc.status {
+				t.Fatalf("submit: %d %s", submitted.Code, submitted.Body)
+			}
+			note, err := s.store.HumanIntervention(t.Context(), result.Note.ID)
+			if err != nil || note.ResolvedAt != nil || note.ReadAt != nil || note.Version != result.Note.Version {
+				t.Fatalf("rejected submission changed the Note: %+v %v", note, err)
+			}
+			if s.secretHandoffs.Pending(note.ID, target) {
+				t.Fatal("rejected value was accepted")
+			}
+		})
+	}
+}
+
 var secretFixtureCommand = []string{"/usr/bin/gh", "auth", "login", "--with-token"}
 
 func secretSubmitBody(value string, command []string) string {
@@ -188,7 +249,6 @@ func createSecretNote(t *testing.T, s *Server, source, key string, extra map[str
 	return created
 }
 
-// flatRefusal reads the code writeRefusal puts in `error`.
 func flatRefusal(r *httptest.ResponseRecorder) string {
 	var body struct {
 		Error string `json:"error"`
@@ -197,9 +257,6 @@ func flatRefusal(r *httptest.ResponseRecorder) string {
 	return body.Error
 }
 
-// A Secret Handoff Note that does not say which program will receive the
-// value is refused, and so is one that names the program only by a name PATH
-// would resolve later. A non-secret Note cannot carry a command at all.
 func TestASecretHandoffNoteMustNameItsReceivingCommand(t *testing.T) {
 	s, source, _ := humanInterventionTestServer(t)
 	s.secretHandoffs = app.NewSecretHandoffs()
@@ -236,8 +293,6 @@ func TestASecretHandoffNoteMustNameItsReceivingCommand(t *testing.T) {
 	}
 }
 
-// A console that never showed the command (an older or hosted build) does not
-// confirm it, and its submission is refused before any value is held.
 func TestASecretHandoffSubmissionMustConfirmTheShownCommand(t *testing.T) {
 	s, source, target := humanInterventionTestServer(t)
 	s.secretHandoffs = app.NewSecretHandoffs()
@@ -264,9 +319,6 @@ func TestASecretHandoffSubmissionMustConfirmTheShownCommand(t *testing.T) {
 	}
 }
 
-// The finding: a prompt-injected Agent claims the value with a command of its
-// own choosing. The claim must hand nothing to that command, and the value
-// the person gave for the declared command must not stay around for it.
 func TestASecretHandoffClaimWithAnotherCommandGetsNothing(t *testing.T) {
 	s, source, target := humanInterventionTestServer(t)
 	s.secretHandoffs = app.NewSecretHandoffs()

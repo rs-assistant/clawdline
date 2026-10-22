@@ -14,9 +14,11 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/contract"
+	"github.com/sainteye/clawdline/internal/domain/auth"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	"github.com/sainteye/clawdline/internal/domain/session"
 	"github.com/sainteye/clawdline/internal/domain/task"
+	"github.com/sainteye/clawdline/internal/transport/cloud"
 )
 
 // sessionVerb reads `/v1/sessions/{id}/{verb}` off the string the mux
@@ -82,7 +84,23 @@ func (s *Server) sessionAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	requestContext := r.Context()
+	// Network requests always carry the gate. In-process callers may supply a
+	// trusted verdict directly and keep their existing application contract.
+	if accessOf(r).gate != nil && !cloud.ViaCloud(r.Context()) {
+		requestContext = app.WithOperationCheck(r.Context(), func() error {
+			a := accessOf(r)
+			if a.gate == nil || a.gate.auth == nil {
+				return app.Refusal{Code: "forbidden", Detail: "This device may read, and not send."}
+			}
+			d, ok := a.gate.auth.Holds(a.verdict.Device)
+			if !ok || !d.Caps.Has(auth.Send) {
+				return app.Refusal{Code: "forbidden", Detail: "This device may read, and not send."}
+			}
+			return nil
+		})
+	}
+	ctx, cancel := context.WithTimeout(requestContext, 15*time.Second)
 	defer cancel()
 
 	switch verb {
@@ -106,7 +124,7 @@ func (s *Server) sessionAction(w http.ResponseWriter, r *http.Request) {
 			// picture; the read of the machine before it keeps the ordinary bound.
 			if len(body.Images) > 0 {
 				var more context.CancelFunc
-				ctx, more = context.WithTimeout(r.Context(), 45*time.Second)
+				ctx, more = context.WithTimeout(requestContext, 45*time.Second)
 				defer more()
 			}
 			sent, err := s.actions().SendWithPictures(ctx, id, body.Text, body.Images)
@@ -337,6 +355,25 @@ func closeEvidenceDecision(c contract.Closeability, expected string, force, proc
 		}
 		return true, ""
 	}
+	// A person may override unreadable work records, but only for an owned
+	// terminal in a fresh inventory and the exact reading they confirmed.
+	if !processOnly && c.State == contract.CloseabilityStateUnknown && c.Source.Freshness == "current" {
+		inventoryOK := true
+		for _, reason := range c.Reasons {
+			if reason.Code == "session_inventory_stale" || reason.Code == "session_inventory_missing" {
+				inventoryOK = false
+			}
+		}
+		if inventoryOK {
+			if expected == "" || c.Version == "" || expected != c.Version {
+				return false, "close_not_proven"
+			}
+			if force {
+				return true, ""
+			}
+			return false, "close_blocked"
+		}
+	}
 	// A failed fresh scan is a retryable inability to verify, regardless of
 	// the version the last successful list advertised. Do not imply that the
 	// Session itself changed when only the inventory reader failed.
@@ -442,7 +479,7 @@ func (s *Server) sessionWrite(w http.ResponseWriter, r *http.Request, limit int6
 		act(w, raw)
 		return
 	}
-	k := store.ReceiptKey{Scope: scopeSessions, Actor: accessOf(r).verdict.Device, Key: key}
+	k := store.ReceiptKey{Scope: scopeSessions, Actor: actorOf(r), Key: key}
 	s.receiptedFor(w, r, k, requestDigest([]byte(r.Method), []byte(routePath(r)), raw),
 		store.ReceiptPolicy{Window: sessionReceiptWindow}, sessionWriteFiled,
 		func(w http.ResponseWriter) { act(w, raw) })
@@ -589,6 +626,10 @@ func writeActionRefusal(w http.ResponseWriter, err error) {
 
 func actionStatus(code string) int {
 	switch code {
+	case "forbidden", "viewer_read_only", "cloud_commands_disabled", "unknown_sender":
+		return http.StatusForbidden
+	case "command_roster_unreadable", "command_clock_uncertain":
+		return http.StatusServiceUnavailable
 	case "session_not_found":
 		return http.StatusNotFound
 	case "session_unknown", "closeability_unknown", "close_inventory_unavailable":

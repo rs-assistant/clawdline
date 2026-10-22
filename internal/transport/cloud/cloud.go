@@ -40,6 +40,12 @@ type Inbound struct {
 	// and a carrier that dies between the two is a request the page asks
 	// again on the relay (docs/cloud-terminal-wire.md, Session reads).
 	Direct bool
+	// Correlation is the connection-health correlation of the transport
+	// phase that admitted this request ("op-1k"), so the lane and handler
+	// continue that operation instead of minting a new one. It is the
+	// tracker's own counter, never a message identifier, and "" when
+	// monitoring is off.
+	Correlation string
 }
 
 // Outbound is one answer, ready to seal: the channel it belongs on, the class

@@ -15,6 +15,19 @@ project, stop the turn it is on, and close it safely.
 
 Labels below follow the English interface; the console also supports other languages.
 
+## Workflow and control
+
+In **Settings → Workflow and control**, both switches start enabled. Select the ⓘ button beside
+one to expand its On, Off, and scope explanation. These are settings of the selected machine,
+including when changed from a paired Cloud browser with Send permission.
+
+- **Use full permission by default for dispatch**: off changes future dispatches that omit a
+  permission mode to the assistant’s own permission settings, without adding full-permission arguments.
+  An explicit task mode takes precedence; existing tasks keep their mode.
+- **Automatically discover other Sessions**: off keeps Sessions opened by Clawdline and stops
+  adding externally opened conversations. It takes effect on the next inventory refresh, without
+  closing conversations, deleting retained records, or changing pairing or Cloud command permission.
+
 ## Read the list
 
 Open **Sessions**. Each row is one session, marked with its project's pixel icon,
@@ -107,6 +120,14 @@ the tunnel's HTTPS address, or the hosted console.
 3. Choose **Claude Code** or **Codex** under **Start with**, or resume a past
    conversation under **Pick up an earlier one**.
 
+Codex history loads twenty provider records at a time. Choose **Load older sessions** to
+continue; a page containing only excluded background conversations still offers the next page.
+If a read fails, **Retry** keeps the sessions already loaded and retries the same page. A read
+failure does not mean a conversation was deleted. Resuming checks the selected conversation
+directly rather than listing the project's entire history again. Provider subprocesses retain
+their two-process concurrency cap, eight-second per-response timeout and twenty-second total
+deadline; retries happen only when requested.
+
 **Check:** the sheet says **Started. Waiting for it to appear…** and the new
 session shows up in the list. With several machines on a Cloud account, **Machine** chooses
 where it runs.
@@ -123,7 +144,8 @@ opens a new session without another model choice; a model chosen for one session
 wins, a child agent may explicitly choose any admitted model for its own task, and resuming an
 existing conversation does not change its model.
 The same two fields appear in Clawdline Cloud on a phone. The phone can read them through its paired
-machine; saving a change also requires **Settings → Remote → Allow Cloud commands** on that machine.
+machine; saving a change also requires that machine's Cloud command switch and this browser's local
+operation grant. See [Let paired devices act](remote-access.md#let-paired-devices-act).
 The same setting is available without a browser as
 `clawdline setting set codex_default_model gpt-6-sol` (or
 `claude_default_model claude-opus-5-5`); use `default` as the value to hand the choice back to the

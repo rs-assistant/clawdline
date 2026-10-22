@@ -1,5 +1,6 @@
 // Build the console, then run this fixture in headless Chrome. Screenshots are
 // written only when CLAWDLINE_SHOTS names a directory.
+import type { Icon } from "@clawdline/contract"
 import { test, before, after } from "node:test"
 import assert from "node:assert/strict"
 import { spawn, type ChildProcess } from "node:child_process"
@@ -13,7 +14,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const dist = resolve(process.env.CLAWDLINE_DIST || resolve(here, "../../../dist"))
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 const shots = process.env.CLAWDLINE_SHOTS || ""
-const icon = { accent: "#d97757", cells: [".##.", "#oo#", "####", ".##."].map((line) => line.split("").map((cell) => cell === "#" ? "#d97757" : cell === "o" ? "#16161a" : "#24242a")) }
+const icon: Icon = { accent: "#d97757", cells: [".##.", "#oo#", "####", ".##."].map((line) => line.split("").map((cell) => cell === "#" ? "#d97757" : cell === "o" ? "#16161a" : "#24242a")) }
 const names = (text: string) => ({ en: text, "zh-Hant": text })
 const definitions = Array.from({ length: 42 }, (_, index) => ({
   definition_id: "clawdline.persona.role-" + (index + 1), short_id: "role-" + (index + 1),
@@ -113,7 +114,11 @@ function fixture(): Server {
           const previous = catalogReceipts.get(key)
           if (previous) return json(res, 200, previous)
           if (body.expected_version !== catalog.catalog_version) return json(res, 409, { error: "version_conflict", current_version: catalog.catalog_version })
-          if (body.kind === "definition") (definitions as any[]).push(body.entity.definition)
+          if (body.kind === "definition") {
+            const index = definitions.findIndex((row) => row.definition_id === body.entity.definition.definition_id)
+            if (index < 0) (definitions as any[]).push(body.entity.definition)
+            else (definitions as any[])[index] = body.entity.definition
+          }
           else (catalog.skills as any[]).push(body.entity.skill)
           catalog.catalog_version++
           const receipt = { catalog_version: catalog.catalog_version }
@@ -368,7 +373,7 @@ async function tab(width: number, height: number, run: (evaluate: (code: string)
     }
     const deadline = Date.now() + 10_000
     const readyExpression = ready === "roster"
-      ? '!document.documentElement.classList.contains("booting") && document.querySelectorAll("#squad:not([hidden]) .squad-persona-card").length'
+      ? '!document.documentElement.classList.contains("booting") && document.querySelectorAll("#squad:not([hidden]) .squad-persona-card").length && !!document.querySelector("#squad .squad-create-actions button")'
       : '!document.documentElement.classList.contains("booting") && !!document.querySelector("#squad:not([hidden]) .squad-error")'
     while (!(await evaluate(readyExpression).catch(() => 0))) {
       if (Date.now() > deadline) throw new Error("squad " + ready + " state did not load")
@@ -1081,12 +1086,12 @@ test("a phone can request one AI role draft, edit it, and save it into Custom", 
     await evaluate(`(() => { const el = document.querySelector("#squad .squad-role-ai textarea"); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(el, "幫我核對版本說明"); el.dispatchEvent(new Event("input", { bubbles: true })); })()`)
     await evaluate('document.querySelector("#squad .squad-role-ai button").click()')
     const deadline = Date.now() + 10_000
-    while (!(await evaluate('document.querySelector("#squad .squad-role-form input").value === "草稿角色"'))) {
+    while (!(await evaluate('document.querySelector("#squad .squad-role-form input[required]").value === "草稿角色"'))) {
       if (Date.now() > deadline) throw new Error("AI draft did not fill the editor")
       await new Promise((resolve) => setTimeout(resolve, 50))
     }
     assert.equal(catalogWrites.length, beforeWrites, "generating a draft does not install the role")
-    await evaluate(`(() => { const el = document.querySelector("#squad .squad-role-form input"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "我的版本主編"); el.dispatchEvent(new Event("input", { bubbles: true })); })()`)
+    await evaluate(`(() => { const el = document.querySelector("#squad .squad-role-form input[required]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "我的版本主編"); el.dispatchEvent(new Event("input", { bubbles: true })); })()`)
     await evaluate('document.querySelector("#squad .squad-role-form button[type=submit]").click()')
     while (!(await evaluate('document.querySelector("#squad .squad-persona-card")?.textContent.includes("我的版本主編")'))) {
       if (Date.now() > deadline + 10_000) throw new Error("saved custom role did not appear")
@@ -1099,4 +1104,55 @@ test("a phone can request one AI role draft, edit it, and save it into Custom", 
   assert.equal(catalogWrites.at(-1)?.body.kind, "definition")
   assert.equal(catalogWrites.at(-1)?.body.entity.definition.name["zh-Hant"], "我的版本主編")
   assert.equal(definitions.length, beforeRoles + 1)
+})
+
+
+test("a private robot icon survives a lost reply without changing role text or skills", async () => {
+  const id = "personal.persona.robot-editor"
+  const original = { ...definitions[0], definition_id: id, short_id: "", builtin: false,
+    icon: { accent: "#d97935", cells: Array.from({ length: 7 }, () => Array.from({ length: 8 }, () => "#365e69")) },
+    teams: [{ id: "clawdline.team.custom", version: "1" }], name: names("圖示主編"), body: "Keep this private role definition." }
+  definitions.push(original)
+  const beforeWrites = catalogWrites.length
+  const beforeSettings = settingsWrites.length
+  const beforeDrafts = roleDraftRequests
+  try {
+    await tab(390, 844, async (evaluate, shot) => {
+      await evaluate(`document.querySelector('#squad .squad-teams button:last-child').click()`)
+      await evaluate(`(() => { const row = [...document.querySelectorAll('#squad .squad-persona-card')].find((node) => node.textContent.includes('圖示主編')); row.click() })()`)
+      await evaluate(`(() => { const summary = [...document.querySelectorAll('#squad summary')].find((node) => node.textContent === '編輯機器人圖示'); summary.click() })()`)
+      assert.equal(await evaluate(`document.querySelectorAll('#squad details[open] .squad-icon-pixels button').length`), 56)
+      await evaluate(`document.querySelector('#squad details[open] .squad-icon-pixels button').click()`)
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true)
+      await shot("squad-custom-robot-editor")
+      dropNextCatalogReply = true
+      await evaluate(`([...document.querySelectorAll('#squad button')].find((node) => node.textContent === '儲存機器人圖示')).click()`)
+      const deadline = Date.now() + 10000
+      while (!(await evaluate(`!!document.querySelector('#squad details [role=alert]')`))) {
+        if (Date.now() > deadline) throw new Error("lost icon reply did not show recovery")
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      await evaluate(`([...document.querySelectorAll('#squad button')].find((node) => node.textContent === '儲存機器人圖示')).click()`)
+      while (catalogWrites.length < beforeWrites + 2 || (await evaluate(`!!document.querySelector('#squad details [role=alert]')`))) {
+        if (Date.now() > deadline + 10000) throw new Error("icon retry did not recover")
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+    })
+    const writes = catalogWrites.slice(beforeWrites)
+    assert.equal(writes.length, 2)
+    assert.equal(writes[0].key, writes[1].key)
+    assert.deepEqual(writes[0].body, writes[1].body)
+    const saved = definitions.find((row) => row.definition_id === id)!
+    assert.equal(saved.body, original.body)
+    assert.deepEqual(saved.skills, original.skills)
+    assert.deepEqual(saved.name, original.name)
+    assert.notEqual(saved.version, original.version)
+    assert.equal(saved.icon.cells[0][0], "#e58a35")
+    assert.equal(settingsWrites.length, beforeSettings)
+    assert.equal(roleDraftRequests, beforeDrafts)
+  } finally {
+    dropNextCatalogReply = false
+    const index = definitions.findIndex((row) => row.definition_id === id)
+    if (index >= 0) definitions.splice(index, 1)
+  }
 })

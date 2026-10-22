@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- Node runs source tests with type stripping.
-import { compactValue, comparisonComplete, dailyValue, lineSegments, percentageChange, selectedDay, shortDate, UsageRequestScope } from "./model.ts"
+import { compactValue, dateRange, comparisonComplete, dailyValue, lineSegments, percentageChange, sampleLabel, selectedDay, shortDate, UsageRequestScope } from "./model.ts"
 // @ts-expect-error -- Node runs source tests with type stripping.
 import { readUsageOverview, UsageReadError, type UsageOverview, type UsageOverviewDay } from "./api.ts"
 
@@ -42,7 +42,7 @@ test("chart keyboard selection reaches and clamps both ends", () => {
   assert.equal(selectedDay(2, "End", 28), 27)
   assert.equal(selectedDay(27, "ArrowRight", 28), 27)
   assert.equal(selectedDay(27, "Home", 28), 0)
-  assert.equal(shortDate("2026-10-12"), "10/12")
+  assert.equal(shortDate("2026-10-12", "en"), "10/12")
   assert.equal(compactValue(null), "—")
   assert.equal(compactValue(1_200_000), "1.2M")
 })
@@ -87,4 +87,57 @@ test("overview fetch carries real filters, caller cancellation and flat offline 
     assert.deepEqual(result.project_options, [])
     assert.deepEqual(result.daily, [])
   } finally { globalThis.fetch = original }
+})
+
+test("large totals use billions and calendar ranges preserve year boundaries", () => {
+ assert.equal(compactValue(2_889_100_000), "2.9B")
+ assert.equal(compactValue(1_000_000_000), "1B")
+ assert.equal(compactValue(950_000_000), "950M")
+ assert.equal(dateRange("2026-10-12", "2026-10-18", "en"), "Oct 12, 2026 – Oct 18, 2026")
+ assert.equal(dateRange("2026-12-25", "2027-01-01", "en"), "Dec 25, 2026 – Jan 1, 2027")
+})
+
+test("calendar labels use the selected interface locale and stay fixed across viewer time zones", () => {
+  const savedZone = process.env.TZ
+  try {
+    for (const tag of ["en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"]) {
+      let labels: [string, string, string] | null = null
+      for (const zone of ["Pacific/Honolulu", "Pacific/Auckland"]) {
+        process.env.TZ = zone
+        const current: [string, string, string] = [shortDate("2026-01-09", tag),
+          dateRange("2026-01-09", "2026-01-15", tag), dateRange("2026-12-25", "2027-01-01", tag)]
+        assert.deepEqual(current, labels ?? current, `${tag} changed in ${zone}`)
+        labels = current
+      }
+    }
+    assert.equal(shortDate("2026-01-09", "de"), "9.1.")
+    assert.match(dateRange("2026-12-25", "2027-01-01", "de"), /2026.*2027/u)
+    assert.equal(shortDate("2026-01-09", "en"), "1/9")
+  } finally {
+    if (savedZone === undefined) delete process.env.TZ
+    else process.env.TZ = savedZone
+  }
+})
+
+test("sample labels select the locale's singular form without changing CJK wording", () => {
+  assert.equal(sampleLabel(0, "de", "{count} Stichprobe", "{count} Stichproben"), "0 Stichproben")
+  assert.equal(sampleLabel(1, "de", "{count} Stichprobe", "{count} Stichproben"), "1 Stichprobe")
+  assert.equal(sampleLabel(2, "de", "{count} Stichprobe", "{count} Stichproben"), "2 Stichproben")
+  assert.equal(sampleLabel(1, "en", "{count} sample", "{count} samples"), "1 sample")
+  assert.equal(sampleLabel(1, "fr", "{count} échantillon", "{count} échantillons"), "1 échantillon")
+  assert.equal(sampleLabel(1, "ja", "{count} サンプル", "{count} サンプル"), "1 サンプル")
+})
+
+// @ts-expect-error -- Node runs source tests with type stripping.
+import { usageProjectOptions } from "./project-options.ts"
+// @ts-expect-error -- Node runs source tests with type stripping.
+import { sha256Hex } from "../../session/fingerprint.ts"
+
+test("usage project choices come from configured projects rather than Session history", () => {
+  const id = sha256Hex(new TextEncoder().encode("/projects/configured"))
+  const options = [{ id: "session-only", name: "temporary-session" }, { id, name: "old-directory-name" }, { id: "unattributed", name: "unattributed" }]
+  const places = [{ path: "/projects/configured", label: "Configured project", icon: { svg: "project-mark" } }]
+  assert.deepEqual(usageProjectOptions(options, places), [{ id, label: "Configured project", icon: places[0].icon }])
+  assert.deepEqual(usageProjectOptions(options, []), [])
+  assert.deepEqual(usageProjectOptions([], places), [])
 })

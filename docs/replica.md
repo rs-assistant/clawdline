@@ -45,7 +45,7 @@
   `http://127.0.0.1:7727/v1/auth/open#t=…`。token 在 fragment（瀏覽器不會送出、不會寫進 log），
   那一頁用 `/v1/auth/adopt` 換成 `clawdline-next` cookie，再轉到 `/`。之後同一個瀏覽器裡的量測照舊：
   measure2.js 在頁面裡 `fetch('/v1/…')`，同源的 760 寬 iframe 與 hidden 分頁 shim 都吃同一個 cookie。
-  這個裝置只能讀；要量 send、interrupt 這類寫入，改用 `clawdline open --send`。
+  這個裝置和每個配對裝置一樣可以讀也可以送出，send、interrupt 這類寫入可以直接在同一個分頁量。
   量完在該分頁執行 `fetch('/v1/auth/logout', {method: 'POST'})`，cookie 清掉，裝置也一起撤銷。
   沒有瀏覽器可開時，`clawdline open --print` 只印網址（網址本身就是鑰匙，別貼到別處）。
 - **cookie 名字刻意跟舊版不同**：舊版叫 `clawdline`，新版叫 `clawdline-next`。瀏覽器的 cookie 不分 port，

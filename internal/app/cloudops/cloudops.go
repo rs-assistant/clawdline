@@ -29,6 +29,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/sainteye/clawdline/internal/adapters/store"
+	"github.com/sainteye/clawdline/internal/app"
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
 	"strings"
 )
@@ -128,6 +129,11 @@ type LocalRequest struct {
 	Query  map[string]string
 	Header map[string]string
 	Body   []byte
+	// Viewer is the verified envelope sender this request is answered on
+	// behalf of. The bridge sets it from `Command.Sender` and no decode
+	// does, so a viewer cannot name another one. Empty is a request this
+	// machine makes of itself, such as the publisher's own reads.
+	Viewer string
 }
 
 // LocalResponse is what that route answered. ContentType matters for exactly
@@ -174,6 +180,7 @@ type Authority struct {
 	// WriteGateAllows is the machine's own switch: may a remote device cause
 	// an effect here at all. False by default, everywhere.
 	WriteGateAllows bool
+	ViewerReadOnly  bool
 	// ReadTranscriptAllows is set only after the machine rechecks the viewer's
 	// current roster capability and signing key for the separate r/ rail.
 	ReadTranscriptAllows bool
@@ -667,6 +674,18 @@ func (b Bridge) route(ctx context.Context, cmd Command, plan plan, o op) Answer 
 	if _, taken := req.Header["Idempotency-Key"]; !taken && req.Method != "GET" {
 		req.Header["Idempotency-Key"] = idempotencyKey(cmd, plan)
 	}
+	// Every viewer on the account reaches the routes holding this machine's
+	// own credential, so the sender is what makes one phone's subscriptions
+	// and receipts its own rather than the whole account's.
+	req.Viewer = cmd.Sender
+	if !o.read && !o.readLevel {
+		ctx = app.WithOperationCheck(ctx, func() error {
+			if refusal, denied := b.authorize(ctx, cmd.Sender, cmd.VerifiedKey, true); denied {
+				return app.Refusal{Code: refusal.Code, Detail: refusal.Message}
+			}
+			return nil
+		})
+	}
 	res, err := b.Router.Do(ctx, req)
 	if err != nil {
 		return b.publish(cmd, plan, Refusal{Status: 502, Code: "route_failed",
@@ -758,6 +777,9 @@ func authorityRefusal(a Authority) (Refusal, bool) {
 	case !a.WriteGateAllows:
 		return Refusal{Status: 403, Code: "cloud_commands_disabled",
 			Message: "Cloud commands are disabled on this machine.", fixedCopy: true}, true
+	}
+	if a.ViewerReadOnly {
+		return Refusal{Status: 403, Code: "viewer_read_only", Message: "This device may read, and not send.", fixedCopy: true}, true
 	}
 	return Refusal{}, false
 }

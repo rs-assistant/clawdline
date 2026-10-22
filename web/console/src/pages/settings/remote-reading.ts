@@ -1,6 +1,6 @@
 /**
- * The answer of a reading this caller may not have: the Remote tab's routes
- * (`/v1/cloud/status`, `/v1/tunnel`) serve only this machine's own token
+ * The answer of a reading this caller may not have: the Remote tab's route
+ * (`/v1/cloud/status`) serves only this machine's own token
  * (`requireLocal`, 403 `forbidden`), and this is a browser that `clawdline open`
  * or a pairing signed in. That is not a failure to read — the daemon answered —
  * so the card says where Cloud is managed instead of "Could not read this

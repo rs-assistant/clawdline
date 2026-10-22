@@ -3,9 +3,14 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
+	"github.com/sainteye/clawdline/internal/adapters/terminal"
+	"github.com/sainteye/clawdline/internal/app/ports"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -285,5 +290,178 @@ func TestSessionTodosDecodeTerminalNamesOnce(t *testing.T) {
 				t.Fatalf("effects: %v", effects)
 			}
 		})
+	}
+}
+
+// The provider has not written a transcript yet. This is the actual failing
+// cell: the Workflow must itself be the first message, not a warm-up line.
+func TestWorkflowCanBeTheFirstInstruction(t *testing.T) {
+	s, p, _ := directTodoServer(t)
+	p.s.ConversationID = ""
+	p.s.Binding = session.BindingNoRecord
+	p.s.PID = os.Getpid()
+	if ownrecords.ProcessStart(p.s.PID).IsZero() {
+		t.Skip("kernel process identity is unavailable")
+	}
+	body := `{"text":"Review this project.\n\n[Clawdline-Workflow 00000000-0000-4000-8000-000000000041 Review]"}`
+	path := "/v1/work/v2/session-todos/pane-4"
+	post := func(path, body, key string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		s.workV2Route(rec, personWorkV2Request(http.MethodPost, path, body, key))
+		return rec
+	}
+	created := post(path, body, "first-workflow-create")
+	if created.Code != http.StatusCreated {
+		t.Fatalf("first Workflow: %d %s", created.Code, created.Body)
+	}
+	var answer struct {
+		Todo directTodoV2Wire `json:"todo"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &answer); err != nil {
+		t.Fatal(err)
+	}
+	replay := post(path, body, "first-workflow-create")
+	if replay.Code != created.Code || replay.Body.String() != created.Body.String() {
+		t.Fatalf("create replay: %d %s", replay.Code, replay.Body)
+	}
+	sent := post(path+"/"+answer.Todo.ID+"/send", `{}`, "first-workflow-send")
+	if sent.Code != http.StatusOK {
+		t.Fatalf("first send: %d %s", sent.Code, sent.Body)
+	}
+	replay = post(path+"/"+answer.Todo.ID+"/send", `{}`, "first-workflow-send")
+	if replay.Code != sent.Code || replay.Body.String() != sent.Body.String() {
+		t.Fatalf("send replay: %d %s", replay.Code, replay.Body)
+	}
+	second := post(path, body, "first-workflow-again")
+	if second.Code != http.StatusConflict || !strings.Contains(second.Body.String(), "workflow_running") {
+		t.Fatalf("second Workflow: %d %s", second.Code, second.Body)
+	}
+	if len(p.acts) != 1 || !strings.Contains(p.acts[0], "Review this project.") {
+		t.Fatalf("terminal writes: %v", p.acts)
+	}
+	p.s.ConversationID = "20000000-0000-4000-8000-000000000004"
+	p.s.Binding = session.BindingOpenFile
+	queue := httptest.NewRecorder()
+	s.workV2Route(queue, agentWorkV2Request(http.MethodGet, "/v1/work/v2/agent/session-todos/"+p.s.ConversationID, "", ""))
+	if queue.Code != http.StatusOK || !strings.Contains(queue.Body.String(), answer.Todo.ID) {
+		t.Fatalf("bound queue: %d %s", queue.Code, queue.Body)
+	}
+	rows, _, err := s.workV2().DirectTodos(context.Background(), p.s.ConversationID, true, false)
+	if err != nil || len(rows) != 1 || rows[0].ID != answer.Todo.ID || rows[0].ReadAt.IsZero() || rows[0].SentAt.IsZero() {
+		t.Fatalf("bound row: %+v %v", rows, err)
+	}
+	done := httptest.NewRecorder()
+	s.workV2Route(done, agentWorkV2Request(http.MethodPost, "/v1/work/v2/agent/session-todos/"+p.s.ConversationID+"/"+answer.Todo.ID+"/complete", `{}`, "first-workflow-done"))
+	if done.Code != http.StatusOK {
+		t.Fatalf("complete: %d %s", done.Code, done.Body)
+	}
+}
+
+// Unknown/unreadable is deliberately not the fresh-Session case.
+func TestFirstWorkflowRefusesUnprovenProcessBindings(t *testing.T) {
+	for _, binding := range []session.Binding{session.BindingUnreadable, session.BindingAmbiguous, ""} {
+		t.Run(string(binding), func(t *testing.T) {
+			s, p, _ := directTodoServer(t)
+			p.s.ConversationID, p.s.Binding, p.s.PID = "", binding, os.Getpid()
+			rec := httptest.NewRecorder()
+			s.workV2Route(rec, personWorkV2Request(http.MethodPost, "/v1/work/v2/session-todos/pane-4", `{"text":"Review"}`, "unproven-create"))
+			if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "session_unavailable") || len(p.acts) != 0 {
+				t.Fatalf("unproven binding: %d %s acts=%v", rec.Code, rec.Body, p.acts)
+			}
+		})
+	}
+}
+
+type firstTodoFailureHost struct {
+	*pane
+	failure   error
+	afterSend func()
+}
+
+func (h *firstTodoFailureHost) Send(ctx context.Context, s session.Session, text string) error {
+	h.pane.Send(ctx, s, text)
+	if h.afterSend != nil {
+		h.afterSend()
+	}
+	return h.failure
+}
+
+func TestFirstWorkflowDeliveryFailuresNeverDuplicateAnUncertainWrite(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		failure   error
+		safeRetry bool
+	}{
+		{"definitely unsent", terminal.Unsent{Why: "injected before first byte"}, true},
+		{"answer lost", errors.New("injected after a possible terminal write"), false},
+		{"typed but unsubmitted", terminal.Unsubmitted{Why: "injected Enter withheld"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, p, _ := directTodoServer(t)
+			p.s.ConversationID, p.s.Binding, p.s.PID = "", session.BindingNoRecord, os.Getpid()
+			owner := app.PendingTodoOwner(p.s)
+			if owner == "" {
+				t.Skip("kernel process identity is unavailable")
+			}
+			td, err := s.workV2().CreateDirectTodo(context.Background(), app.NewDirectTodoV2{SessionID: owner, Text: "First instruction", Actor: "device:phone"}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := &firstTodoFailureHost{pane: p, failure: tc.failure}
+			s.terminals = []ports.TerminalHost{h}
+			s.inventory.Terminals = s.terminals
+			path := "/v1/work/v2/session-todos/pane-4/" + td.ID + "/send"
+			rec := httptest.NewRecorder()
+			s.workV2Route(rec, personWorkV2Request(http.MethodPost, path, `{}`, "first-failure"))
+			if rec.Code != http.StatusBadGateway {
+				t.Fatalf("injected send: %d %s", rec.Code, rec.Body)
+			}
+			// A new conversation id must not erase the unresolved terminal attempt.
+			p.s.ConversationID = "20000000-0000-4000-8000-000000000004"
+			p.s.Binding = session.BindingOpenFile
+			h.failure = nil
+			retry := httptest.NewRecorder()
+			s.workV2Route(retry, personWorkV2Request(http.MethodPost, path, `{}`, "retry-failure"))
+			if tc.safeRetry {
+				if retry.Code != http.StatusOK || len(p.acts) != 2 {
+					t.Fatalf("safe retry: %d %s writes=%v", retry.Code, retry.Body, p.acts)
+				}
+			} else if retry.Code != http.StatusConflict || !strings.Contains(retry.Body.String(), "todo_delivery_unknown") || len(p.acts) != 1 {
+				t.Fatalf("uncertain retry: %d %s writes=%v", retry.Code, retry.Body, p.acts)
+			}
+		})
+	}
+}
+
+func TestFirstWorkflowQueueCanBindWhileTheTerminalSendIsReturning(t *testing.T) {
+	s, p, _ := directTodoServer(t)
+	p.s.ConversationID, p.s.Binding, p.s.PID = "", session.BindingNoRecord, os.Getpid()
+	owner := app.PendingTodoOwner(p.s)
+	if owner == "" {
+		t.Skip("kernel process identity is unavailable")
+	}
+	td, err := s.workV2().CreateDirectTodo(context.Background(), app.NewDirectTodoV2{SessionID: owner, Text: "First instruction", Actor: "device:phone"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &firstTodoFailureHost{pane: p, afterSend: func() {
+		p.s.ConversationID = "20000000-0000-4000-8000-000000000004"
+		p.s.Binding = session.BindingOpenFile
+		queue := httptest.NewRecorder()
+		s.workV2Route(queue, agentWorkV2Request(http.MethodGet, "/v1/work/v2/agent/session-todos/"+p.s.ConversationID, "", ""))
+		if queue.Code != http.StatusOK || !strings.Contains(queue.Body.String(), td.ID) {
+			t.Fatalf("queue during send: %d %s", queue.Code, queue.Body)
+		}
+	}}
+	s.terminals = []ports.TerminalHost{h}
+	s.inventory.Terminals = s.terminals
+	sent := httptest.NewRecorder()
+	s.workV2Route(sent, personWorkV2Request(http.MethodPost, "/v1/work/v2/session-todos/pane-4/"+td.ID+"/send", `{}`, "racing-send"))
+	if sent.Code != http.StatusOK {
+		t.Fatalf("send: %d %s", sent.Code, sent.Body)
+	}
+	rows, _, err := s.workV2().DirectTodos(context.Background(), p.s.ConversationID, true, false)
+	if err != nil || len(rows) != 1 || rows[0].ID != td.ID || rows[0].SentAt.IsZero() || rows[0].ReadAt.IsZero() {
+		t.Fatalf("racing bind: %+v %v", rows, err)
 	}
 }

@@ -42,6 +42,7 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 | [user/projects.md](user/projects.md) | User page | English | Adding projects, the Projects page, and bringing project settings to another machine |
 | [user/new-machine.md](user/new-machine.md) | User page | English with a Traditional Chinese prompt | One prompt, in English and Traditional Chinese, that has an Agent set up a second machine: git, credentials, clones and project settings |
 | [user/usage.md](user/usage.md) | User page | English | Token bills by category, assistant quotas, the compaction window and capacity |
+| [provider-quotas.md](provider-quotas.md) | Specification | English | Global quota footer, provider sources, browser preference and refresh behavior |
 | [user/troubleshooting.md](user/troubleshooting.md) | User page | English | From a symptom to its cause and fix |
 | [linux-headless-browser.md](linux-headless-browser.md) | User page | English | An agent on Linux cannot screenshot a page: install the browser's libraries and fonts, with or without `sudo` |
 
@@ -87,6 +88,7 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 | [squad-packages.md](squad-packages.md) | Public design note | English | Offline squad ZIP format, contribution example, validation, preview, adoption and private export boundaries |
 | [cross-platform.md](cross-platform.md) | Public design note | English | Every feature on macOS, Linux and Windows, and what a platform shows when it cannot do something |
 | [localization.md](localization.md) | Public design note | English | Shipped languages, separate language preferences, catalog fallback and delivery checks |
+| [console-loading.md](console-loading.md) | Internal UI inventory | English | Stable screen IDs, existing skeletons and proposed first-read improvements |
 
 ## How it got here
 
@@ -111,3 +113,5 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 ## Dated records
 
 [Records index](records/README.md) lists retired documents and dated measurements moved from specifications.
+
+- [Onboarding survey](onboarding-survey.md): optional bilingual questions, consent, persistence and aggregate reporting.

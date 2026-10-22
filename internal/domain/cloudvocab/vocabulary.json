@@ -214,6 +214,7 @@
       ],
       "decode": {"reply": "action", "fields": {"report": {"type": "any"}}}
     },
+    {"op": "direct-local-network-enable", "kind": "command", "write_gate": true, "console": "carried", "console_route": "cloud-client.js enableSameNetwork", "console_seam": "client", "local": {"method": "POST", "local_exemption": true}, "example": {"request": "req-local-network", "session": "__clawdline_machine__"}, "shapes": [{"body": ["request", "session"], "path": "/v1/cloud/direct/local-network", "local_body": ["enabled"]}], "decode": {"reply": "action", "fields": {}, "route": {"path": "/v1/cloud/direct/local-network", "body": {"fields": {"enabled": {"const": true}}}}}},
     {
       "op": "dismiss-restorable",
       "kind": "command",
@@ -362,16 +363,18 @@
       "kind": "read",
       "write_gate": false,
       "console": "carried",
-      "console_route": "GET /v1/artifacts/images/{id}?session={id}",
+      "console_route": "GET /v1/artifacts/images/{id}?session={id}[&size=thumb]",
       "console_seam": "writer",
       "local": {"method": "GET"},
       "special": ["content_read", "shaped_answer"],
-      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "id": "img_7f3a", "session": "%19"},
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "id": "img_7f3a", "session": "%19", "size": "thumb"},
       "shapes": [
         {"body": ["id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]},
-        {"body": ["expected_generation", "id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]}
+        {"body": ["expected_generation", "id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]},
+        {"body": ["id", "session", "size"], "path": "/v1/artifacts/images/{id}", "query": ["session", "size"]},
+        {"body": ["expected_generation", "id", "session", "size"], "path": "/v1/artifacts/images/{id}", "query": ["session", "size"]}
       ],
-      "decode": {"reply": "session", "name": "image.{id}", "fields": {"id": {"type": "string", "non_empty": true, "into": "id"}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/artifacts/images/{id}", "query": {"session": {"from": "session"}}}}
+      "decode": {"reply": "session", "name": "image.{id}", "name_suffix": {"field": "size", "text": ".{size}"}, "fields": {"size": {"type": "string", "enum": ["thumb"]}, "id": {"type": "string", "non_empty": true, "into": "id"}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/artifacts/images/{id}", "query": {"session": {"from": "session"}, "size": {"from": "size"}}}}
     },
     {
       "op": "info",
@@ -514,7 +517,7 @@
       "console": "carried",
       "console_route": "POST /v1/cloud/pairing/agent",
       "console_seam": "reader",
-      "local": {"method": "POST", "headers": ["Idempotency-Key"]},
+      "local": {"method": "POST", "local_exemption": true, "headers": ["Idempotency-Key"]},
       "example": {"machine_id": "mac_target", "machine_name": "Target", "offer": "opaque", "request": "req-pair-agent-start", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["machine_id", "machine_name", "offer", "request", "session"], "path": "/v1/cloud/pairing/agent", "local_body": ["machine_id", "machine_name", "offer"]}
@@ -528,7 +531,7 @@
       "console": "carried",
       "console_route": "GET /v1/cloud/pairing/agent/{task}",
       "console_seam": "reader",
-      "local": {"method": "GET"},
+      "local": {"method": "GET", "local_exemption": true},
       "example": {"request": "req-pair-status", "session": "__clawdline_machine__", "task_id": "7a000000-0000-4000-8000-000000000001"},
       "shapes": [
         {"body": ["request", "session", "task_id"], "path": "/v1/cloud/pairing/agent/{task_id}"}
@@ -543,11 +546,12 @@
       "console_route": "GET /v1/places/{id}/sessions[/{assistant}]",
       "console_seam": "writer",
       "local": {"method": "GET"},
-      "example": {"assistant": "codex", "place": "/Users/sean/code/clawdline-go", "request": "req-past", "session": "__clawdline_machine__"},
+      "example": {"cursor": "opaque-older-page", "assistant": "codex", "place": "/Users/sean/code/clawdline-go", "request": "req-past", "session": "__clawdline_machine__"},
       "shapes": [
+        {"body": ["assistant", "cursor", "place", "request", "session"], "path": "/v1/places/{place}/sessions/{assistant}", "query": ["cursor"]},
         {"body": ["assistant", "place", "request", "session"], "path": "/v1/places/{place}/sessions/{assistant}"}
       ],
-      "decode": {"reply": "machine", "fields": {"place": {"type": "string", "non_empty": true}, "assistant": {"type": "string"}}, "route": {"path": "/v1/places/{place}/sessions{/assistant?}"}}
+      "decode": {"reply": "machine", "fields": {"cursor": {"type": "string"}, "place": {"type": "string", "non_empty": true}, "assistant": {"type": "string"}}, "route": {"path": "/v1/places/{place}/sessions{/assistant?}", "query": {"cursor": {"from": "cursor", "omit_empty": true}}}}
     },
     {
       "op": "peer-control",
@@ -904,6 +908,37 @@
         {"body": ["request", "session"], "path": "/v1/projects"}
       ],
       "decode": {"reply": "machine", "route": {"path": "/v1/projects"}}
+    },
+    {
+      "op": "provider-quotas",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/provider-quotas",
+      "console_seam": "writer",
+      "console_note": "Account quota snapshots for the global footer. Credentials remain on the machine.",
+      "local": {
+        "method": "GET"
+      },
+      "example": {
+        "request": "req",
+        "session": "__clawdline_machine__"
+      },
+      "shapes": [
+        {
+          "body": [
+            "request",
+            "session"
+          ],
+          "path": "/v1/provider-quotas"
+        }
+      ],
+      "decode": {
+        "reply": "machine",
+        "route": {
+          "path": "/v1/provider-quotas"
+        }
+      }
     },
     {
       "op": "push-key",
@@ -2412,6 +2447,34 @@
         {"body": ["id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}/{id}/images", "local_body": ["data_url", "expected_version"]}
       ],
       "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 18874368, "copies": {"max_bytes": "workV2CloudImageBodyLimit"}}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}/{id}/images", "body": {"object": "item"}}}
+    },
+    {
+      "op": "workflow-settings",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/settings/workflow",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-read", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/settings/workflow"}
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/settings/workflow"}}
+    },
+    {
+      "op": "workflow-settings-update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/settings/workflow",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"changes": {"dispatch_full_permission": false, "session_auto_discovery": true, "iterm_integration": false}, "request": "req-write", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["changes", "request", "session"], "path": "/v1/settings/workflow", "local_body": ["dispatch_full_permission", "iterm_integration", "session_auto_discovery"]}
+      ],
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "max_keys": 3, "properties": {"iterm_integration": {"type": "bool", "nullable": true}, "dispatch_full_permission": {"type": "bool", "nullable": true}, "session_auto_discovery": {"type": "bool", "nullable": true}}, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/settings/workflow", "body": {"object": "changes"}}}
     }
   ]
 }

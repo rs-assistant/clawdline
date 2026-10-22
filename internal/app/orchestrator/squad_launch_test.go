@@ -94,7 +94,7 @@ func TestSquadDispatchRequiresBoundActorAndHonorsDisabledRole(t *testing.T) {
 	check("", "pending-terminal", "conversation-a", "session_actor_required")
 }
 
-func TestSquadDispatchUsesAdmittedProjectScope(t *testing.T) {
+func TestSquadDispatchAllowsCrossProjectRoles(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	st, err := store.Open(dir)
@@ -110,7 +110,7 @@ func TestSquadDispatchUsesAdmittedProjectScope(t *testing.T) {
 		}
 	}
 	scope, _ := projects.ResolveScope(project)
-	document, _ := json.Marshal(map[string]string{"definition_id": "clawdline.persona.minimal-change", "scope_id": scope.ID})
+	document, _ := json.Marshal(map[string]string{"definition_id": "clawdline.persona.product-manager", "scope_id": scope.ID})
 	launch, err := st.PrepareSquadLaunch(ctx, document)
 	if err != nil {
 		t.Fatal(err)
@@ -121,20 +121,35 @@ func TestSquadDispatchUsesAdmittedProjectScope(t *testing.T) {
 	if err := st.BindSquadConversation(ctx, launch.ID, "conversation-a"); err != nil {
 		t.Fatal(err)
 	}
-	b := &Broker{Store: st, SquadActorRequired: true}
+	var checkedProject string
+	b := &Broker{Store: st, SquadActorRequired: true,
+		SquadAutoDispatchEnabled: func(context.Context) (bool, error) { return true, nil },
+		SquadAutoAssignable: func(_ context.Context, persona, path string) (bool, error) {
+			if persona != "frontend" {
+				t.Fatalf("unexpected role: %q", persona)
+			}
+			checkedProject = path
+			return true, nil
+		},
+	}
 	for _, tc := range []struct{ name, project, nested, want string }{
 		{"same without nested", project, "", ""},
 		{"same with nested", project, project, ""},
-		{"cross project", other, "", "session_scope_mismatch"},
+		{"cross project", other, "", ""},
+		{"cross project with nested", other, other, ""},
 		{"conflicting nested", project, other, "bad_task"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			checkedProject = ""
 			root, _ := json.Marshal(map[string]any{"session_id": "conversation-a", "assistant": "claude", "project_dir": tc.nested})
 			p := 1
 			claims := []string{}
-			record, err := b.admit("11111111-1111-4111-8111-111111111111", draft{Protocol: &p, TaskID: "11111111-1111-4111-8111-111111111111", Assistant: "claude", ProjectDir: tc.project, Title: "Do the thing", Instructions: "Do it", Claims: &claims, Root: (*json.RawMessage)(&root)}, false, false)
+			record, err := b.admit("11111111-1111-4111-8111-111111111111", draft{Protocol: &p, TaskID: "11111111-1111-4111-8111-111111111111", Assistant: "claude", Persona: json.RawMessage(`"frontend"`), ProjectDir: tc.project, Title: "Do the thing", Instructions: "Do it", Claims: &claims, Root: (*json.RawMessage)(&root)}, false, false)
 			if err == nil {
 				err = b.checkSquadDispatchActor(ctx, DispatchRequest{ActorCapability: launch.ActorCapability}, record, "terminal-a")
+			}
+			if tc.want == "" && checkedProject != tc.project {
+				t.Fatalf("role settings checked for %q, want target %q", checkedProject, tc.project)
 			}
 			if got := refusalCode(err); got != tc.want {
 				t.Fatalf("refusal = %q (%v), want %q", got, err, tc.want)

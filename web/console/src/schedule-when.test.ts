@@ -52,3 +52,19 @@ test("a move's disable of a trigger-only schedule keeps it trigger-only", () => 
   assert.equal(body.trigger_only, true)
   assert.equal("at" in body || "days" in body || "on" in body, false)
 })
+
+test("calendar intervals send an anchor without weekday or one-shot fields", () => {
+  assert.deepEqual(scheduleWhenFields(false, "09:00", "daily", "", { every_days: 3, start: "2026-10-21" }),
+    { at: "09:00", every_days: 3, start: "2026-10-21" })
+  assert.deepEqual(scheduleWhenFields(true, "09:00", "daily", "", { every_days: 3, start: "2026-10-21" }), { trigger_only: true })
+})
+
+test("moving or disabling an interval carries its original calendar anchor", () => {
+  const body = recordBody({ id: "interval", when: { at: "09:00", every_days: 3, start: "2026-10-21" }, time_zone: "Asia/Taipei" }, "target", false)
+  assert.equal(body.every_days, 3)
+  assert.equal(body.start, "2026-10-21")
+  assert.equal(body.time_zone, "Asia/Taipei")
+  assert.equal(body.enabled, false)
+  assert.equal(body.days, undefined)
+  assert.equal(body.on, undefined)
+})

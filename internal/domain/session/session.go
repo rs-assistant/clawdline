@@ -162,10 +162,12 @@ func StateFromAssistantStatus(status string) State {
 }
 
 type Session struct {
-	ID      string  `json:"id"`
-	Backend Backend `json:"backend"`
-	TTY     string  `json:"tty,omitempty"`
-	PID     int     `json:"pid,omitempty"`
+	// DiscoveryExcluded retains terminal presence without exposing an external conversation.
+	DiscoveryExcluded bool    `json:"-"`
+	ID                string  `json:"id"`
+	Backend           Backend `json:"backend"`
+	TTY               string  `json:"tty,omitempty"`
+	PID               int     `json:"pid,omitempty"`
 	// ExpectedStart pins a recovery close to the process the person saw.
 	ExpectedStart time.Time `json:"-"`
 	Assistant     Assistant `json:"assistant,omitempty"`
@@ -192,9 +194,9 @@ type Session struct {
 	// wire in this shape; the transport puts it where a person reads it.
 	BindingDetail string `json:"-"`
 
-	// Persona is the built-in persona this session's process was launched
-	// with, read from its command line (persona.FromCommandLine); empty for
-	// none. The command line is the record: nothing else stores it.
+	// Persona is the role this session's process was launched with, read from
+	// its command line or verified immutable Squad launch; empty for
+	// none. A recorded role is used only for the matching live launch.
 	Persona string `json:"persona,omitempty"`
 	// SquadLaunchID is parsed from the immutable prompt path on the process
 	// command line. It is not sent on the session wire; the binding API joins

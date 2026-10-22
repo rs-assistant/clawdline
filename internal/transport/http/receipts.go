@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
+	cloudtransport "github.com/sainteye/clawdline/internal/transport/cloud"
 )
 
 // Durable request receipts for the routes that open things (D03, G15).
@@ -28,6 +29,37 @@ const (
 	scopeIntent       = "intent"
 	scopePairingAgent = "pairing-agent"
 )
+
+// cloudActorPrefix namespaces a Cloud viewer's device id as an actor, so that
+// no viewer's id can ever spell a paired device's or this machine's own.
+const cloudActorPrefix = "cloud:"
+
+// actorOf is who a request acts as for what a route keeps per device: a push
+// subscription, an idempotency receipt.
+//
+// For every request that arrived over a socket it is the gate's verdict, as
+// it always was. A Cloud viewer's request arrives in process holding this
+// machine's own credential, so that verdict names the same device for every
+// phone and browser on the account — and for this machine's own console. The
+// viewer it is answered for is carried beside it by the Cloud line
+// (`cloudtransport.CloudViewerOf`), from the envelope's verified sender and
+// from nothing a client can set, and each viewer is its own actor here.
+func actorOf(r *http.Request) string {
+	if viewer := cloudtransport.CloudViewerOf(r.Context()); viewer != "" {
+		return cloudActorPrefix + viewer
+	}
+	return accessOf(r).verdict.Device
+}
+
+// viewerPrincipal is personPrincipal for a receipt: a Cloud viewer files under
+// its own name (`actorOf`), and every other request under the name it always
+// did.
+func viewerPrincipal(r *http.Request) string {
+	if cloudtransport.CloudViewerOf(r.Context()) != "" {
+		return actorOf(r)
+	}
+	return personPrincipal(r)
+}
 
 // receiptWait is how long a request whose twin is still being answered waits
 // for that answer before it is told to ask again. Opening a tab takes seconds

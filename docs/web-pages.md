@@ -170,12 +170,11 @@ in the hidden SPA page.
 For a user reading through Clawdline Cloud, hand off the canonical
 `https://app.clawdline.com/` document link with the actual Cloud machine and Session identity.
 Use the document share helper and its strict locator contract above. Do not derive a delivery
-URL from `cloudflared.yml`, `remote_hostname`, a local preview address, or a remembered named
-tunnel. In particular, a successful local document read proves only local rendering and access;
+URL from a Tailscale address, a local preview address, or a remembered tunnel hostname. In particular, a successful local document read proves only local rendering and access;
 it does not prove that the user's phone can open that address through Cloud.
 
 If Cloud identity, pairing, or the document read is unavailable, report that specific gap and
-retain the Cloud locator. Do not silently substitute localhost, a LAN address, a named tunnel,
+retain the Cloud locator. Do not silently substitute localhost, a LAN address, a tunnel hostname,
 an absolute file link, or `machine=this-mac` as the user's delivery link. Local preview remains
 valid for development verification, but is not a Cloud handoff or evidence of Cloud acceptance.
 
@@ -479,3 +478,23 @@ That last branch replaced a second `keydown` listener inside `view/usage.js`. **
 own listener and nothing else**, so with the drawer open over Usage one press closed the drawer
 *and* left the page, while the same three steps over Settings were right — an edge that had not
 been connected rather than an order that was wrong.
+
+### Filling sparse conversation history
+
+The React transcript asks for up to 200 entries per page; the daemon still scans
+at most 8 MiB of raw JSONL for each page. Tool payloads and bookkeeping can occupy
+an entire window without yielding any visible conversation. A nonzero
+`nextBefore` means unread raw history remains, not that the newest page contains
+200 messages.
+
+After layout, the transcript automatically loads older pages while the content
+fits within the viewport, without requiring a scroll gesture. One opening or
+explicit load permits at most 32 older reads (`console.transcript_fill_pages`).
+A single loading surface stays mounted over the transcript across the entire
+fill. Intermediate pages remain laid out but hidden, so they can be measured
+without flashing incomplete content. Page counts and internal budgets are not
+shown in the conversation. The fill measures the hidden conversation body, not
+the loading placeholder or its overflow. At the limit the existing manual
+button remains. Polling and resize do not reset that budget. Errors and non-decreasing cursors stop automatic reads; leaving
+the Session prevents an outstanding response from starting another read. Loaded
+pages retain the existing chronological merge and scroll anchor behavior.

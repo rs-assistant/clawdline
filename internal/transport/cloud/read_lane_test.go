@@ -305,3 +305,38 @@ func TestACommandPastTheLaneIsRefusedByNameAndReadsStillGo(t *testing.T) {
 		t.Fatalf("the route saw %v; the refused command must never reach it", got)
 	}
 }
+
+// Runtime key rotation must not turn the bounded read lane into one global queue.
+func TestRuntimeReadDoesNotHoldOtherReadsOrKeyAuthority(t *testing.T) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	defer close(release)
+	router := routerFunc(func(ctx context.Context, req cloudops.LocalRequest) (cloudops.LocalResponse, error) {
+		if req.Path == "/v1/places" {
+			close(entered)
+			select {
+			case <-release:
+			case <-ctx.Done():
+			}
+		}
+		return cloudops.LocalResponse{Status: 200, Body: []byte(`{"places":[],"personas":[]}`)}, nil
+	})
+	l, fake := laneLink(t, router)
+	l.contentAuthority = &runtimeAuthority{}
+	// Stop after releasing the held route, including on failure.
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); _ = l.runService(ctx) }()
+	defer func() { cancel(); <-done }()
+	deliver(t, l, 1, placesRead("held"))
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("first read never entered")
+	}
+	deliver(t, l, 2, map[string]any{"type": "personas", "session": cloudops.MachineReplySession, "request": "fast"})
+	waitFor(t, "another read to answer while the first is held", func() bool { _, ok := publishedNamed(fake, "read:fast"); return ok })
+	if !l.contentAuthority.mu.TryLock() {
+		t.Fatal("slow read prevents pairing/revocation from acquiring authority")
+	}
+	l.contentAuthority.mu.Unlock()
+}

@@ -1,5 +1,15 @@
+import { BrowserPairingBlock } from "../pages/settings/BrowserPairingBlock.js"
+import { LocalMachineSetup } from "./LocalMachineSetup.js"
+import { accessProblemAfterRead } from "./state.js"
+import { CloudReadProblem } from "./CloudReadProblem.js"
+import { dashboardFetch } from "./dashboard-reader.js"
+import { readMachineUsage } from "../machine/read.js"
+import { Start } from "../session/Start.js"
+import { SurveyCoordinator } from "../onboarding/Survey.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { flushSync } from "react-dom"
+import { MachineSheet } from "../pages/devices/AccountMachines.js"
+import { machineManager } from "./machine-manager.js"
+import { createPortal, flushSync } from "react-dom"
 import type { SessionRow } from "@clawdline/contract"
 import App from "../App.js"
 import { CLOSE_EXECUTION_CHANGED } from "../overlays/events.js"
@@ -8,7 +18,7 @@ import type { ConnectionLight } from "../connection-state.js"
 import * as L from "../legacy/bridge.js"
 import { nextWord, type NextWord } from "../next-strings.js"
 import { focusModalContainer } from "../modal-focus.js"
-import { bootCatalog } from "../catalog.js"
+import { bootCatalog, catalogWord } from "../catalog.js"
 import { cardsAreFor } from "../session/send.js"
 import { namesSession, sessionFragment } from "../session/address.js"
 import { startedRow } from "../session/started-row.js"
@@ -33,6 +43,11 @@ import { afterForget, forgetMachine, honestyIsOurs, type ForgetOutcome } from ".
 import { NAME_MAX, renameMachine, type RenameOutcome } from "./rename.js"
 import { setAccountMachines, setAccountRosterStatus, setMachineForgetting, setMachinePairing } from "../legacy/devices-bridge.js"
 import { setMachineManager } from "./machine-manager.js"
+import { setOwnerDiagnosticsSource } from "./health-owner/source.js"
+import { ownerDiagnostics } from "./health-owner/client.js"
+import { forgetHandovers, handover, heldMasterKeyFor, watchIdentityPairing, type HandoverSession } from "./health-owner/handover.js"
+import { IdentityHandoverDialog } from "./health-owner/IdentityHandoverDialog.js"
+import { VIEWER_HEALTH_BUILD_FLAG, ViewerHealthLifecycle } from "../health-viewer/lifecycle.js"
 import { machinePaired } from "./pairing-completion.js"
 import { setProjectSyncSeam, syncSeamFor, type SyncClient } from "./project-sync.js"
 import { machinePresentation } from "../legacy/js/session/selection.js"
@@ -47,7 +62,7 @@ import {
   durablePairViewerFromInvitation,
   resumePendingPairing,
 } from "./pair-pending.js"
-import { PairPanel, type PairRequest } from "./PairPanel.js"
+import { PairPanel, type PairDevice, type PairRequest } from "./PairPanel.js"
 import { FleetUpdateRow } from "./FleetUpdateRow.js"
 import { FleetUpdateNotice } from "./FleetUpdateNotice.js"
 import type { PairAgentProgress, PairAgentReply } from "./pair-agent.js"
@@ -90,6 +105,7 @@ import {
   type RetryReason,
 } from "./state.js"
 import "./cloud.css"
+import { attentionWatch, type Attention } from "./admin/health/attention.js"
 
 /**
  * What stands in front of the console when the build says it is Clawdline
@@ -193,6 +209,17 @@ type Screen =
   | { at: "misdeclared"; reason: string }
 
 /** The machine a tab chose, so a reload reads the same one. Per account, per tab. */
+/**
+ * Which pairing way the card leads with. The Home Screen app and a phone
+ * browser scan the machine's QR inside the page; anything else is a computer,
+ * which copies a code to paste on the machine. An iPhone's Safari never gets
+ * here: it is sent to install the Home Screen app first.
+ */
+function pairDevice(): PairDevice {
+  if (cloudOnboardingMode(window) === "pwa") return "app"
+  return cloudViewerDeviceMetadata(window).kind === "android" ? "phone" : "desktop"
+}
+
 const CHOSEN = "clawdline.cloud.machine:"
 /**
  * A toolbar press that a reload used to be in the middle of.
@@ -295,6 +322,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         : { at: "checking" },
   )
   const [who, setWho] = useState<{ account: string; device: string } | null>(null)
+  // The account this page is signed in to, connected or still on the pairing screen; kept through
+  // a reconnect's "checking" so a handover in flight is not stopped by a redraw.
+  const [handoverAccount, setHandoverAccount] = useState<string | null>(null)
   const [managingMachines, setManagingMachines] = useState(false)
   const [machineList, setMachineList] = useState<MachineListState>({ phase: "loading" })
   const machines = machineList.phase === "ready" ? machineList.machines : null
@@ -380,6 +410,16 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       reader.current.attach(client.current)
   }, [])
   /** A console is on screen, for a machine this browser can read. */
+  const [operationsAccess, setOperationsAccess] = useState(false)
+  // One attention reader for the whole gate, so a remounted console never adds a poller. It
+  // exists only for an administrator: nobody else ever sends the operator read.
+  const attentionOrigin = operationsAccess && transport.kind === "cloud" ? transport.config.apiOrigin : null
+  const attention = useMemo(() => attentionOrigin === null ? null : attentionWatch(attentionOrigin, (...a) => fetch(...a)), [attentionOrigin])
+  const [operationsAttention, setOperationsAttention] = useState<Attention | null>(null)
+  useEffect(() => {
+    setOperationsAttention(null)
+    return attention?.subscribe(setOperationsAttention)
+  }, [attention])
   const consoleUp = !!chosen && screen.at === "console"
   /**
    * The machine the console is reading.
@@ -399,8 +439,26 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [reading, fleetScope, fleetTarget && destinationKey(fleetTarget), consoleUp])
   const [pendingTool, setPendingTool] = useState<PendingMachineAction | null>(pendingMachineTool)
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [dashboardPicker, setDashboardPicker] = useState(false)
+  const [dashboardMachine, setDashboardMachine] = useState<CloudMachine | null>(null)
+  const switchOpener = useRef<HTMLElement | null>(null)
+  const dashboardClosed = useCallback(() => setDashboardMachine(null), [])
+  const readDashboardUsage = useMemo(() => {
+    if (!dashboardMachine) return undefined
+    const fetchUsage = dashboardFetch(dashboardMachine.id, () => client.current)
+    return () => readMachineUsage(fetchUsage)
+  }, [dashboardMachine?.id])
   const switcherRef = useRef<HTMLDivElement>(null)
   const switchButtonRef = useRef<HTMLButtonElement>(null)
+  const closeSwitcher = useCallback(() => {
+    // Return focus before inert removes the closing menu from keyboard access.
+    if (switcherRef.current?.querySelector(".cloud-switch-menu")?.contains(document.activeElement)) {
+      const opener = switchOpener.current ?? switchButtonRef.current
+      opener?.focus({ preventScroll: true })
+    }
+    setSwitcherOpen(false)
+    setDashboardPicker(false)
+  }, [])
   // Forgetting a machine (`forget.ts`): which one is being asked about, which
   // ones this tab or the account says are forgotten, and what the account
   // answered about the last one. The relay can retain an old snapshot after
@@ -432,6 +490,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // account revoked (`opening.ts`).
   const [rosterPending, setRosterPending] = useState(transport.kind === "cloud")
   const [rosterFailed, setRosterFailed] = useState(false)
+  const [connectionMachineID, setConnectionMachineID] = useState<string | null>(null)
   const [connectionVersion, setConnectionVersion] = useState(0)
   const pairingStore = useMemo(() => browserPendingPairings(), [])
 
@@ -507,6 +566,34 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     }
   }, [liveSessionSource])
   useEffect(() => clearTerminalCloseStates(), [who?.account])
+  // Opened diagnostics belong to one signed-in account; another account or none clears them.
+  useEffect(() => ownerDiagnostics.bind(who?.account || null, null), [who?.account])
+  // This page's own connection-health producer (docs/admin-connection-health-contract.md §11.4):
+  // only in a build made with VITE_VIEWER_HEALTH=on, only while signed in to the Cloud, attributed
+  // to the machine being read. A sign-out, a revocation, another account or unmounting stops it.
+  const viewerHealth = useRef<ViewerHealthLifecycle | null>(null)
+  if (!viewerHealth.current) viewerHealth.current = new ViewerHealthLifecycle({ enabled: VIEWER_HEALTH_BUILD_FLAG })
+  useEffect(() => {
+    viewerHealth.current?.update({
+      apiOrigin: transport.kind === "cloud" ? transport.config.apiOrigin : null,
+      signedIn: !!who?.account && screen.at !== "sign_in" && screen.at !== "revoked",
+      account: who?.account || null,
+      targetMachineId: chosen?.id ?? null,
+    })
+  }, [transport, who?.account, screen.at, chosen?.id])
+  useEffect(() => () => viewerHealth.current?.stop(), [])
+  // A machine's `#pairid=` link runs the identity handover once this page is signed in — on the
+  // console or on the pairing screen, since signing in already registered this browser's device
+  // key. The link waits in this tab's session storage through a sign-in; another account, or
+  // none, stops a run. The handover gives a diagnostics key only, never relay access.
+  useEffect(() => {
+    if (transport.kind !== "cloud" || !handoverAccount) return
+    return watchIdentityPairing(window, {
+      apiOrigin: transport.config.apiOrigin, account: handoverAccount,
+      session: () => session.current as unknown as HandoverSession | null,
+      fetch: (input, init) => fetch(input, init),
+    })
+  }, [transport, handoverAccount])
   const reader = useRef<RelayReader | null>(null)
   const unlisten = useRef<(() => void) | null>(null)
   const recheck = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1031,6 +1118,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         if (!current?.tryDirect) return { kind: "unsupported" }
         return current.tryDirect(machine)
       },
+      sameNetworkAvailable: (machine) => client.current?.sameNetworkAvailable?.(machine) === true,
+      enableSameNetwork: async (machine) => {
+        const current = client.current
+        if (!current?.enableSameNetwork) throw new Error("unsupported")
+        await current.enableSameNetwork(machine)
+      },
       rename: async (machine, name) => (await renameRef.current(machine, name)) ?? busy,
       forget: async (machine) => (await forgetRef.current(machine)) ?? busy,
       pair: (id) => {
@@ -1039,7 +1132,30 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         openPairingRef.current({ id, name: named ? named.name || named.label || id : id })
       },
     })
-    return () => setMachineManager(null)
+    // The owner-diagnostics reader's authority, read from the session at each call: the account
+    // and device, this device's signing key, and the epochs its last device token was minted
+    // under (null until one was minted: unknown, never guessed). The master secret comes only
+    // from an identity handover record (`health-owner/handover.ts`); a browser paired before that
+    // handover holds an AES-only key with no epoch, so it answers key_handover_required.
+    type Held = { account?: string | null; deviceID?: string | null; devicePrivateKey?: CryptoKey | null
+      tokenIdentity?: { identityEpoch: number; deviceKeyEpoch: number } | null }
+    const held = () => session.current as unknown as Held | null
+    setOwnerDiagnosticsSource({
+      apiOrigin: transport.config.apiOrigin,
+      accountID: () => held()?.account ?? null,
+      deviceID: () => held()?.deviceID ?? null,
+      proofIdentity: () => ({
+        signingKey: held()?.devicePrivateKey ?? null,
+        deviceKeyEpoch: held()?.tokenIdentity?.deviceKeyEpoch ?? null,
+        identityEpoch: held()?.tokenIdentity?.identityEpoch ?? null,
+      }),
+      heldMasterKey: (machine) => heldMasterKeyFor(held()?.account ?? null, machine),
+    })
+    return () => {
+      setMachineManager(null)
+      setOwnerDiagnosticsSource(null)
+      ownerDiagnostics.clear("source_removed")
+    }
   }, [transport, carrierOf])
 
   const askForget = useCallback((machine: CloudMachine | null) => {
@@ -1061,6 +1177,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           for (const listener of [...clientChanges.current]) listener()
           setClientEpoch((epoch) => epoch + 1)
           setWho({ account: next.account ?? "", device: next.deviceID ?? "" })
+          setHandoverAccount(next.account || null)
           // The Devices page reads the account's machines through this, and
           // says so under its heading. It is the client at the moment of the
           // call rather than this one, because a renewal replaces it
@@ -1100,13 +1217,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             // When every row was stale the timer below was also stopped, so
             // no later pass could repair either machine's status.
             if (reportsMachinePresence(event)) listMachines()
-            // A decryptable inventory clears only the problem attributed to
-            // that machine. One machine answering is not evidence that a
-            // different machine's key problem went away.
-            if (event.type === "sessions") {
-              const machine = event.machine ?? event.identity?.machine
-              setProblem((held) => !held || !machine || held.machine === machine ? null : held)
-            }
+            // Only a live successful read repairs this machine's read path.
+            setProblem((held) => accessProblemAfterRead(held, event))
             const listed = machinesRef.current
             const access = machineAccessProblem(
               event,
@@ -1132,10 +1244,15 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           return
         }
         case "sign_in":
+          setOperationsAccess(false)
+          handover.stop()
+          setHandoverAccount(null)
+          ownerDiagnostics.clear("sign_out")
           setScreen({ at: "sign_in", url: update.url })
           return
         case "pairing_required":
           setScreen({ at: "pairing", account: update.accountID })
+          setHandoverAccount(update.accountID || null)
           if (transport.kind === "cloud") {
             readAccountRoster(transport.config.apiOrigin)
           }
@@ -1160,11 +1277,21 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           setTerminalHost(null)
           setScreen({ at: "failed", code: update.error?.code ?? update.reason ?? "terminal_error" })
           return
-        case "revoked":
+        case "revoked": {
           reader.current?.lost()
           setTerminalHost(null)
+          // A revoked device keeps no diagnostics authority: the handover in flight stops, opened
+          // plaintext is dropped, and this account's handover keys are deleted from this browser.
+          handover.stop()
+          setHandoverAccount(null)
+          viewerHealth.current?.stop("session_gone")
+          ownerDiagnostics.clear("revoked")
+          const revokedAccount = session.current?.account
+          if (revokedAccount) void forgetHandovers(revokedAccount).catch(() => undefined)
+          setOperationsAccess(false)
           setScreen({ at: "revoked", url: session.current?.signInURL() ?? "" })
           return
+        }
         case "reconnecting":
           reader.current?.lost()
           setTerminalHost(null)
@@ -1184,7 +1311,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     }
     if (!session.current) {
       const device = cloudViewerDeviceMetadata(window)
-      session.current = newCloudSession({ config: transport.config, deviceKind: device.kind, deviceName: device.name })
+      session.current = newCloudSession({ config: transport.config, deviceKind: device.kind, deviceName: device.name, onOperationsAccess: setOperationsAccess })
     }
     line.current?.stop()
     if (!reader.current) setScreen({ at: "checking" })
@@ -1245,14 +1372,16 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   useEffect(() => {
     if (!switcherOpen) return
     const outside = (event: PointerEvent) => {
-      if (!switcherRef.current?.contains(event.target as Node)) setSwitcherOpen(false)
+      if (!switcherRef.current?.contains(event.target as Node) &&
+        !switchOpener.current?.contains(event.target as Node)) closeSwitcher()
     }
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
       event.preventDefault()
       event.stopPropagation()
-      setSwitcherOpen(false)
-      switchButtonRef.current?.focus()
+      closeSwitcher()
+      const opener = switchOpener.current ?? switchButtonRef.current
+      opener?.focus()
     }
     document.addEventListener("pointerdown", outside)
     document.addEventListener("keydown", escape, true)
@@ -1260,7 +1389,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       document.removeEventListener("pointerdown", outside)
       document.removeEventListener("keydown", escape, true)
     }
-  }, [switcherOpen])
+  }, [switcherOpen, closeSwitcher])
 
   const shown = useMemo<MachineListState>(
     () => {
@@ -1497,7 +1626,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [scheduleFleetKey])
 
   const switchMachine = (machine: CloudMachine) => {
-    setSwitcherOpen(false)
+    if (dashboardPicker) {
+      closeSwitcher()
+      setDashboardMachine(machine)
+      return
+    }
+    closeSwitcher()
     setFleetScope(false)
     setFleetTarget(null)
     // The address names a fleet that is being left, or a Session on the machine
@@ -1537,7 +1671,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }
 
   const openAllSessions = () => {
-    setSwitcherOpen(false)
+    closeSwitcher()
     // Every machine is this tab's choice now, so the one machine it chose
     // before is not: leaving it recorded would reopen that machine alone on
     // the next load from any address but this one.
@@ -1600,7 +1734,14 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         aria-expanded={switcherOpen}
         aria-controls="cloud-quick-machines"
         ref={switchButtonRef}
-        onClick={() => setSwitcherOpen((open) => !open)}
+        onClick={() => {
+          if (switcherOpen) closeSwitcher()
+          else {
+            switchOpener.current = switchButtonRef.current
+            setDashboardPicker(false)
+            setSwitcherOpen(true)
+          }
+        }}
       >
         <span className="dot" aria-hidden="true" />
         <span className="cloud-switch-name">{fleetScope ? nextWord("cloudAllMachines") : named.name || named.label || named.id}</span>
@@ -1610,12 +1751,14 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           <path d="m3 4.5 3 3 3-3" />
         </svg>
       </button>
-      {switcherOpen && (
-        <div
+      <div
+          data-open={switcherOpen}
+          inert={!switcherOpen}
+          aria-hidden={!switcherOpen}
           className="cloud-switch-menu"
           id="cloud-quick-machines"
           role="dialog"
-          aria-label={nextWord("cloudSwitch")}
+          aria-label={dashboardPicker ? catalogWord("literal", "b9fcf1d5c799") : nextWord("cloudSwitch")}
         >
           <div className="cloud-switch-conn" data-state={fleetScope ? "unknown" : light.state}>
             <span className="dot" aria-hidden="true" />
@@ -1630,7 +1773,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           </div>
           <p className="cloud-switch-title">{nextWord("cloudMachinesLede")}</p>
           <div className="cloud-switch-options">
-            {quickMachines.length >= 2 && <button type="button" className="cloud-switch-option"
+            {!dashboardPicker && quickMachines.length >= 2 && <button type="button" className="cloud-switch-option"
               data-current={fleetScope ? "true" : undefined}
               onClick={openAllSessions}>{nextWord("cloudAllMachines")}</button>}
             {quickMachines.map((machine) => {
@@ -1674,7 +1817,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
                         title={nextWord("cloudPairOne", { machine: name })}
                         aria-label={nextWord("cloudPairOne", { machine: name })}
                         onClick={() => {
-                          setSwitcherOpen(false)
+                          closeSwitcher()
                           openPairing({ id: machine.id, name })
                         }}
                       >
@@ -1691,14 +1834,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             type="button"
             className="cloud-switch-manage"
             onClick={() => {
-              setSwitcherOpen(false)
+              closeSwitcher()
               leave()
             }}
           >
             {nextWord("cloudManageMachines")}
           </button>
         </div>
-      )}
     </div>
   )
   // A pairing is drawn over whatever is on screen, the console included, but
@@ -1768,8 +1910,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               failedReason: typeof answer.failed_reason === "string" ? answer.failed_reason : "",
             }
           },
-          canScan: cloudOnboardingMode(window) === "pwa",
+          device: pairDevice(),
           onScan: readInvitation,
+          viewerID: session.current?.deviceID ?? "",
+          // A comparison failure must never revoke the account's whole machine.
+          // Keep the machine-side viewer-revocation instruction in the panel.
+          onMismatch: () => {},
         }
       : null
   // Once drawn, the console stays: the copied modules bind to the document
@@ -1810,9 +1956,47 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [fleetScope, fleetTarget && destinationKey(fleetTarget), fleetProjectionRevision])
   return (
     <>
+      <IdentityHandoverDialog relay={screen.at === "pairing" ? "pairing_required" : "connected"} />
+      {problem && (screen.at === "console" || screen.at === "machines") && (
+        <CloudReadProblem key={problem.machine + ":" + problem.code}
+          message={nextWord("cloudReadUnknownFailure", {
+            machine: machinesRef.current?.find((row) => row.id === problem.machine)?.label ?? problem.machine,
+          })} code={problem.code} trace={problem.trace} retryLabel={nextWord("cloudRetry")}
+          dismissLabel={nextWord("updateBannerDismiss")}
+          onRetry={() => { line.current?.retry(); listMachines() }} />
+      )}
+      {words && who && transport.kind === "cloud" ? <SurveyCoordinator key={who.account}
+        account={{ id: who.account, apiOrigin: transport.config.apiOrigin }}
+        eligible={!pairing && !asking && !naming && (screen.at === "machines" || screen.at === "console")}
+        productVersion={transport.config.build || "unknown"} /> : null}
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
-          <App key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
+          <App cloudOperationsAccess={operationsAccess} cloudOperationsAttention={operationsAttention} key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
+            onChooseDashboardMachine={fleetScope ? () => {
+              switchOpener.current = document.getElementById("machine-dashboard-open")
+              setDashboardPicker(true)
+              setSwitcherOpen(true)
+            } : undefined}
+            dashboardRequested={!!dashboardMachine}
+            dashboardSource={dashboardMachine && readDashboardUsage ? {
+              name: dashboardMachine.name || dashboardMachine.label || dashboardMachine.id,
+              readUsage: readDashboardUsage,
+              sessions: [...fleetPresentations.current.values()].filter((row) =>
+                row.destination.machineID === dashboardMachine.id && row.projection?.freshness === "current")
+                .map((row) => ({ ...row.status, id: row.destination.sessionID, label: row.title,
+                  machine_scope: row.projection?.machineScope, coordinator_bound: row.projection?.coordinatorBound }) as SessionRow),
+              onClawdfather: (id) => {
+                const machine = dashboardMachine
+                const projection = fleetProjections.current.get(machine.id)?.reading
+                const steward = id && projection?.kind === "ready" ? projection.rows.find((row) =>
+                  row.destination.sessionID === id && row.freshness === "current") : null
+                if (steward) { openFleetSession(steward.destination); return }
+                // Opening Clawdfather is an explicit navigation action, unlike inspecting usage.
+                flushSync(() => { setDashboardMachine(null); switchMachine(machine) })
+                Start.openMachine()
+              },
+            } : undefined}
+            onDashboardClosed={dashboardClosed}
             confirmedTitle={fleetTarget ? confirmedTitles.current.get(destinationKey(fleetTarget)) : undefined}
             onTitleSaved={(id, title) => {
               const target = fleetTargetRef.current
@@ -1846,6 +2030,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
                   : null
               : null}
             onFleetDetailPending={noteRowPending}
+            quotaMachineName={readingRow?.name || readingRow?.label}
             fleetReaderMachine={readerMachine}
             onFleetClose={closeFleetTarget}
             fleetActionIntent={fleetActionIntent}
@@ -1868,12 +2053,20 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             filter={filter} onFilter={onFilter}
             onOpen={openFleetSession}
             carrierOf={carrierOf}
+            onConnection={setConnectionMachineID}
             onPresentations={noteFleetPresentations}
             onProjection={noteFleetProjection}
             onCloseRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title }) }}
             onArchiveRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title, kind: "archive" }) }}
             onMachineAction={runMachineTool}
           /></> : undefined} />
+          {connectionMachineID && machineManager() && (() => {
+            const machine = quickMachines.find((row) => row.id === connectionMachineID)
+            return machine ? createPortal(<MachineSheet key={machine.id} machine={{ ...machine }}
+              manager={machineManager()!} onClose={() => setConnectionMachineID(null)}
+              onStart={() => { setConnectionMachineID(null); runMachineTool(machine.id, "start") }}
+              onForgotten={() => setConnectionMachineID(null)} />, document.body) : null
+          })()}
           <CloudSessionSheets machineID={reading ?? chosen.id}
             machines={quickMachines.map((machine) => machine.id)}
             source={liveSessionSource}
@@ -1961,6 +2154,8 @@ function GateCard(props: {
   const card = useRef<HTMLDivElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
   const go = useRef<HTMLButtonElement>(null)
+  // Which machine row has its details and rare actions (rename, remove) open.
+  const [moreFor, setMoreFor] = useState<string | null>(null)
   useLayoutEffect(() => {
     L.paintIcon(mark.current, BRAND_MARK, 3)
   }, [])
@@ -2047,18 +2242,22 @@ function GateCard(props: {
           ;(event.shiftKey ? ends[ends.length - 1] : ends[0]).focus({ preventScroll: true })
         }}
       >
-        <p className="lede">{nextWord("cloudForgetTitle", { machine: name })}</p>
-        <p className="say" id="cloud-forget-say">
-          {nextWord("cloudForgetAsk", { machine: name })}
-          {"\n"}
-          {machine.freshness === "current"
-            ? nextWord("cloudForgetAskCurrent")
-            : machine.freshness === "stale"
-              ? nextWord("cloudForgetAskStale")
-              : nextWord("cloudForgetAskUnknown")}
-          {"\n"}
-          {nextWord("cloudForgetHonest")}
-        </p>
+        <p className="lede">{nextWord("cloudForgetTitleShort", { machine: name })}</p>
+        <p className="say" id="cloud-forget-say">{nextWord("cloudForgetAskShort")}</p>
+        <details className="cloud-detail">
+          <summary>{nextWord("cloudForgetDetails")}</summary>
+          <p>
+            {nextWord("cloudForgetAsk", { machine: name })}
+            {"\n"}
+            {machine.freshness === "current"
+              ? nextWord("cloudForgetAskCurrent")
+              : machine.freshness === "stale"
+                ? nextWord("cloudForgetAskStale")
+                : nextWord("cloudForgetAskUnknown")}
+            {"\n"}
+            {nextWord("cloudForgetHonest")}
+          </p>
+        </details>
         <div className="buttons">
           <button
             className="chip"
@@ -2078,7 +2277,7 @@ function GateCard(props: {
             disabled={forgetting}
             onClick={() => onForget(machine)}
           >
-            {forgetting ? nextWord("cloudForgetting", { machine: name }) : nextWord("cloudForget")}
+            {forgetting ? nextWord("cloudForgetting", { machine: name }) : nextWord("cloudForgetGoShort")}
           </button>
         </div>
       </div>
@@ -2205,19 +2404,23 @@ function GateCard(props: {
     const outcome = told.outcome
     if (outcome.kind === "forgotten") {
       return (
-        <p className="say" id="cloud-forget-told" data-forget-outcome="forgotten">
-          {nextWord("cloudForgotten", { machine })}
-          {"\n"}
-          {/* Our own sentence while the route still answers the two words it
-              was written against; the route's own note when it answered
-              something else; and, when the answer to a revoke that did happen
-              could not be read at all, neither. */}
-          {honestyIsOurs(outcome)
-            ? nextWord("cloudForgetHonest")
-            : outcome.note
-              ? nextWord("cloudForgetSaid", { note: outcome.note })
-              : nextWord("cloudForgetHonestUnread")}
-        </p>
+        <div className="cloud-forget-told" data-forget-outcome="forgotten">
+          <p className="say calm" id="cloud-forget-told" role="status">{nextWord("cloudForgottenShort", { machine })}</p>
+          <details className="cloud-detail">
+            <summary>{nextWord("cloudForgetDetails")}</summary>
+            {/* Our own sentence while the route still answers the two words it
+                was written against; the route's own note when it answered
+                something else; and, when the answer to a revoke that did happen
+                could not be read at all, neither. */}
+            <p>
+              {honestyIsOurs(outcome)
+                ? nextWord("cloudForgetHonest")
+                : outcome.note
+                  ? nextWord("cloudForgetSaid", { note: outcome.note })
+                  : nextWord("cloudForgetHonestUnread")}
+            </p>
+          </details>
+        </div>
       )
     }
     const word =
@@ -2245,8 +2448,25 @@ function GateCard(props: {
       case "install":
         return (
           <>
-            <p className="lede">{nextWord("cloudInstallLede")}</p>
-            <p className="fine">{nextWord("cloudInstallFine")}</p>
+            <p className="lede">{nextWord("cloudInstallTitle")}</p>
+            <p className="fine">{nextWord("cloudInstallBenefit")}</p>
+            <ol className="cloud-home-steps">
+              <li>
+                <b aria-hidden="true">1</b>
+                <span>{nextWord("cloudInstallStep1")}</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12M8 7l4-4 4 4" /><rect x="5" y="10" width="14" height="11" rx="2" /></svg>
+              </li>
+              <li>
+                <b aria-hidden="true">2</b>
+                <span>{nextWord("cloudInstallStep2")}</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M12 8v8M8 12h8" /></svg>
+              </li>
+              <li><b aria-hidden="true">3</b><span>{nextWord("cloudInstallStep3")}</span></li>
+            </ol>
+            <details className="cloud-detail">
+              <summary>{nextWord("cloudInstallWhy")}</summary>
+              <p>{nextWord("cloudInstallWhyBody")}</p>
+            </details>
           </>
         )
       case "sign_in":
@@ -2271,11 +2491,13 @@ function GateCard(props: {
       case "pairing":
         return (
           <>
-            <p className="lede">{nextWord("cloudPairingLede")}</p>
-            <p className="fine">{nextWord("cloudPairingFine", { account: screen.account })}</p>
+            <p className="lede">{nextWord("cloudConnectLede")}</p>
+            <p className="fine">{nextWord("cloudConnectFine")}</p>
+            <LocalMachineSetup onPair={onPair}><BrowserPairingBlock shown /></LocalMachineSetup>
             <button className="go" type="button" id="cloud-pair-start" onClick={() => onPair(null)}>
               {nextWord("cloudPairStart")}
             </button>
+            <p className="fine cloud-account-line">{nextWord("cloudMachinesAccount", { account: screen.account })}</p>
           </>
         )
       case "device_limit":
@@ -2290,21 +2512,38 @@ function GateCard(props: {
         )
       case "retrying":
         return (
-          <p className="say calm">
-            {screen.reason.kind === "named"
-              ? nextWord("cloudRetrying", { code: screen.reason.code, seconds: screen.seconds })
-              : screen.reason.kind === "browser_offline"
+          <>
+            <p className="lede cloud-retrying-lede">
+              <span className="cloud-opening-ring" aria-hidden="true" />
+              {nextWord("cloudRetryingPlain")}
+            </p>
+            <p className="say calm" role="status">
+              {screen.reason.kind === "browser_offline"
                 ? nextWord("cloudRetryingBrowserOffline", { seconds: screen.seconds })
-                : nextWord("cloudRetryingUnknown", { seconds: screen.seconds })}
-          </p>
+                : nextWord("cloudRetryingIn", { seconds: screen.seconds })}
+            </p>
+            <button className="chip cloud-retry-now" type="button" onClick={onRetry}>
+              {nextWord("cloudRetryNow")}
+            </button>
+            {screen.reason.kind === "named" && (
+              <details className="cloud-detail">
+                <summary>{nextWord("cloudErrorDetails")}</summary>
+                <span className="cloud-detail-code">{screen.reason.code}</span>
+              </details>
+            )}
+          </>
         )
       case "failed":
         return (
           <>
-            <p className="say">{nextWord("cloudFailed", { code: screen.code })}</p>
+            <p className="say">{nextWord("cloudFailedPlain")}</p>
             <button className="go" type="button" onClick={onRetry}>
               {nextWord("cloudRetry")}
             </button>
+            <details className="cloud-detail">
+              <summary>{nextWord("cloudErrorDetails")}</summary>
+              <span className="cloud-detail-code">{screen.code}</span>
+            </details>
           </>
         )
       case "roster_failed":
@@ -2324,8 +2563,9 @@ function GateCard(props: {
         const machines = machineList.phase === "ready" ? machineList.machines : null
         return (
           <>
-            <p className="lede">{nextWord("cloudMachinesLede")}</p>
-            {who && <p className="fine">{nextWord("cloudMachinesFine", { account: who.account, device: who.device })}</p>}
+            <p className="lede">{nextWord(machineList.phase === "empty_authoritative" ? "cloudConnectLede" : "cloudMachinesLede")}</p>
+            {who && machineList.phase !== "empty_authoritative" &&
+              <p className="fine">{nextWord("cloudMachinesAccount", { account: who.account })}</p>}
             {machines ? (
               <ul className="cloud-machines" id="cloud-machines">
                 {machines.map((m) => {
@@ -2333,92 +2573,142 @@ function GateCard(props: {
                   const name = m.name || m.label || m.id
                   const identity = machineIdentityFacts(m)
                   const pairable = m.pairing !== "paired"
+                  const open = moreFor === m.id
+                  // One word for where the machine stands; the evidence behind it
+                  // (platform, id, each access fact, version) is under "⋯".
+                  const status = m.pairing === "not_paired"
+                    ? { kind: "pair", text: nextWord("cloudMachineNeedsPair") }
+                    : m.freshness === "current"
+                      ? { kind: "online", text: typeof count === "object"
+                        ? nextWord("cloudMachineOnlineSessions", { count: count.count })
+                        : nextWord("cloudMachineOnline") }
+                      : m.freshness === "stale"
+                        ? { kind: "offline", text: nextWord("cloudMachineOffline", { seen: machineSeenWord(identity.seenAt) }) }
+                        : { kind: "unknown", text: T.webCoordUnknown }
                   return (
                     <li
                       key={m.id}
                       data-pairable={pairable ? "true" : undefined}
+                      data-more={open ? "open" : undefined}
                     >
-                      <button
-                        type="button"
-                        data-machine={m.id}
-                        disabled={!m.selectable}
-                        onClick={() => onChoose(m)}
-                      >
-                        <span className="cloud-machine-heading">
+                      <div className="cloud-machine-row">
+                        <button
+                          className="cloud-machine-open"
+                          type="button"
+                          data-machine={m.id}
+                          disabled={!m.selectable}
+                          onClick={() => onChoose(m)}
+                        >
                           <MachinePlatformIcon platform={platformWord(identity.platform)} />
-                          <span className="cloud-machine-name">{name}</span>
-                        </span>
-                        <span className="cloud-machine-identity">
-                          {platformWord(identity.platform)}
-                          {" · "}
-                          {nextWord("cloudMachineID", { id: identity.shortID })}
-                        </span>
-                        <span className="cloud-machine-facts">
-                          {machineSeenWord(identity.seenAt)}
-                          {" · "}
-                          {typeof count === "object"
-                            ? nextWord("cloudMachineSessions", { count: count.count })
-                            : count === "unread"
-                              ? nextWord("cloudMachineSessionsUnread")
-                              : nextWord("cloudMachineSessionsUnknown")}
-                          {" · "}
-                          {m.pairing === "not_paired"
-                            ? T.webDeviceNotPaired
-                            : m.freshness === "current"
-                              ? T.webDeviceOnline
-                              : m.freshness === "stale" ? T.webStartMachineStale : T.webCoordUnknown}
-                        </span>
-                        <span className="cloud-machine-access">{machineAccessFacts(m).join(" · ")}</span>
+                          <span className="cloud-machine-text">
+                            <span className="cloud-machine-name">{name}</span>
+                            <span className="cloud-machine-status" data-status={status.kind}>{status.text}</span>
+                          </span>
+                          {m.selectable && <svg className="cloud-machine-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6" /></svg>}
+                        </button>
+                        {/* The row and its controls are siblings: nesting buttons
+                           would be invalid, while a disabled unpaired row must
+                           leave Pair and the details in the focus order. */}
+                        <div
+                          className="cloud-machine-actions"
+                          role="group"
+                          aria-label={nextWord("cloudMachineActions", { machine: name })}
+                        >
+                          {pairable && (
+                            <button
+                              className="cloud-pair"
+                              type="button"
+                              data-pair={m.id}
+                              disabled={forgetting || renaming}
+                              title={nextWord("cloudPairOne", { machine: name })}
+                              aria-label={nextWord("cloudPairOne", { machine: name })}
+                              onClick={() => onPair({ id: m.id, name })}
+                            >
+                              {nextWord("cloudPair")}
+                            </button>
+                          )}
+                          <button
+                            className="cloud-more"
+                            type="button"
+                            aria-expanded={open}
+                            aria-controls={"cloud-more-" + m.id}
+                            title={nextWord("cloudMachineMore", { machine: name })}
+                            aria-label={nextWord("cloudMachineMore", { machine: name })}
+                            onClick={() => setMoreFor(open ? null : m.id)}
+                          >
+                            <span aria-hidden="true">⋯</span>
+                          </button>
+                        </div>
+                      </div>
+                      {/* Kept mounted while folded, so the version row keeps reading. */}
+                      <div className="cloud-machine-more" id={"cloud-more-" + m.id} hidden={!open}>
+                        <p className="cloud-machine-more-title">{nextWord("cloudMachineInfo")}</p>
+                        <dl className="cloud-machine-details">
+                          <div>
+                            <dt>{nextWord("cloudMachineIdentityLabel")}</dt>
+                            <dd className="cloud-machine-identity">
+                              <span>{platformWord(identity.platform)}</span>
+                              <span>{nextWord("cloudMachineID", { id: identity.shortID })}</span>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>{nextWord("cloudMachineActivityLabel")}</dt>
+                            <dd>
+                              <span>{machineSeenWord(identity.seenAt)}</span>
+                              <span>{typeof count === "object"
+                                ? nextWord("cloudMachineSessions", { count: count.count })
+                                : count === "unread"
+                                  ? nextWord("cloudMachineSessionsUnread")
+                                  : nextWord("cloudMachineSessionsUnknown")}</span>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>{nextWord("cloudMachineAccessLabel")}</dt>
+                            <dd className="cloud-machine-access">
+                              {machineAccessFacts(m).map((fact, index) => <span key={index}>{fact}</span>)}
+                            </dd>
+                          </div>
+                        </dl>
                         <FleetUpdateRow
                           client={updateClient}
                           machine={m}
                           appVersion={updateClient ? machineApp(updateClient, m.id).version : undefined}
                         />
-                      </button>
-                      {/* The row and its controls are siblings: nesting buttons
-                         would be invalid, while a disabled unpaired row must
-                         leave Pair, Rename and Forget in the focus order. */}
-                      <div
-                        className="cloud-machine-actions"
-                        role="group"
-                        aria-label={nextWord("cloudMachineActions", { machine: name })}
-                      >
-                        {pairable && (
+                        <div className="cloud-machine-more-actions">
                           <button
                             className="cloud-pair"
                             type="button"
-                            data-pair={m.id}
+                            data-repair-pair={m.id}
                             disabled={forgetting || renaming}
                             title={nextWord("cloudPairOne", { machine: name })}
                             aria-label={nextWord("cloudPairOne", { machine: name })}
-                            onClick={() => onPair({ id: m.id, name })}
+                            onClick={() => { setMoreFor(null); onPair({ id: m.id, name }) }}
                           >
                             {nextWord("cloudPair")}
                           </button>
-                        )}
-                        <button
-                          className="cloud-rename"
-                          type="button"
-                          data-rename={m.id}
-                          disabled={forgetting || renaming}
-                          title={nextWord("cloudRenameOne", { machine: name })}
-                          aria-label={nextWord("cloudRenameOne", { machine: name })}
-                          onClick={() => onName(m)}
-                        >
-                          <span aria-hidden="true">✎</span>
-                          <span>{nextWord("cloudRename")}</span>
-                        </button>
-                        <button
-                          className="cloud-forget"
-                          type="button"
-                          data-forget={m.id}
-                          disabled={forgetting}
-                          title={nextWord("cloudForgetOne", { machine: name })}
-                          aria-label={nextWord("cloudForgetOne", { machine: name })}
-                          onClick={() => onAsk(m)}
-                        >
-                          <span aria-hidden="true">×</span>
-                        </button>
+                          <button
+                            className="cloud-rename"
+                            type="button"
+                            data-rename={m.id}
+                            disabled={forgetting || renaming}
+                            title={nextWord("cloudRenameOne", { machine: name })}
+                            aria-label={nextWord("cloudRenameOne", { machine: name })}
+                            onClick={() => { setMoreFor(null); onName(m) }}
+                          >
+                            {nextWord("cloudRename")}
+                          </button>
+                          <button
+                            className="cloud-forget"
+                            type="button"
+                            data-forget={m.id}
+                            disabled={forgetting}
+                            title={nextWord("cloudForgetOne", { machine: name })}
+                            aria-label={nextWord("cloudForgetOne", { machine: name })}
+                            onClick={() => { setMoreFor(null); onAsk(m) }}
+                          >
+                            {nextWord("cloudMachineForgetShort")}
+                          </button>
+                        </div>
                       </div>
                     </li>
                   )
@@ -2428,26 +2718,28 @@ function GateCard(props: {
               <p className="say calm" data-machine-list-state={machineList.phase}>
                 {machineList.phase === "loading"
                   ? nextWord("cloudMachinesWaiting")
-                  : machineList.phase === "empty_authoritative"
-                    ? nextWord("cloudMachinesNone")
-                    : machineList.phase === "refused"
-                      ? nextWord(
-                          machineList.next === "sign_in"
-                            ? "cloudMachinesRefusedSignIn"
-                            : machineList.next === "pair"
-                              ? "cloudMachinesRefusedPair"
-                              : "cloudMachinesRefusedRetry",
-                          { code: machineList.code },
-                        )
-                      : null}
+                  : machineList.phase === "refused"
+                    ? nextWord(
+                        machineList.next === "sign_in"
+                          ? "cloudMachinesRefusedSignInPlain"
+                          : machineList.next === "pair"
+                            ? "cloudMachinesRefusedPairPlain"
+                            : "cloudMachinesRefusedRetryPlain",
+                      )
+                    : null}
               </p>
             )}
             {machineList.phase === "empty_authoritative" && (
               <>
-                <p className="fine">{nextWord("cloudMachinesNoneNext")}</p>
+                <p className="fine">{nextWord("cloudConnectFine")}</p>
+            <LocalMachineSetup onPair={onPair}><BrowserPairingBlock shown /></LocalMachineSetup>
                 <button className="go" type="button" id="cloud-machines-pair" onClick={() => onPair(null)}>
                   {nextWord("cloudPairStart")}
                 </button>
+                <a className="cloud-install-link" href="https://clawdline.com" target="_blank" rel="noreferrer">
+                  {nextWord("cloudConnectInstall")}
+                </a>
+                {who && <p className="fine cloud-account-line">{nextWord("cloudMachinesAccount", { account: who.account })}</p>}
               </>
             )}
             {machineList.phase === "refused" && (
@@ -2467,6 +2759,12 @@ function GateCard(props: {
                 </button>
               </div>
             )}
+            {machineList.phase === "refused" && (
+              <details className="cloud-detail">
+                <summary>{nextWord("cloudErrorDetails")}</summary>
+                <span className="cloud-detail-code">{machineList.code}</span>
+              </details>
+            )}
             {forgetOutcome()}
             {renameOutcome()}
             {reading && !forgotten.includes(reading) && (
@@ -2481,11 +2779,6 @@ function GateCard(props: {
               <button className="go" type="button" id="cloud-forget-leave" onClick={onLeave}>
                 {nextWord("cloudSwitch")}
               </button>
-            )}
-            {problem && (
-              <p className="say">
-                {nextWord("cloudAccessProblem", { machine: problem.machine, code: problem.code })}
-              </p>
             )}
           </>
         )

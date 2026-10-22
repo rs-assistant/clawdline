@@ -68,7 +68,7 @@ Swift app 已於 2026-09-19 退役：它被停掉、取消了登入時啟動，p
 | `clawdline dispatch --title "…" --claims a,b < brief.md` | 派出一個 owned child（§4） |
 | `clawdline item show\|steps\|name\|phase\|step-add\|step-done\|doc\|acceptance <item id> …` | 讀取並推進你負責的看板項目（`clawdline guide zh-Hant feature-root`、§10） |
 | `clawdline todo add\|list\|done` | 這個 Session 自己的待辦，只在使用者要求時（§10） |
-| `clawdline heavy [--handoff] -- <command…>` | 在機器唯一的編譯槽裡跑 build 或測試；`--handoff` 會把排隊等待交給 callback（§11） |
+| `clawdline heavy [--handoff] -- <command…>` | 應用程式與原生編譯才排隊；一般指令直接執行；`--handoff` 會把排隊等待交給 callback（§11） |
 | `clawdline send --to <terminal> "…"` | 把一則訊息轉進另一個 session（§8） |
 | `clawdline notify --title "…" --body "…"` | 推播一則通知給使用者（§9） |
 | `clawdline note create --body-file <JSON> [--target <terminal>]` | 在 Session 上方留下需要人處理的便條（§9a） |
@@ -112,7 +112,7 @@ token 讀。帳本還沒讀到、或已經讀不到的 session 會回它的原�
 
 **收到完成通知後再續接。** 派出 child 後結束這個 turn：child 自己的完成通知會喚醒你，不必另設 callback
 監看它。排隊中的 `heavy`、CI、deploy、長時間編譯，或其他不需 Agent 即時判斷的指令，登記
-`clawdline callback`（或使用 `heavy --handoff`／`tools/check.sh`）後結束 turn。收到通知後，對該 id 執行一次
+`clawdline callback`（原生編譯也可使用 `heavy --handoff`）後結束 turn。收到通知後，對該 id 執行一次
 `clawdline task show <id>`；讀取會關掉通知。分別處理成功、失敗與逾時。失敗、逾時或結果不明時，先查明
 已執行的部分，再判斷重試是否安全；不要只因等待逾時就重啟同一工作。後續 turn 不要輪詢，包括用
 `clawdline leases`。一次 token 檢查在十個項目裡數到 520 個純等待 turn（7,220 萬 token），大多花在排隊
@@ -160,7 +160,7 @@ token 讀。帳本還沒讀到、或已經讀不到的 session 會回它的原�
   建置尚未執行；76 代表 `heavy --handoff` 已啟動 callback，應結束這個 turn 並等待通知。
 
 `clawdline heavy` 最多等 `--max-wait`（預設 30 分鐘），之後不執行指令、以 75 結束；要等的時間比你的工具
-允許的長，可用 `--handoff`：排隊時啟動 callback 並以 76 結束。`tools/check.sh` 預設啟用；child 不需要等待型 callback。callback 被拒絕時，讀取具體的拒絕原因並選擇受支援的路徑；拒絕代表指令尚未啟動。
+允許的長，可用 `--handoff`：排隊時啟動 callback 並以 76 結束。一般 `tools/check.sh` 不排隊；child 不需要等待型 callback。callback 被拒絕時，讀取具體的拒絕原因並選擇受支援的路徑；拒絕代表指令尚未啟動。
 
 **用 curl 呼叫 orchestrator 路由。** 從 `<state dir>/orchestrator-token` 讀取憑證，放進
 `X-Clawdline-Orchestrator` header。避免把憑證放在指令參數：使用
@@ -323,9 +323,10 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 1. **Project。** 執行 `clawdline project list`。清單沒有這個 checkout 時，用
    `clawdline project add <absolute-root>` 加入 repository root，再列一次。這只記錄能從哪裡開 Session，
    不會改 repository。
-2. **名稱與圖示。** 沒有設定時，Clawdline 會從路徑產生一個穩定圖示。使用者想指定名稱或像素圖示時，
+2. **名稱與圖示。** 沒有設定時，Clawdline 會從路徑產生一個穩定圖示。使用者想指定名稱、像素圖示或 SVG 時，
    保留 `~/.claude/project-icons.json` 裡的其他每一列，只修改這個 Project 最長相符路徑的那一列。格式在
-   Clawdline repository 的 `docs/project-status.md`；Projects 頁也能複製已解析好的圖示，不必手改 JSON。
+   Clawdline repository 的 `docs/project-icons.md`：像素格上限為 64×64；SVG 須有正尺寸的 `viewBox`，
+   只含靜態內容與內部參照，最多 96 KiB。兩者都會縮放進原有圖示框，不會撐大版面。
    全域使用者檔案不是 repository 內容；若原要求沒有授權修改，先把準備寫入的完整 entry 給使用者看。
 3. **Deploy 與長時間工作。** Clawdline 只讀狀態收據，從不執行 deploy。GitHub repository 的 deploy 收據
    是 `~/.claude/statusline-cache/ghrun-<owner>-<repo>.json`，owner 與 repo 取自 `origin`。已經知道 run
@@ -606,7 +607,7 @@ writes、deliverables、kind 和 timeout 都在裡面——所以 child 讀到�
 | `instructions` | 必填，最多 16 KiB。內容必須自己就講得清楚：除此之外 child 什麼都不知道。寫進你已經查證過的事實，每一條附 `file:line` 或指令；調查 child 還要有停止條件與 turn 上限 |
 | `claims` | **必填**：最多 32 個 child 可以寫入的相對路徑。`[]` 表示它什麼都不寫，派工會帶一個警告（`claims_missing`） |
 | `isolation` | `none`（預設），或 `worktree`：在自己的 branch 上開一份私有 checkout |
-| `permission_mode` | `ask`、`edits` 或 `full` |
+| `permission_mode` | `ask`、`edits` 或 `full`；省略時依機器設定（初始為 `full`） |
 | `timeout_minutes` | 1–240，預設 30 |
 | `kind`、`deliverables`、`model` | 選填；`model` 只能用 `[a-z0-9._-]`，最多 64 字元 |
 | `work_id` | 選填，這個 task 所服務的看板項目的 UUID |
@@ -900,6 +901,8 @@ body）與 `DELETE /v1/orchestrator/schedules/<id>`（以 JSON body 送出兩個
 指示。絕對不要把一次 run 當成使用者沒有要求之工作的概括授權。這份證據讓代轉行為可以稽核；它不會把
 整台機器共用的 orchestrator token 變成某個 Session 專屬的憑證。
 
+每隔固定天數的排程用 `"at":"09:00", "every_days":3, "start":"2026-10-21"` 取代 `days` 或 `on`。正整數天數依 `time_zone` 的日曆日期計算，包含起始日期；手動執行不移動週期，補跑仍只處理最近一次。這是長期指示，須帶相同的使用者授權證明。
+
 排程可以不設時間：用 `"trigger_only": true` 取代 `at`、`days` 與 `on`。時鐘永遠不會執行它；它只由
 `…/run` 或它的 webhook 啟動，而且只在 `enabled` 時。它和重複排程一樣是長期指示，需要同一份證據。
 
@@ -1026,6 +1029,11 @@ envelope。
 clawdline image send /absolute/path.png [more.png …]
 ```
 
+所有旗標都必須放在第一個圖片路徑之前，例如
+`clawdline image send --port 7727 /absolute/path.png`；`--target` 與 `--from` 也一樣。
+第一個路徑後面的參數都會被當成其他圖片路徑；把 `--port 7727` 放在最後會被當成兩個不存在的檔案，
+整批回傳 `400 invalid_image_path`。
+
 它會把圖片存成「在你自己的 Session 裡顯示」，console 會把它們畫在**圖片存好之後、你的 Session 第一則寫進紀錄的
 回覆**底下——通常就是執行這個指令的那則訊息（Claude Code 在指令開始後才把它寫進紀錄），不然就是下一則。
 回覆裡不需要寫任何東西。它就是 `POST /v1/artifacts/images`，body 為
@@ -1078,6 +1086,14 @@ clawdline note create --requested-by-person --body-file note.json
 密碼、憑證或 API key 請使用 **Secret Handoff／機密交付**。建立 `kind: "secret"` 的便條，標題、請求動作與原因都不得包含機密；在 `summary` 填入具體的憑證名稱（例如「正式環境 API key」），它會顯示為多行輸入欄位正上方的標籤。在 `command` 填入將接收此值的完整命令，格式為 argv 陣列，例如 `["gh","auth","login","--with-token"]`；沒有 `command` 的機密交付便條會被拒絕。`clawdline note create` 會在你的環境中把單純的執行檔名稱解析成絕對路徑，Console 會在輸入欄位旁把這個命令顯示給使用者（「這個值將交給：`/usr/bin/gh auth login --with-token`」），讓對方在交付前確認值會送到哪裡。請直接寫出真正的接收程式，不要用 shell 或包裝程式。`detail`、`options`、`document_url` 留空；其他種類的便條不接受 `command`。使用者在該欄位貼上內容，單行密碼也使用同一欄位。不要請使用者把機密放進建議回覆、一般訊息、文件或指令參數。送出後，目標 Session 可執行 `clawdline secret run <note-id> -- <command> [args...]`，命令必須與便條指定的完全相同；daemon 會以相同方式解析執行檔後比對完整 argv，任何其他命令都會被拒絕（`secret_handoff_command_mismatch`）。比對不符時不會交出任何內容，等待中的值會被抹除，便條也會關閉，使用者必須再對新的或重新開啟的便條交付一次。指令會從標準輸入取得一次性的內容，輸出會被抑制。內容於 15 分鐘後或 daemon 重啟時失效；即使接收程式失敗，也已使用掉這次交付。需要時重新請使用者交付，切勿印出內容或透過 shell 對話紀錄傳遞。界線與使用步驟見 `docs/secret-handoff.md`。
 
 `kind` 可為 `read`、`answer`、`action`、`report` 或 `secret`；`title`、`summary`、`action`、`reason` 必填。`answer` 可提供二至四個選項，每個選項的 `draft` 是按鈕顯示的建議回覆。使用者點一下，Console 就把它當成對話訊息直接送到便條所在的 Session，後面附上便條 ID、標題和待回覆事項，讓接收的 Session 知道使用者回答的是哪張便條；按鈕不顯示這段脈絡。送出成功後，便條才會移到最近已處理。送出失敗時，便條維持待處理，關注按鈕會說明回覆沒有送出。較長內容放 `detail`；`document_url` 可指向真正可讀的 Cloud 文件，建立便條前先驗證文件路徑與檔案。依實際收到的對話訊息行事，不看便條狀態：使用者手動標記已處理的便條，並沒有送出任何訊息。只有使用者明確要求建立便條時才用 `--requested-by-person`；泛稱「完成工作」不算明確要求。加上此旗標時便條仍會顯示，但不會送便條推播。若工作確實卡在答覆上，另記錄等待使用者的狀態；Agent 主動建立的便條已負責關注通知，別再重複送一則。便條不會喚醒 Agent。
+
+**撤回不再需要關注的便條**
+
+執行 `clawdline note list`，列出歸屬於自己存活 Root 的便條、ID、版本與目前狀態。自己留下的待處理便條已經不再需要關注時，執行：
+
+`clawdline note withdraw --id <便條ID> --version <版本> --reason "前置問題已解決，不再需要選擇。"`
+
+撤回原因必填。只有環境無法識別自己時才加 `--from <存活Root對話ID>`。結果不確定時，沿用 CLI 印出的冪等鍵加上 `--key` 重試。版本過期回傳 `version_conflict`，先重新讀取再判斷；其他來源的便條回傳 `intervention_not_found`；已結束的便條回傳 `intervention_already_closed`，保留原本結果。撤回會移除關注紅點，便條以灰色移到最近紀錄，顯示 Agent 已撤回與原因；這不代表使用者回答或批准。使用者可重新開啟。不要撤回其他 Root 的便條；機器憑證仍為共用，來源欄位不是密碼學上的 Session 隔離。
 
 ## 10. 看板
 
@@ -1682,9 +1698,9 @@ clawdline item assign <child id> (--terminal <terminal id> | --new [--assistant 
 
 取得 `daemon_restart` 前先完成建置。不要把 `clawdline dev install` 或其他會要求 `heavy_compile` 的指令包進此 wrapper：重新啟動租約會擋住編譯名額。安排好維護時段後直接執行 `clawdline dev install`；它會先建置再切換。`clawdline update --apply` 也直接執行，由更新程序自行下載、切換、檢查與回復。此 wrapper 只用於不會建置的獨立重新啟動指令。
 
-**編譯或跑測試套件時，用 `clawdline heavy -- <指令>` 包起來，不要直接跑。** 它會先排 `heavy_compile`，等機器有足夠的可用記憶體（機器的四分之一，最多 1 GB，且記憶體等待不超過 10%），再以較低優先權執行；在 Linux 上，記憶體真的不夠時，核心會先砍它而不是互動中的 session。執行期間續租，結束後釋放，並保留指令本身的 exit code。daemon 沒回應、或被它看不懂的理由拒絕時，它不會因此不編譯：照樣執行指令，並在 stderr 說明。等超過 `--max-wait`（預設 30 分鐘）還沒拿到編譯位置和記憶體時，它會放棄排隊、不執行指令，以 **75** 結束——這個代碼不會跟指令本身的失敗混在一起；晚點再跑一次。等待期間只在開始等時印一行、等完時印一行，中間什麼都不印：等它就一次等久一點（§2「等一個跑很久的指令」）。`heavy` 裡面再呼叫 `heavy` 會直接執行。`--min-available 1500M` 可要求更多記憶體，`--no-slot` 只檢查記憶體。repository 裡有 `tools/heavy.sh` 的話，用 `tools/heavy.sh <指令>` 就會自動找到執行檔。
+**只有應用程式建置與原生編譯才使用 `clawdline heavy -- <指令>`。** Go build/install、Swift build、Objective-C／C 編譯及 Xcode 建置會排隊。Python、一般測試（含 Go／Swift test）、前端建置與型別檢查直接執行，不依 CPU 用量判斷。無法辨識的指令也直接執行，不等待記憶體或建立 callback。只有包含應用程式／原生編譯的腳本才用 `--compile`（或 `tools/heavy.sh --compile`）明確標記，不可把整套檢查或測試標記為編譯。`--no-slot` 仍可明確要求只等待記憶體。原生編譯會先排 `heavy_compile`，等機器有足夠的可用記憶體（機器的四分之一，最多 1 GB，且記憶體等待不超過 10%），再以較低優先權執行；在 Linux 上，記憶體真的不夠時，核心會先砍它而不是互動中的 session。執行期間續租，結束後釋放，並保留指令本身的 exit code。daemon 沒回應、或被它看不懂的理由拒絕時，它不會因此不編譯：照樣執行指令，並在 stderr 說明。等超過 `--max-wait`（預設 30 分鐘）還沒拿到編譯位置和記憶體時，它會放棄排隊、不執行指令，以 **75** 結束——這個代碼不會跟指令本身的失敗混在一起；晚點再跑一次。等待期間只在開始等時印一行、等完時印一行，中間什麼都不印：等它就一次等久一點（§2「等一個跑很久的指令」）。`heavy` 裡面再呼叫 `heavy` 會直接執行。`--min-available 1500M` 可要求更多記憶體，`--no-slot` 只檢查記憶體。repository 裡有 `tools/heavy.sh` 的話，用 `tools/heavy.sh <指令>` 就會自動找到執行檔。
 
-Root 的 `heavy` 預設在需要等待時啟動 callback，並以 **76** 結束，印出 callback ID 與已知的排隊位置。這時結束這個 turn，等待通知。`tools/check.sh` 預設啟用；child、缺少 conversation ID、callback 被拒絕或 daemon 無法連線時，仍在原處等待。
+Root 的 `heavy` 預設在需要等待時啟動 callback，並以 **76** 結束，印出 callback ID 與已知的排隊位置。這時結束這個 turn，等待通知。一般 `tools/check.sh` 不排隊；child、缺少 conversation ID、callback 被拒絕或 daemon 無法連線時，仍在原處等待。
 
 **Session 暫停與喚醒。** 排列衝突工作前，先讀 `docs/session-resource-coordination.md`。`clawdline coordination status` 顯示持久化的暫停回執。`clawdline coordination pause --reason "…" --wake "lease:heavy_compile" <目標對話 ID>…` 接受指令並嘗試送達。收件 Session 完成重要命令後執行 `clawdline coordination observed <指令 ID>`，到安全停點再執行 `clawdline coordination safe <指令 ID>`，然後結束模型回合。只有最後一筆收件者回執代表已暫停。條件成立後執行 `wake <指令 ID>`；收件者執行 `resumed <指令 ID>`，且仍須先取得租約或確認等待已釋放，才能工作。`retry <指令 ID>` 可重試失敗或結果不明的送達。新的已註冊 Clawdfather 可以喚醒離線前任留下的 Session。候位期間不要讓模型回合定期輪詢。
 

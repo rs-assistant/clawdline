@@ -22,7 +22,7 @@ import (
 	"sync"
 )
 
-//go:embed clawdline/SKILL.md clawdline/freshness.json clawdline/guide.md clawdline/guide.zh-TW.md clawdline/guide.ja.md clawdline/guide.zh-Hans.md clawdline/guide.ko.md clawdline/guide.es.md clawdline/guide.pt-BR.md clawdline/guide.fr.md clawdline/guide.de.md clawdline/routes.md clawdline/routes.zh-TW.md clawdline/capacity.md clawdline/capacity.zh-TW.md clawdline/refusals.md clawdline/refusals.zh-TW.md
+//go:embed clawdline/squad.md clawdline/squad.zh-TW.md clawdline/SKILL.md clawdline/freshness.json clawdline/guide.md clawdline/guide.zh-TW.md clawdline/guide.ja.md clawdline/guide.zh-Hans.md clawdline/guide.ko.md clawdline/guide.es.md clawdline/guide.pt-BR.md clawdline/guide.fr.md clawdline/guide.de.md clawdline/routes.md clawdline/routes.zh-TW.md clawdline/capacity.md clawdline/capacity.zh-TW.md clawdline/refusals.md clawdline/refusals.zh-TW.md
 var files embed.FS
 
 // DefaultTopic is the guide `clawdline guide` prints with no topic.
@@ -247,6 +247,15 @@ func RefusalCatalog(topic string) ([]byte, error) {
 	path := "clawdline/refusals.md"
 	if ResolveTopic(topic) == "zh-Hant" {
 		path = "clawdline/refusals.zh-TW.md"
+	}
+	return files.ReadFile(path)
+}
+
+// SquadGuide is the complete Agent contract for private roles and skills.
+func SquadGuide(lang string) ([]byte, error) {
+	path := "clawdline/squad.md"
+	if ResolveTopic(lang) == "zh-Hant" {
+		path = "clawdline/squad.zh-TW.md"
 	}
 	return files.ReadFile(path)
 }

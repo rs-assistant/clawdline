@@ -33,6 +33,7 @@ type humanInterventionWire struct {
 	CreatedAt          int64                          `json:"created_at"`
 	ReadAt             *int64                         `json:"read_at"`
 	ResolvedAt         *int64                         `json:"resolved_at"`
+	Withdrawn          bool                           `json:"withdrawn,omitempty"`
 	Resolution         string                         `json:"resolution,omitempty"`
 	SecretReceived     bool                           `json:"secret_received,omitempty"`
 	Version            int64                          `json:"version"`
@@ -42,7 +43,7 @@ func humanInterventionOf(v work.HumanIntervention) humanInterventionWire {
 	out := humanInterventionWire{ID: v.ID, SourceConversation: v.SourceConversation, SourceLabel: v.SourceLabel,
 		TargetConversation: v.TargetConversation, TargetSession: v.TargetSession, Kind: v.Kind, Title: v.Title,
 		Summary: v.Summary, Action: v.Action, Reason: v.Reason, Detail: v.Detail, Options: v.Options,
-		DocumentURL: v.DocumentURL, Command: v.Command, CreatedAt: v.CreatedAt.Unix(), Resolution: v.Resolution, Version: v.Version}
+		DocumentURL: v.DocumentURL, Command: v.Command, CreatedAt: v.CreatedAt.Unix(), Resolution: v.Resolution, Withdrawn: v.Withdrawn, Version: v.Version}
 	if out.Options == nil {
 		out.Options = []work.HumanInterventionOption{}
 	}
@@ -227,4 +228,60 @@ func (s *Server) writeHumanInterventionIdentityError(w http.ResponseWriter, err 
 		return
 	}
 	writeRefusal(w, http.StatusServiceUnavailable, "session_unresolved", "The source Session could not be verified.")
+}
+
+// Agents can inspect and withdraw only notes attributed to their live Root.
+func (s *Server) agentManageHumanInterventions(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		SourceConversation string `json:"source_conversation"`
+		ExpectedVersion    int64  `json:"expected_version"`
+		Reason             string `json:"reason"`
+	}
+	var raw []byte
+	if r.Method == http.MethodGet {
+		body.SourceConversation = r.URL.Query().Get("source_conversation")
+	} else {
+		var ok bool
+		raw, ok = readWorkV2Body(w, r, &body)
+		if !ok {
+			return
+		}
+	}
+	if s.broker == nil {
+		writeRefusal(w, http.StatusServiceUnavailable, "session_unresolved", "The live Session registry is unavailable.")
+		return
+	}
+	if _, err := s.broker.LiveRootSession(r.Context(), body.SourceConversation); err != nil {
+		s.writeHumanInterventionIdentityError(w, err)
+		return
+	}
+	if r.Method == http.MethodGet {
+		rows, err := s.store.SourceHumanInterventions(r.Context(), body.SourceConversation)
+		if err != nil {
+			s.writeWorkV2Error(w, err)
+			return
+		}
+		out := []humanInterventionWire{}
+		for _, row := range rows {
+			out = append(out, humanInterventionOf(row))
+		}
+		writeJSON(w, map[string]any{"ok": true, "rows": out})
+		return
+	}
+	k, ok := s.beginWorkV2Write(w, r, body.SourceConversation, raw)
+	if !ok {
+		return
+	}
+	answer := func(v work.HumanIntervention) []byte {
+		b, _ := json.Marshal(map[string]any{"ok": true, "note": humanInterventionOf(v)})
+		return b
+	}
+	_, response, err := s.humanInterventions().Withdraw(r.Context(), id, body.SourceConversation, body.Reason, body.ExpectedVersion, k, answer)
+	if err != nil {
+		_ = s.store.ReleaseReceipt(context.WithoutCancel(r.Context()), k)
+		s.writeWorkV2Error(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(response)
 }
