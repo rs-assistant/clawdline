@@ -1,0 +1,71 @@
+pointers:
+  fork: https://github.com/rs-assistant/clawdline
+  upstream: https://github.com/sainteye/clawdline
+  branch: local-source-build
+  reviewed_base_commit: 418bac778938e1099d0c895ac2431abe66b75fef
+  run_and_policy_rules: CLAUDE.md (fork section)
+  pinned_release_pubkey: internal/adapters/release/keys.go
+  update_check_switch: internal/adapters/updatecheck/updatecheck.go (CLAWDLINE_NEXT_UPDATE_CHECK=off, checked in Run and Refresh)
+  release_updater_gate: internal/transport/http/update.go (updateChecker, kind != install.KindRelease)
+
+decisions:
+  - choice: Install by building from source (option C) at the reviewed commit only.
+    date: "2026-10-22"
+    why: User does not want any code that was not verified by us.
+    rejected:
+      - option: curl install.sh | sh (option A)
+        reason: install.sh checks only a same-origin sha256 and then runs the downloaded binary; the signature is verified by that binary itself.
+      - option: Download release assets and verify with go run ./tools/release verify, then install (option B)
+        reason: Still installs upstream-built binaries and enables the GitHub release updater; user rejected release installs entirely.
+  - choice: No GitHub release update checks.
+    how: A source build never starts the release updater. The remaining BUILD.json check to app.clawdline.com is disabled with CLAWDLINE_NEXT_UPDATE_CHECK=off. No code change was needed.
+  - choice: Bump golang.org/x/net v0.50.0 -> v0.60.0 and pin toolchain go1.27.3 in go.mod.
+    why: govulncheck on 2026-10-22 found 13 reachable vulns (x/net HTTP/2 and DNS; stdlib in go1.27.1). After the bump it reports 0 reachable.
+    side_effects: go directive raised 1.25.0 -> 1.26.0 (required by x/net v0.60.0); x/crypto bumped to v0.57.0 and x/sys to v0.48.0; go mod tidy marked goldmark and x/crypto as direct deps; README badge and docs/user/install.md updated to Go 1.26.
+  - choice: npm ci --ignore-scripts for web deps.
+    why: Lockfile integrity hashes, no install scripts. Third-party deps are hash-verified, not code-reviewed. User accepted this boundary implicitly; reconfirm if asked.
+  - choice: Cloud off, tunnel off, dispatch with --permission-mode ask.
+    why: Security review findings below.
+
+blockers:
+  - npm audit could not run on 2026-10-22 (registry advisory endpoint returned 503). npm ci printed that issues exist; their count and severity are unknown.
+  - Daemon has not been started. No LaunchAgent exists yet; user has not answered whether to create one.
+  - Local checkout lives under /tmp and will be lost on reboot; re-clone from the fork branch.
+
+next:
+  - Run npm audit in web/ and report the findings to the user.
+  - Ask the user where to keep the checkout and whether to install a LaunchAgent that sets CLAWDLINE_NEXT_UPDATE_CHECK=off and CLAWDLINE_NEXT_WEB.
+  - Before merging any upstream change into the fork, review the diff against 418bac7 and rerun govulncheck.
+  - If the user wants code fixes for review findings, start with the dispatch default (permission full) and the cloud off reload bug.
+
+context:
+  user_preferences:
+    - Replies in Traditional Chinese (Taiwan); code, commits and docs in English.
+    - Wants Claude and Codex to cross-review; present disagreements instead of resolving them silently.
+    - Strong preference against running any unreviewed upstream code or binaries.
+  data_exposure_with_this_setup: With a source build, Cloud off and the update check off, nothing is sent to clawdline operators or GitHub. Remaining egress, none of it to the operator - AI auto-naming sends conversation snippets and paths to Anthropic/OpenAI via the local claude/codex CLI; browser push subscriptions go to Apple/Google push services, E2E encrypted; clicking docs or plan links opens clawdline.com.
+  data_exposure_if_cloud_enabled: Operator sees hostname as machine name (renameable), OS, version, account; relay sees machine id, session id, timing, sizes and which device reads which session. Titles, projects, transcripts and terminal content are E2E encrypted, but the decrypting JS is served by app.clawdline.com. Cloud direct uses Google and Cloudflare STUN, which see the public IP.
+  local_data_collection: Scans all ~/.claude/projects/*.jsonl and ~/.codex/sessions, including non-Clawdline sessions, for token counts only (kept 57 days, no opt-out). Does not read Claude/Codex credential files; only experiments/personas/round5/run.mjs copies ~/.codex/auth.json and it is not on a daemon path. Voice transcripts persist in idempotency receipts for 24h. Security audit segments are never auto-deleted.
+  review_findings_2026-10-19:
+    note: Static review only; Claude (5 subagents) and Codex (2 runs). Verdicts were spot-checked against source. Not fixed in this branch.
+    high:
+      - Device revocation does not rotate the shared account master secret, and unpinned senders fall back to the cloud roster key (internal/transport/cloud/link.go publicKeyFor). Someone holding an old master secret who can add a roster device keeps decrypting, and can command if cloud_commands is on.
+      - Hosted console JS from app.clawdline.com holds the keys and cannot be verified against the repo (only matters if the operator is compromised or malicious).
+    medium:
+      - install.sh executes the downloaded binary before an independent signature check (Codex rated High).
+      - dispatch defaults to permission full, i.e. bypassPermissions / --ask-for-approval never (cmd/clawdline/dispatch.go, internal/app/orchestrator/draft.go).
+      - No envelope timestamp check and the replay window is in memory, rebuilt on every wire(); a malicious relay can delay or replay commands that have no durable receipt, e.g. work-gate-settings-update (internal/adapters/cloud/transport.go, internal/transport/cloud/link.go).
+      - Session cookie is not port-scoped; other 127.0.0.1 services opened in the same browser receive it (internal/transport/http/auth.go signedIn).
+      - SSE /v1/events stays open after device revocation (internal/transport/http/stream.go) - Codex only.
+      - An artifacts symlink in a repo widens document reads while documents_contain_project_root is false (internal/adapters/documents/documents.go) - Codex only.
+      - Secret Handoff does not stop a prompt-injected agent from running secret run -- curl (cmd/clawdline/secret.go).
+      - cloud off via CLI writes the file first, then the daemon sees no change and skips reload, so a live relay line stays up (internal/transport/http/cloud_onboarding.go) - Codex found, statically confirmed, not reproduced.
+    disputed:
+      - ctl/ reads skip re-authorization (internal/app/cloudops/cloudops.go serveRead). Codex rated High, Claude Low; assessed Medium because every paired device already gets Read+Send.
+    low:
+      - Multi-user Linux - port squatting on 7727, token in argv for clawdline open, global 24h pairing lockout DoS.
+      - No CSP or frame-ancestors on console pages (internal/transport/http/page.go).
+      - Unvalidated pre-release segment in version strings allows path traversal; needs the signing key (internal/adapters/release/version.go).
+      - Forced downgrade possible; manifests do not expire.
+      - curl --proto allows http in install.sh.
+    sound: No telemetry, analytics or crash SDKs. Local HTTP has CSRF, Origin and Host checks. No exploitable XSS found. No sh -c injection. Release updater verifies the ed25519 signature before parsing. Token and key files are 0600.

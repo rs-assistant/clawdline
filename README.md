@@ -3,7 +3,7 @@
 [繁體中文](README.zh-TW.md)
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.25-00ADD8.svg)](go.mod)
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8.svg)](go.mod)
 
 **With Clawdline Cloud, see Claude Code and Codex Sessions across your machines in one phone list, then open one to reply or leave a to-do.**
 

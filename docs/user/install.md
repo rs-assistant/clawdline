@@ -176,7 +176,7 @@ even when nothing else is left. Uninstall also removes the service's systemd dro
 
 ## Build from source instead
 
-For working on Clawdline itself — you need Go 1.25+, Node.js with npm, and tmux:
+For working on Clawdline itself — you need Go 1.26+, Node.js with npm, and tmux:
 
 ```sh
 git clone https://github.com/sainteye/clawdline.git && cd clawdline
