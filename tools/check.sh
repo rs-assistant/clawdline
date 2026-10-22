@@ -199,9 +199,12 @@ fi
 # change; nothing else exercises their failure cases before a release.
 release_evidence=$scope_full
 for path in ${private_paths[@]+"${private_paths[@]}"}; do
-  case "$path" in tools/release/*|tools/check.sh|.github/workflows/release.yml|.github/workflows/tmux.yml) release_evidence=true ;; esac
+  case "$path" in tools/release/*|tools/check.sh|.github/workflows/release.yml|.github/workflows/dmg.yml|.github/workflows/tmux.yml) release_evidence=true ;; esac
 done
 if [ "$release_evidence" = true ]; then check "release evidence (supply-chain.test.sh)" bash tools/release/supply-chain.test.sh
+if [ "$(uname -s)" = Darwin ]; then
+  check "DMG install harness (synthetic images)" bash tools/release/test-dmg-install-smoke.sh
+fi
 else summary+=("SKIP  release evidence  (tools/release and the release workflows unchanged; full checks run it)"); fi
 if [ "$web" = yes ]; then
   check "web: npm run check" sh -c 'cd web && npm run deps && npm run check'

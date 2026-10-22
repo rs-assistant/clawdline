@@ -21,6 +21,7 @@ MOCK
 chmod +x "$scratch/repo/tools/heavy.sh"
 mkdir -p "$scratch/repo/tools/release"
 printf '#!/bin/sh\nprintf "supply-chain\\n" >> "$CALLS"\n' > "$scratch/repo/tools/release/supply-chain.test.sh"
+printf '#!/bin/sh\nprintf "dmg-install-harness\\n" >> "$CALLS"\n' > "$scratch/repo/tools/release/test-dmg-install-smoke.sh"
 cat > "$scratch/bin/go" <<'MOCK'
 #!/bin/bash
 printf 'go %s\n' "$*" >> "$CALLS"
@@ -99,6 +100,7 @@ grep -Fxq 'supply-chain' "$CALLS"
 if [ "$(uname -s)" = Darwin ]; then
   grep -Fxq 'test-shell-pairing-permission.sh' "$CALLS"
   grep -Fxq 'test-shell-language.sh' "$CALLS"
+  grep -Fxq 'dmg-install-harness' "$CALLS"
 elif grep -Fxq 'test-shell-pairing-permission.sh' "$CALLS"; then
   exit 1
 fi
