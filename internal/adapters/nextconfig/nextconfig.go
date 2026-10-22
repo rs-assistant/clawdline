@@ -549,6 +549,15 @@ var Settables = []Settable{
 	// (docs/interface.md "Turning iTerm2 scanning off").
 	{Name: "iterm_scan", Kind: "bool"},
 	{Name: "session_auto_discovery", Kind: "bool"},
+	// The console's setup wizard (web/console/src/setup): `local` is the
+	// person choosing to use this machine only, so the header shows a quiet
+	// local mark instead of unfinished Cloud steps.
+	{Name: "setup_mode", Kind: "string", Choices: []string{"", "cloud", "local"},
+		Refusal: "invalid_setup_mode", Because: "empty, cloud or local"},
+	// When the console first saw all three setup items paired, Unix seconds;
+	// 0 is not complete. The header button folds away a day after it.
+	{Name: "setup_completed_at", Kind: "int", Min: 1, Max: 1 << 40, Zero: true,
+		Refusal: "invalid_setup_completed_at", Because: "0, or Unix seconds"},
 	{Name: "orchestrator_enabled", Kind: "bool"},
 	{Name: "orchestrator_max_children", Kind: "int", Min: 1, Max: 10},
 	{Name: "orchestrator_permission", Kind: "string", Choices: []string{"ask", "edits", "full"},
