@@ -200,13 +200,13 @@ export function writeWorkGateSettings(change: Partial<WorkGateSettingsRequest>):
   })
 }
 
-async function callWorkflow(init: RequestInit): Promise<WorkflowSettingsSnapshot> {
+async function callWorkflow(init: RequestInit, request: typeof fetch = fetch): Promise<WorkflowSettingsSnapshot> {
   const path = "/v1/settings/workflow"
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 10_000)
   let res: Response
   try {
-    res = await fetch(client.url(path), { ...init, signal: controller.signal })
+    res = await request(client.url(path), { ...init, signal: controller.signal })
   } catch (cause) {
     throw new TransportError(`${init.method ?? "GET"} ${path} did not complete`, cause)
   } finally {
@@ -226,14 +226,14 @@ async function callWorkflow(init: RequestInit): Promise<WorkflowSettingsSnapshot
   return parsed as WorkflowSettingsSnapshot
 }
 
-export function readWorkflowSettings(): Promise<WorkflowSettingsSnapshot> {
-  return callWorkflow({ method: "GET" })
+export function readWorkflowSettings(request?: typeof fetch): Promise<WorkflowSettingsSnapshot> {
+  return callWorkflow({ method: "GET" }, request)
 }
 
-export function writeWorkflowSettings(change: Partial<WorkflowSettingsRequest>): Promise<WorkflowSettingsSnapshot> {
+export function writeWorkflowSettings(change: Partial<WorkflowSettingsRequest>, request?: typeof fetch): Promise<WorkflowSettingsSnapshot> {
   return callWorkflow({
     method: "POST",
     headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
     body: JSON.stringify(change),
-  })
+  }, request)
 }

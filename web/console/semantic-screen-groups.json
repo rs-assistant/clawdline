@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8803,
-  "riskKeys": 3913,
-  "nonRiskCount": 4890,
+  "englishContentKeys": 8853,
+  "riskKeys": 3945,
+  "nonRiskCount": 4908,
   "groups": [
     {
       "name": "admin / other",
@@ -258,6 +258,23 @@
         "bar.placeholder",
         "bar.scanning",
         "bar.sessionAgents"
+      ]
+    },
+    {
+      "name": "browserPairing / other",
+      "count": 8,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "browserPairing.androidCheck",
+        "browserPairing.androidTitle",
+        "browserPairing.approve",
+        "browserPairing.connect",
+        "browserPairing.connectIntro",
+        "browserPairing.machineFingerprint",
+        "browserPairing.retry",
+        "browserPairing.viewerFingerprint"
       ]
     },
     {
@@ -2172,6 +2189,19 @@
         "http.ff5e489c60f89bae",
         "http.ffd795cf51e7ebea",
         "http.ffed8239d8e297e0"
+      ]
+    },
+    {
+      "name": "itermConsent / other",
+      "count": 4,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "itermConsent.enable",
+        "itermConsent.savedTitle",
+        "itermConsent.saving",
+        "itermConsent.title"
       ]
     },
     {
@@ -4648,6 +4678,21 @@
         "settings.webCloudStatusKey",
         "settings.webCloudStatusMac",
         "settings.workTab"
+      ]
+    },
+    {
+      "name": "shell / other",
+      "count": 6,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "shell.menuCopy",
+        "shell.menuCut",
+        "shell.menuEdit",
+        "shell.menuPaste",
+        "shell.menuSelectAll",
+        "shell.pairLinkReturn"
       ]
     },
     {

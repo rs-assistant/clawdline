@@ -5,6 +5,7 @@ import * as L from "../../legacy/bridge.js"
 import { readWorkflowSettings, writeWorkflowSettings } from "./api.js"
 import { Switch } from "./Switch.js"
 import "./workflow-settings.css"
+import { BrowserPairingBlock } from "./BrowserPairingBlock.js"
 
 type Key = keyof WorkflowSettingsSnapshot
 const word = (key: string) => catalogWord("workflowSettings", key)
@@ -70,5 +71,6 @@ export function WorkflowSettingsBlock({ shown }: { shown: boolean }) {
     })}
     <p className="said" role="status" aria-live="polite">{said}</p>
     {!snapshot && !busy && <button type="button" className="chip" onClick={() => setRetry(value => value + 1)}>{word("retry")}</button>}
+    <BrowserPairingBlock shown={shown} />
   </div>
 }
