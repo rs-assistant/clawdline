@@ -31,6 +31,7 @@
       "pattern": "/v1/board/tracks",
       "guide": "board"
     },
+    {"method": "*", "pattern": "/v1/provider-quotas", "guide": "connect"},
     {
       "method": "*",
       "pattern": "/v1/capacity",

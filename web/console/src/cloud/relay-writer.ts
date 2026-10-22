@@ -286,6 +286,7 @@ export type WriteRoute =
   | { op: "usage-overview"; word: Carried<"usage.overview"> }
   | { op: "usage-work-samples"; word: Carried<"usage.work-samples"> }
   | { op: "capacity"; word: Carried<"capacity"> }
+  | { op: "provider-quotas"; word: Carried<"provider-quotas"> }
   | { op: "default-models"; word: Carried<"default-models"> }
   | { op: "default-models-update"; word: Carried<"default-models-update"> }
   | { op: "notification-rules"; word: Carried<"notification-rules"> }
@@ -467,6 +468,7 @@ export const CARRIED_READS: ReadonlySet<WriteRoute["op"]> = new Set<WriteRoute["
   "usage-work-samples",
   "usage",
   "capacity",
+  "provider-quotas",
   "default-models",
   "notification-rules",
   "work-gate-settings",
@@ -536,6 +538,7 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
     }
     // The capacity block on Settings: the register's rows and the dead
     // letters, machine-wide, on the machine's one reply channel.
+    if (head === "provider-quotas" && segments.length === 1) return { op: "provider-quotas", word: "provider-quotas" }
     if (head === "capacity" && segments.length === 1) return { op: "capacity", word: "capacity" }
     if (head === "settings" && a === "default-models" && segments.length === 2) {
       return { op: "default-models", word: "default-models" }
@@ -1407,6 +1410,7 @@ export class RelayWriter {
         }
         return client._machineRequest(this.host.machine, route.word, { id: route.id }, "read")
       }
+      case "provider-quotas":
       case "capacity":
       case "default-models":
       case "notification-rules":

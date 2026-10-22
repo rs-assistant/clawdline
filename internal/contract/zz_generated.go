@@ -4515,6 +4515,35 @@ type ProposalDiagnostics struct {
 	Pending int64 `json:"pending"`
 }
 
+// An account quota observation. Empty windows means unknown, never zero.
+// Credentials and account identifiers are never included. A provider with no
+// windows is omitted from the footer.
+type ProviderQuotaRow struct {
+	ID         string                `json:"id"`
+	Label      string                `json:"label"`
+	ObservedAt int64                 `json:"observed_at,omitempty"`
+	Problem    string                `json:"problem,omitempty"`
+	Source     string                `json:"source"`
+	Stale      bool                  `json:"stale"`
+	Windows    []ProviderQuotaWindow `json:"windows"`
+}
+
+// GET /v1/provider-quotas. Current machine only; file observations for Claude
+// and Codex, cached metadata reads for Gemini and Grok. Network refreshes are
+// asynchronous and single-flight per provider; failures retain the last
+// successful snapshot marked stale.
+type ProviderQuotaSnapshot struct {
+	At        int64              `json:"at"`
+	Providers []ProviderQuotaRow `json:"providers"`
+	Updating  bool               `json:"updating"`
+}
+
+type ProviderQuotaWindow struct {
+	Name        string  `json:"name"`
+	ResetsAt    int64   `json:"resets_at,omitempty"`
+	UsedPercent float64 `json:"used_percent"`
+}
+
 // GET /v1/push/key. The application server key the page passes to `subscribe({
 // applicationServerKey })`: base64url of the uncompressed P-256 public point.
 // It is an identity rather than a session — every subscription a browser

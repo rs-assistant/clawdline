@@ -110,6 +110,7 @@ func init() {
 		// a parameter, as the local route is; a read, since the route writes
 		// nothing.
 		op{name: "capacity", read: true},
+		op{name: "provider-quotas", read: true},
 
 		// The machine-wide launch defaults shown on Settings. This is deliberately
 		// narrower than /v1/settings: a paired phone receives and changes only

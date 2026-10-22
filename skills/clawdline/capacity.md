@@ -19,6 +19,10 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `cache.git_not_repo_rows` | 256 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cache.image_thumbs` | 8388608 | `bytes` | `evict_oldest` | `diagnostics` | — |
 | `cache.pinned_read` | 3 | `seconds` | `expire` | `diagnostics` | — |
+| `cache.provider_quota` | 4 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `cache.provider_quota_refresh_seconds` | 900 | `seconds` | `evict_oldest` | `diagnostics` | — |
+| `cache.provider_quota_request_seconds` | 10 | `seconds` | `evict_oldest` | `diagnostics` | — |
+| `cache.provider_quota_response_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics` | — |
 | `cache.reclaim_summary` | 30 | `seconds` | `expire` | `diagnostics` | — |
 | `cache.session_activity` | 64 | `rows` | `evict_oldest` | `diagnostics, notice` | — |
 | `cache.session_execution_memo` | 4096 | `rows` | `evict_oldest` | `diagnostics` | — |

@@ -72,6 +72,26 @@
     "Note": true
   },
   {
+    "Name": "cache.provider_quota",
+    "Known": true,
+    "WindowSeconds": true
+  },
+  {
+    "Name": "cache.provider_quota_refresh_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.provider_quota_request_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.provider_quota_response_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cache.reclaim_summary",
     "Known": true,
     "Note": true

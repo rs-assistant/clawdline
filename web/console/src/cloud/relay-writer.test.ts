@@ -2443,6 +2443,7 @@ test("every read the writer carries is one it waits for", () => {
     ["/v1/usage/work-samples", "usage-work-samples"],
     ["/v1/usage/sessions/s1", "usage"],
     ["/v1/capacity", "capacity"],
+    ["/v1/provider-quotas", "provider-quotas"],
     ["/v1/settings/default-models", "default-models"],
     ["/v1/notification-rules", "notification-rules"],
     ["/v1/settings/notifications", "notification-settings"],
@@ -2592,4 +2593,15 @@ test("the website workflow tab carries iTerm2 consent only to its selected machi
     assert.equal((await reader.fetch("/v1/settings/workflow", post({ iterm_integration: on }))).status, 200)
     assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "workflow-settings-update", { changes: { iterm_integration: on } }, "action"])
   }
+})
+
+
+test("provider quota metadata crosses Cloud as a machine read without credentials", async () => {
+  assert.deepEqual(writeRoute("GET", "/v1/provider-quotas"), { op: "provider-quotas", word: "provider-quotas" })
+  assert.equal(writeRoute("POST", "/v1/provider-quotas"), null)
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  assert.equal((await reader.fetch("/v1/provider-quotas")).status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "provider-quotas", {}, "read"])
+  assert.equal((await reader.fetch("/v1/provider-quotas?account=other")).status, 501)
 })

@@ -280,6 +280,7 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("usage.work-units" in CARRIED)
   assert.ok("usage.work-samples" in CARRIED)
   assert.ok("capacity" in CARRIED)
+  assert.ok("provider-quotas" in CARRIED)
   assert.ok("default-models" in CARRIED)
   assert.ok("default-models-update" in CARRIED)
   assert.ok("notification-rules" in CARRIED)
@@ -322,7 +323,7 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("session-snippets" in CARRIED)
   assert.ok("usage.overview" in CARRIED)
   assert.ok("direct-local-network-enable" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 164)
+  assert.equal(Object.keys(CARRIED).length, 165)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {

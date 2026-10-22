@@ -47,6 +47,20 @@ clawdline usage --compare-compaction --since 14d
 
 and keep the question open on the **Verify** page ([board.md](board.md)).
 
+## The global provider quota bar
+
+A quota bar appears at the bottom of every console page. It shows Claude Code, Codex, Gemini and
+Grok when that machine has numeric quota data for them. Providers without data stay hidden.
+Click a provider to see all known windows, reset times, sources and the age of the reading. Narrow
+windows keep the tightest limits visible and put the remaining providers behind **+N**.
+
+**Settings → Browser → Show provider quota bar** is on by default. Turn it off to hide the bar in
+this browser; the choice survives reloads. It does not change the dispatch quota check. Cloud shows
+the selected machine's reading rather than adding the same account's quota across machines.
+An outdated or offline reading is marked as such. Refresh never sends a chat message. Gemini and
+Grok checks have a minimum 15-minute interval; expired credentials are refreshed by running the
+corresponding CLI on that machine. [Sources and refresh behavior](../provider-quotas.md).
+
 ## How much each assistant has left
 
 ```sh

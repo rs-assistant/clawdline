@@ -49,6 +49,10 @@ export class ClawdlineClient {
     return `${this.baseUrl}${path}`
   }
 
+  providerQuotas(): Promise<import("@clawdline/contract").ProviderQuotaSnapshot> {
+    return this.get("/v1/provider-quotas")
+  }
+
   health(): Promise<Health> {
     return this.get(routes.health)
   }

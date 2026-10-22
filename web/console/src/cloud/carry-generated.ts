@@ -91,6 +91,9 @@ export const CARRIED = {
   "project-worktree-lifecycle-refresh": "POST /v1/projects/{project}/worktrees/refresh",
   "project-worktree-remove": "DELETE /v1/projects/{project}/worktrees/{worktree}",
   projects: "GET /v1/projects",
+  // Account quota snapshots for the global footer. Credentials remain on the
+  // machine.
+  "provider-quotas": "GET /v1/provider-quotas",
   "push-key": "GET /v1/push/key",
   "push-subscribe": "POST /v1/push/subscribe",
   "push-test": "POST /v1/push/test",

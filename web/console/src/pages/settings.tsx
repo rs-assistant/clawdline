@@ -1,3 +1,4 @@
+import { QuotaSetting } from "../provider-quota/QuotaSetting.js"
 import { SurveySettingsLink } from "../onboarding/Survey.js"
 import { catalogWord } from "../catalog.js"
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react"
@@ -331,6 +332,8 @@ function SettingsPage({ shown }: { shown: boolean }) {
             {push.said}
           </p>
         </div>
+
+        <QuotaSetting />
 
         <div className="block" id="settings-font-scale">
           <div className="settings-control-heading">

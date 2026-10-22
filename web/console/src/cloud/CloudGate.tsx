@@ -2031,6 +2031,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
                   : null
               : null}
             onFleetDetailPending={noteRowPending}
+            quotaMachineName={readingRow?.name || readingRow?.label}
             fleetReaderMachine={readerMachine}
             onFleetClose={closeFleetTarget}
             fleetActionIntent={fleetActionIntent}

@@ -330,6 +330,82 @@
   },
   {
     "Register": "daemon",
+    "Name": "cache.provider_quota",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/providerquota.CacheLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.provider_quota_refresh_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 900,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/providerquota.RefreshSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.provider_quota_request_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/providerquota.RequestSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.provider_quota_response_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/providerquota.ResponseBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cache.reclaim_summary",
     "Class": "cache",
     "Unit": "seconds",

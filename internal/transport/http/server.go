@@ -28,6 +28,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/projectlinks"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	psync "github.com/sainteye/clawdline/internal/adapters/projectsync"
+	"github.com/sainteye/clawdline/internal/adapters/providerquota"
 	"github.com/sainteye/clawdline/internal/adapters/release/updater"
 	"github.com/sainteye/clawdline/internal/adapters/skillfile"
 	"github.com/sainteye/clawdline/internal/adapters/skillmenu"
@@ -165,6 +166,9 @@ type Server struct {
 	// usage keeps the previous reading of this machine's CPU and memory, so
 	// the dashboard's shares are measured between two (machine_usage.go).
 	usageOnce sync.Once
+	// Quota metadata readers are shared by every paired browser on this daemon.
+	providerQuotaOnce    sync.Once
+	providerQuotaService *providerquota.Service
 	// update is the update check behind GET /v1/update (update.go), made on
 	// first use; StartScheduler starts its background refresh.
 	update     *updatecheck.Checker
@@ -628,6 +632,7 @@ func (s *Server) routeTable() []route {
 		// own notification, and the durable-report promotion this daemon does not
 		// keep (orchestrator.go).
 		{Route{"*", "/v1/orchestrator/assistants"}, s.brokerAssistants},
+		{Route{"*", "/v1/provider-quotas"}, s.providerQuotas},
 		{Route{"*", "/v1/orchestrator/landings"}, s.brokerLandings},
 		{Route{"*", "/v1/orchestrator/notify"}, s.brokerMachineNotify},
 		// The coordination plane (W5): the machine role, file waits, leases (the

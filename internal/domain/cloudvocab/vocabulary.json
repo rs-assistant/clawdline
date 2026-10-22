@@ -910,6 +910,37 @@
       "decode": {"reply": "machine", "route": {"path": "/v1/projects"}}
     },
     {
+      "op": "provider-quotas",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/provider-quotas",
+      "console_seam": "writer",
+      "console_note": "Account quota snapshots for the global footer. Credentials remain on the machine.",
+      "local": {
+        "method": "GET"
+      },
+      "example": {
+        "request": "req",
+        "session": "__clawdline_machine__"
+      },
+      "shapes": [
+        {
+          "body": [
+            "request",
+            "session"
+          ],
+          "path": "/v1/provider-quotas"
+        }
+      ],
+      "decode": {
+        "reply": "machine",
+        "route": {
+          "path": "/v1/provider-quotas"
+        }
+      }
+    },
+    {
       "op": "push-key",
       "kind": "read",
       "write_gate": false,

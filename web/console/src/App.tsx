@@ -1,3 +1,4 @@
+import { QuotaBar } from "./provider-quota/QuotaBar.js"
 import { SessionStateFilterControl } from "./session/SessionStateFilter.js"
 import { matchesLocalStateFilter, stateFilterCounts, type SessionStateFilter } from "./session/state-filter.js"
 import { SurveyCoordinator } from "./onboarding/Survey.js"
@@ -218,7 +219,8 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
   cloudStartedRow = null, onCloudStartedObserved, cloudMachineOffline = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
-  hideSessionCounts = false, onChooseDashboardMachine, dashboardSource, dashboardRequested = false, onDashboardClosed, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved, confirmedTitle }: {
+  quotaMachineName, hideSessionCounts = false, onChooseDashboardMachine, dashboardSource, dashboardRequested = false, onDashboardClosed, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved, confirmedTitle }: {
+  quotaMachineName?: string
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
   cloudSessions?: ReactNode
   cloudOperationsAccess?: boolean
@@ -1181,6 +1183,7 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
         <Component key={id} shown={page === id && knowsHere(id)} />
       ))}
       {!surveyAccount ? <SurveyCoordinator /> : null}
+      <QuotaBar key={fleetReaderMachine ?? "local"} machineName={quotaMachineName} offline={!!cloudMachineOffline} />
       <Overlays />
       {machine ? <MachineDashboard
         sessions={dashboardSource?.sessions ?? fleet.snapshot?.sessions ?? []}

@@ -5281,6 +5281,39 @@ export interface ProposalDiagnostics {
 }
 
 /**
+ * An account quota observation. Empty windows means unknown, never zero.
+ * Credentials and account identifiers are never included. A provider with no
+ * windows is omitted from the footer.
+ */
+export interface ProviderQuotaRow {
+  id: string
+  label: string
+  observed_at?: number
+  problem?: string
+  source: string
+  stale: boolean
+  windows: ProviderQuotaWindow[]
+}
+
+/**
+ * GET /v1/provider-quotas. Current machine only; file observations for Claude and
+ * Codex, cached metadata reads for Gemini and Grok. Network refreshes are
+ * asynchronous and single-flight per provider; failures retain the last successful
+ * snapshot marked stale.
+ */
+export interface ProviderQuotaSnapshot {
+  at: number
+  providers: ProviderQuotaRow[]
+  updating: boolean
+}
+
+export interface ProviderQuotaWindow {
+  name: string
+  resets_at?: number
+  used_percent: number
+}
+
+/**
  * GET /v1/push/key. The application server key the page passes to `subscribe({
  * applicationServerKey })`: base64url of the uncompressed P-256 public point. It is
  * an identity rather than a session — every subscription a browser makes is bound
