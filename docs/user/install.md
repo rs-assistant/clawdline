@@ -42,14 +42,14 @@ Line's right edge reads `Plan limits unknown`. [usage.md](usage.md) says what to
 
 ```sh
 curl --proto '=https' --proto-redir '=https' -fL \
-  https://raw.githubusercontent.com/sainteye/clawdline/fcc9059142485514d54683adb769710abb96e1ab/install.sh \
+  https://raw.githubusercontent.com/sainteye/clawdline/eece0f1d49b388ec37f3b37496f856ea27bf9a65/install.sh \
   -o clawdline-install.sh
 ```
 
 Read the downloaded script, then run it:
 
 ```sh
-sh ./clawdline-install.sh --version v2.1.3
+sh ./clawdline-install.sh --version v2.2.0
 ```
 
 The installer checks local verification tools, downloads the release manifest and signatures,
@@ -92,7 +92,7 @@ generation's internal name; the product is Clawdline.
 Pass options to the downloaded script:
 
 ```sh
-sh ./clawdline-install.sh --version v2.1.3 --headless
+sh ./clawdline-install.sh --version v2.2.0 --headless
 ```
 
 | Option | Does |
@@ -116,9 +116,9 @@ answers with the version you installed.
 
 ### Review and pin an installation
 
-The steps above pin installer commit `fcc9059142485514d54683adb769710abb96e1ab`
-and release `v2.1.3`. The release's signed manifest identifies program source commit
-`fcc9059142485514d54683adb769710abb96e1ab`. These are separate identities: the pinned script verifies the
+The steps above pin installer commit `eece0f1d49b388ec37f3b37496f856ea27bf9a65`
+and release `v2.2.0`. The release's signed manifest identifies program source commit
+`eece0f1d49b388ec37f3b37496f856ea27bf9a65`. These are separate identities: the pinned script verifies the
 selected signed release before it starts. Reading the installer does not amount to auditing
 the release's program source or proving the binary reproducible.
 
