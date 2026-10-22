@@ -96,11 +96,12 @@
   .role-detail-content dd { margin-bottom: 10px; }
 }
 
-.info-sheet .effort-reading { display: flex; align-items: baseline; margin-bottom: 14px; }
-.info-sheet .effort-reading strong { color: var(--accent); font-size: 18px; font-weight: 600; }
-.info-sheet .effort-scale { display: flex; gap: 5px; }
-.info-sheet .effort-tick { flex: 1 1 0; min-width: 0; text-align: center; color: var(--faint); font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
-.info-sheet .effort-tick i { display: block; height: 6px; margin-bottom: 8px; border-radius: 3px; background: var(--line); }
-.info-sheet .effort-tick[data-current="1"] { color: var(--accent); font-weight: 600; }
-.info-sheet .effort-tick[data-current="1"] i { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-in); }
+.info-sheet .effort-reading { display: flex; align-items: baseline; margin-bottom: 10px; }
+.info-sheet .effort-reading strong { color: var(--dim); font-size: 13px; font-weight: 500; }
+.info-sheet .effort-scale { display: flex; }
+.info-sheet .effort-tick { position: relative; flex: 1 1 0; min-width: 0; text-align: center; color: var(--faint); font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
+.info-sheet .effort-tick:not(:last-child)::after { content: ""; position: absolute; top: 4px; left: 50%; width: 100%; height: 1px; background: var(--line); }
+.info-sheet .effort-tick i { position: relative; z-index: 1; display: block; width: 7px; height: 7px; margin: 1px auto 9px; border-radius: 50%; }
+.info-sheet .effort-tick[data-current="1"] { color: var(--ink); font-weight: 500; }
+.info-sheet .effort-tick[data-current="1"] i { background: var(--accent); }
 .info-sheet .sec .effort-source { margin-top: 12px; }
