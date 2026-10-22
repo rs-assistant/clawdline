@@ -161,12 +161,19 @@ and fails. `fixture=true` evidence and ad hoc signatures cannot pass. For offlin
 verification, the gate's existing `--bundle-dir` / `--trusted-root` also cover the delivery set;
 Apple signature/notarization checks still require their normal access.
 
-Before attachment, root must exercise the user journey in a disposable Mac account or VM:
+For an App with changed bytes, exercise the user journey in a disposable Mac account or VM:
 download the staged DMG through a browser, open it normally, drag the App to Applications and
-open that copy. Verify its version, console and existing-session behavior there, and capture the
-Gatekeeper/stapler output for **the downloaded image and copied App**. Do not replace the
-maintainer's running installation just to test packaging. Synthetic fixtures cannot establish
-this acceptance. A local fixture test is `bash tools/release/dmg.test.sh`; it uses no private
+open that copy. Verify its version, console and session behavior there. Capture the
+Gatekeeper/stapler output for **the downloaded image and copied App**, and never replace the
+maintainer's running installation just to test packaging.
+
+A supplemental DMG may instead establish packaging acceptance with the real-image release-mode
+harness when the gate proves that its App is byte-identical to the already-published, signed and
+notarized App. This requires actual read-only mounting, copying to a disposable Applications
+directory, isolated native-shell startup, matching daemon/console identities, Apple trust checks
+and cleanup. This narrow case changes the container, not the App, its entitlements or startup
+code. Record unavailable Finder/LaunchServices or fresh-account checks explicitly; do not claim
+that isolated HOME proves fresh TCC permissions. Synthetic fixtures never establish acceptance. A local fixture test is `bash tools/release/dmg.test.sh`; it uses no private
 key or Apple API. A sandbox that cannot create or mount disk images must report that gap and
 have root rerun the same test outside that sandbox.
 

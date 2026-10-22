@@ -54,7 +54,11 @@ A paired browser can send instructions and use your terminal, so pair only devic
 
 ## Install
 
-On macOS 13+ or Linux, install Claude Code or Codex, trusted Python 3, and OpenSSL 3 or newer. The macOS bundled LibreSSL is not sufficient; see [verification prerequisites](docs/user/install.md#before-you-start). Then run:
+[![Download Clawdline v2.1.2 for macOS — Apple Silicon, macOS 13+](docs/assets/download-macos-en.svg)](https://github.com/sainteye/clawdline/releases/download/v2.1.2/Clawdline-v2.1.2-macos-arm64.dmg)
+
+Download the DMG, drag **Clawdline Next** to **Applications**, then open it. For Linux or a command-line installation, use the verified installer below.
+
+For the command-line installer on macOS 13+ or Linux, install Claude Code or Codex, trusted Python 3, and OpenSSL 3 or newer. The macOS bundled LibreSSL is not sufficient; see [verification prerequisites](docs/user/install.md#before-you-start). Then run:
 
 ```sh
 curl --proto '=https' --proto-redir '=https' -fsSL https://raw.githubusercontent.com/sainteye/clawdline/74fc07e5bc8c8d092f216478f26d99b7ed1b77ee/install.sh | sh -s -- --version v2.1.2
