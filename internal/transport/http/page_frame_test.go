@@ -8,7 +8,8 @@ import (
 	"testing"
 )
 
-// No page elsewhere may frame the console, its document or its bundle.
+// No page elsewhere may frame the console, its document or its bundle, and a
+// link out of it does not name it as the referrer.
 func TestTheConsoleRefusesToBeFramed(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "index.html"), []byte(`<html lang="en"><head></head><body></body></html>`), 0o600); err != nil {
@@ -25,7 +26,7 @@ func TestTheConsoleRefusesToBeFramed(t *testing.T) {
 		}
 		h := rec.Header()
 		if h.Get("Content-Security-Policy") != "frame-ancestors 'none'" || h.Get("X-Frame-Options") != "DENY" ||
-			h.Get("X-Content-Type-Options") != "nosniff" {
+			h.Get("X-Content-Type-Options") != "nosniff" || h.Get("Referrer-Policy") != "no-referrer" {
 			t.Fatalf("%s: framing headers %v", path, h)
 		}
 	}

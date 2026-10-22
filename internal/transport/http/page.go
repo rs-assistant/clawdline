@@ -113,6 +113,9 @@ func (p *page) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Security-Policy", "frame-ancestors 'none'")
 	h.Set("X-Frame-Options", "DENY")
 	h.Set("X-Content-Type-Options", "nosniff")
+	// A link out of the console (clawdline.com, the plan page) does not tell
+	// the site it opens that it came from this machine's console and port.
+	h.Set("Referrer-Policy", "no-referrer")
 	// A URL path is a slash path whatever this machine spells its own paths
 	// with, so it is cleaned with path.Clean and only then turned into one.
 	// filepath.Clean cleaned "/" to a lone backslash on Windows, so the console's own
