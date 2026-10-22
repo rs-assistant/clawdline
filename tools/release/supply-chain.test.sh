@@ -140,10 +140,17 @@ cat >"$work/gh" <<'STUB'
 # validateSignerWorkflow), so a looser flag passes here as it would there.
 set -euo pipefail
 file=$3
-want_commit=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1])).commit)' "$(dirname "$file")/manifest.json")
+wf=.github/workflows/release.yml
+if [ -f "$(dirname "$file")/manifest.json" ]; then
+  want_commit=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1])).commit)' "$(dirname "$file")/manifest.json")
+else
+  metadata=("$(dirname "$file")"/*.dmg.delivery.json)
+  want_commit=$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1])).packaging_commit' "${metadata[0]}")
+  wf=$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1])).packaging_workflow' "${metadata[0]}")
+fi
 args=" $* "
 owner=sainteye/clawdline
-san=https://github.com/sainteye/clawdline/.github/workflows/release.yml@refs/heads/main
+san=https://github.com/sainteye/clawdline/$wf@refs/heads/main
 case "${STUB_MODE:-}" in
   # Somebody else's genuinely signed attestation: gh accepts it only when it
   # is asked for that repository.
@@ -164,7 +171,7 @@ else
 fi
 [ "${STUB_MODE:-}" != gh-refuses ] || { echo "Error: no attestations found" >&2; exit 1; }
 digest=$(shasum -a 256 "$file" | cut -d' ' -f1)
-repo=https://github.com/$owner commit=$want_commit wf=.github/workflows/release.yml
+repo=https://github.com/$owner commit=$want_commit
 case "${STUB_MODE:-}" in
   wrong-repo) repo=https://github.com/someone-else/clawdline ;;
   wrong-commit) commit=0000000000000000000000000000000000000000 ;;
@@ -189,6 +196,21 @@ CLAWDLINE_PROVENANCE_REPO=someone-else/clawdline CLAWDLINE_PROVENANCE_WORKFLOW=.
   expect_fail "the environment cannot point provenance at another repository" 'has no attestation' tools/release/provenance.sh "$good"
 unset CLAWDLINE_GH
 rm "$good/manifest.sig.json"
+
+echo "== DMG delivery provenance (stub gh)"
+dmgs="$work/dmg-provenance"; mkdir "$dmgs"
+printf 'fixture image' >"$dmgs/Clawdline-v2.1.2-macos-arm64.dmg"
+printf '{}' >"$dmgs/Clawdline-v2.1.2-macos-arm64.dmg.spdx.json"
+printf '{"packaging_commit":"%s","packaging_workflow":".github/workflows/dmg.yml"}' "$commit" >"$dmgs/Clawdline-v2.1.2-macos-arm64.dmg.delivery.json"
+export CLAWDLINE_GH="$work/gh"
+expect_ok "DMG evidence is attested by its packaging workflow and commit" tools/release/provenance.sh "$dmgs" --dmg
+STUB_MODE=wrong-commit expect_fail "DMG provenance of another packaging commit fails" 'source commit' tools/release/provenance.sh "$dmgs" --dmg
+STUB_MODE=wrong-digest expect_fail "DMG provenance of another image fails" 'subject digest' tools/release/provenance.sh "$dmgs" --dmg
+STUB_MODE=wrong-workflow expect_fail "DMG statement of another workflow fails" 'workflow .github/workflows/ci.yml' tools/release/provenance.sh "$dmgs" --dmg
+rm "$dmgs/Clawdline-v2.1.2-macos-arm64.dmg.spdx.json"
+expect_fail "missing DMG SBOM attestation fails" 'is missing' tools/release/provenance.sh "$dmgs" --dmg
+unset CLAWDLINE_GH
+bash tools/release/dmg.test.sh --no-disk
 
 echo "== rebuild comparison"
 expect_ok "two identical builds compare clean" tools/release/reproduce.sh compare "$good" "$good"
@@ -244,6 +266,7 @@ pub=$(go run ./tools/release keygen "$work/test.key" | awk '{print $3}')
 signed="$work/signed"; cp -R "$good" "$signed"
 go run ./tools/release sign -key "$work/test.key" "$signed" >/dev/null
 export CLAWDLINE_TEST_RELEASE_PUB=$pub
+expect_fail "a packaging pin cannot silently gate a source without a DMG" 'requires a DMG delivery' tools/release/gate.sh "$version" --dir "$signed" --packaging-commit "$commit"
 # The privacy scan answers 3 (undetermined) on a machine without the private
 # word list and 0 with it; either way the evidence checks before it passed.
 if tools/release/gate.sh "$version" --dir "$signed" >"$work/log" 2>&1; then rc=0; else rc=$?; fi
@@ -252,6 +275,8 @@ d="$work/gate-extra"; cp -R "$signed" "$d"; printf 'x\n' >"$d/notes.txt"
 expect_fail "the gate refuses an asset the manifest does not account for" 'does not account for: notes.txt' tools/release/gate.sh "$version" --dir "$d"
 d="$work/gate-no-sbom"; cp -R "$signed" "$d"; rm "$d"/*.spdx.json
 expect_fail "the gate refuses a release without SBOMs" 'has no .*\.spdx\.json' tools/release/gate.sh "$version" --dir "$d"
+d="$work/gate-fixture-dmg"; cp -R "$signed" "$d"; printf 'fixture' >"$d/Clawdline-${version}-macos-arm64.dmg"
+expect_fail "a fixture DMG cannot use the test-release gate bypass" 'fixture DMGs cannot pass' tools/release/gate.sh "$version" --dir "$d"
 # A -test version may skip provenance and the macOS check only as a local
 # --dir release; one drafted on GitHub gets the whole gate or none. The stub
 # gh answers as a draft whose assets are this test release.
