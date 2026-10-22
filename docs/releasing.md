@@ -42,10 +42,13 @@ from the newest published non-prerelease. `min_version` is the oldest version a 
 upgraded from and rolled back to; a release whose store change an older binary cannot read sets
 `non_additive_migration` and raises it.
 
-The README and install guide deliberately pin both the installer source commit and a published
-release version. When promoting a later release, update those examples together after verifying
-the chosen public installer revision and the signed release manifest. The installer revision
-may be newer than the program release; do not present them as the same source tree.
+The README and quick installation use `https://clawdline.com/install.sh`, which redirects over
+HTTPS to a reviewed installer commit and selects the latest signed stable release. The advanced
+install guide retains the fixed-script, fixed-version path. The marketing repository pins the
+redirect target in `marketing/marketing-claude/scripts/write-localized-404.mjs`; promote it only
+after comparing the public script bytes with the reviewed commit and verifying the signed release.
+A changing official entry point is not an immutable script pin. The installer revision may be
+newer than the program release; do not present them as the same source tree.
 
 ## A release from start to finish
 
@@ -84,8 +87,9 @@ each step done. v2.2.0 was cut this way ([acceptance record](records/release-v2.
    version: a plain `--apply` shortly after publication can still act on the updater's earlier
    check and install the previous release. Confirm `/v1/health` reports the version and `GET /`
    answers 200. The new App is staged until the person quits and reopens it.
-10. **Pin the install examples** in `README.md`, `README.zh-TW.md` and `docs/user/install.md` to
-    the new version and the installer at the released commit. Check the public installer bytes
+10. **Refresh installation references**: update the README download badges and the fixed-version
+    alternative in `docs/user/install.md`. Keep the quick command on the official short URL.
+    Review and promote its verifier pin in the marketing repository. Check the public installer bytes
     (`raw.githubusercontent.com/.../<commit>/install.sh`) against `git show <commit>:install.sh`,
     and whether `install.sh` changed since the previous pin. Add
     `docs/records/release-<version>-acceptance.md` with the evidence and the boundaries not
