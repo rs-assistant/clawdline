@@ -1,15 +1,24 @@
 # Provider quota footer
 
-The console shares one account-quota footer across its pages. **Settings → Browser → Show provider
-quota bar** is on by default and saved in that browser's local storage. Turning it off unmounts the
+The console shares one account-quota footer across its pages. **Settings → Browser** has independent
+**Show quota bar on desktop** and **Show quota bar in the mobile Session list** switches. Both
+default on and are saved separately in that browser's local storage. Existing saved visibility
+is the fallback for each switch until it is explicitly set. Turning a layout off unmounts its
 footer and stops its reads; it does not change dispatch policy. Providers without a usable numeric
 window are hidden. A real zero is a usable reading. The footer is available from API level 28.
 
 The footer reads the currently selected machine, including in the all-machines view; its detail
 names that source machine. It never adds percentages across machines, projects or Sessions.
-Switching the Cloud reader discards the previous machine's footer state. At narrow widths the
-highest used fraction from each provider is shown, and on phones the two tightest providers remain
-beside a **+N** button. Every known window remains available in the details dialog.
+Switching the Cloud reader discards the previous machine's footer state. Desktop windows show a
+progress bar, percentage and reset countdown, with middle dots between one provider's windows. Desktop keeps all windows
+together; overflowing providers remain horizontally scrollable. The local footer starts with the
+provider icons, while Cloud may identify the selected machine by name. Every known window remains available in the details dialog. Below 900 CSS pixels,
+the mobile layout shows the two tightest providers and a **+N** details button only in the Session
+list. Session conversations and other pages unmount the footer and stop its reads, leaving no
+reserved bottom space. The mobile list reserves the full measured footer height, including its
+home-indicator clearance from `--indicator` (the console does not use `viewport-fit=cover`, so
+`env(safe-area-inset-bottom)` alone can be zero on iOS). Changing viewport size does not change
+the saved browser preference.
 
 ## Sources and ownership
 

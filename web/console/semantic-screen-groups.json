@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8901,
-  "riskKeys": 3960,
-  "nonRiskCount": 4941,
+  "englishContentKeys": 8903,
+  "riskKeys": 3959,
+  "nonRiskCount": 4944,
   "groups": [
     {
       "name": "admin / other",
@@ -2197,12 +2197,13 @@
     },
     {
       "name": "itermConsent / other",
-      "count": 4,
+      "count": 5,
       "sources": [
         null
       ],
       "keys": [
         "itermConsent.enable",
+        "itermConsent.saved",
         "itermConsent.savedTitle",
         "itermConsent.saving",
         "itermConsent.title"
@@ -3261,7 +3262,7 @@
     },
     {
       "name": "next / other",
-      "count": 386,
+      "count": 388,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3464,6 +3465,8 @@
         "next.quotaRefresh",
         "next.quotaResetPending",
         "next.quotaResetsIn",
+        "next.quotaSettingDesktopTitle",
+        "next.quotaSettingMobileTitle",
         "next.quotaSettingTitle",
         "next.quotaSourceAPI",
         "next.quotaSourceClaude",

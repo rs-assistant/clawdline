@@ -1,16 +1,18 @@
 import type { ProviderQuotaRow } from "@clawdline/contract"
 
+export type QuotaLayout = "desktop" | "mobile"
+export const quotaVisibilityKey = (layout: QuotaLayout) => `${QUOTA_VISIBLE_KEY}.${layout}`
 export const QUOTA_VISIBLE_KEY = "clawdline.provider-quota-visible"
 type ReadStore = Pick<Storage, "getItem">
 type WriteStore = Pick<Storage, "setItem">
 export function quotaStorage(): Storage | null {
   try { return typeof localStorage === "undefined" ? null : localStorage } catch { return null }
 }
-export function readQuotaVisible(store: ReadStore | null = quotaStorage()): boolean {
-  try { return store?.getItem(QUOTA_VISIBLE_KEY) !== "false" } catch { return true }
+export function readQuotaVisible(store: ReadStore | null = quotaStorage(), layout: QuotaLayout = "desktop"): boolean {
+  try { return (store?.getItem(quotaVisibilityKey(layout)) ?? store?.getItem(QUOTA_VISIBLE_KEY)) !== "false" } catch { return true }
 }
-export function saveQuotaVisible(on: boolean, store: WriteStore | null = quotaStorage()): boolean {
-  try { if (!store) return false; store.setItem(QUOTA_VISIBLE_KEY, String(on)); return true } catch { return false }
+export function saveQuotaVisible(on: boolean, store: WriteStore | null = quotaStorage(), layout: QuotaLayout = "desktop"): boolean {
+  try { if (!store) return false; store.setItem(quotaVisibilityKey(layout), String(on)); return true } catch { return false }
 }
 /** Unknown is not zero. A provider enters the footer only after supplying a number. */
 export function visibleQuotaRows(rows: readonly ProviderQuotaRow[]): ProviderQuotaRow[] {

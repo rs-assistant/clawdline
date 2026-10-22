@@ -8816,7 +8816,7 @@
   "next.cloudReadPairingRequired": "無法讀取 {machine}：這個瀏覽器需要重新確認配對。已顯示的內容可能不是最新狀態。",
   "next.cloudReadUnknownFailure": "讀取 {machine} 失敗，顯示的內容可能尚未更新。",
   "next.quotaSettingTitle": "顯示供應商額度列",
-  "next.quotaSettingHint": "預設開啟，顯示偏好儲存在此瀏覽器。沒有額度資料的供應商不會顯示。",
+  "next.quotaSettingHint": "兩項皆預設開啟，分別儲存在此瀏覽器。手機僅在 Session 列表顯示；沒有額度資料的供應商不會顯示。",
   "next.quotaSaveFailed": "已套用，但此瀏覽器無法儲存偏好；重新開啟後可能恢復預設。",
   "next.quotaOn": "開",
   "next.quotaOff": "關",
@@ -8860,7 +8860,7 @@
   "itermConsent.saving": "正在開啟…",
   "itermConsent.failed": "無法開啟 iTerm2 整合。",
   "itermConsent.savedTitle": "已開啟 iTerm2 整合",
-  "itermConsent.saved": "原訊息仍保留在失敗卡片上。請按該卡片的「重試」傳送。",
+  "itermConsent.saved": "原訊息仍保留。請回到原本的 Session，確認內容後再傳送。",
   "itermConsent.done": "完成",
   "shell.menuEdit": "編輯",
   "shell.menuUndo": "復原",
@@ -8880,7 +8880,7 @@
   "shell.pairInvitationAsks": "要顯示這台機器的配對 QR Code 嗎？",
   "shell.pairInvitationBody": "請用要配對的手機或瀏覽器掃描。配對碼可讓已登入同一個 Cloud 帳號的瀏覽器取得這台機器的加密內容金鑰，並會自動到期。",
   "browserPairing.androidTitle": "Android",
-  "browserPairing.androidOpen": "用 Chrome 開啟 app.clawdline.com，登入同一個 GitHub 帳號。也可先從 Chrome 選單安裝 Clawdline，再進行配對。",
+  "browserPairing.androidOpen": "用 Chrome 開啟 app.clawdline.com。若要使用安裝版 App，先從 Chrome 選單安裝，再從之後要使用的瀏覽器或 App 登入。",
   "browserPairing.androidScan": "在該瀏覽器或已安裝的 App 中，選「配對」→「掃描機器上的 QR」，允許相機後對準 QR Code。無法使用相機時，可選取 QR 圖片。",
   "browserPairing.androidCheck": "核對指紋後，確認出現這台機器的 Session。之後請沿用同一個瀏覽器設定檔或已安裝的 App。",
   "shell.pairLinkDone": "瀏覽器已配對",
@@ -8901,5 +8901,7 @@
   "browserPairing.machineFingerprint": "機器指紋",
   "browserPairing.viewerFingerprint": "瀏覽器指紋",
   "browserPairing.mismatch": "指紋不一致，請勿繼續。在機器執行下方指令撤銷這個瀏覽器，再產生新的 QR Code。這不會從帳號移除機器。",
-  "browserPairing.retry": "再試一次"
+  "browserPairing.retry": "再試一次",
+  "next.quotaSettingDesktopTitle": "桌機顯示額度列",
+  "next.quotaSettingMobileTitle": "手機 Session 列表顯示額度列"
 }

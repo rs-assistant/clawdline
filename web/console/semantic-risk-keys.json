@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "englishKeys": 8901,
+  "englishKeys": 8903,
   "counts": {
     "negation": 2584,
     "state": 1458,
@@ -8,7 +8,7 @@
     "deletion": 199,
     "uncertainty": 271
   },
-  "unionCount": 3960,
+  "unionCount": 3959,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -3384,7 +3384,6 @@
       "inline.fc7d5b5c2ceb",
       "inline.feb19f096641",
       "itermConsent.done",
-      "itermConsent.saved",
       "legacy.agentRunning",
       "legacy.closeabilityNeedsAttestation",
       "legacy.closeabilityRefreshing",
@@ -3760,6 +3759,7 @@
       "next.proposalResolveSummary",
       "next.quotaReauth",
       "next.quotaSaveFailed",
+      "next.quotaSettingHint",
       "next.restoreCardHint",
       "next.restoreCardTitle",
       "next.restoreCardTitleOne",
@@ -7068,7 +7068,6 @@
     "itermConsent.description",
     "itermConsent.done",
     "itermConsent.failed",
-    "itermConsent.saved",
     "itermConsent.scope",
     "legacy.agentEmpty",
     "legacy.agentRunning",

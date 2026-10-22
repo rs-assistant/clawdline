@@ -8816,7 +8816,7 @@
   "next.cloudReadPairingRequired": "Cannot read {machine}: this browser needs to confirm its pairing. Existing content may be out of date.",
   "next.cloudReadUnknownFailure": "Could not refresh {machine}. Displayed content may be out of date.",
   "next.quotaSettingTitle": "Show provider quota bar",
-  "next.quotaSettingHint": "On by default. Remembered in this browser. Providers without quota data stay hidden.",
+  "next.quotaSettingHint": "Both are on by default and saved independently in this browser. Mobile shows quotas only in the Session list. Providers without data stay hidden.",
   "next.quotaSaveFailed": "Applied for now. This browser could not save the preference.",
   "next.quotaOn": "On",
   "next.quotaOff": "Off",
@@ -8860,7 +8860,7 @@
   "itermConsent.saving": "Enabling…",
   "itermConsent.failed": "Could not enable iTerm2 integration.",
   "itermConsent.savedTitle": "iTerm2 integration is enabled",
-  "itermConsent.saved": "Your message is still on its failed card. Select Try again on that card to send it.",
+  "itermConsent.saved": "Your message is preserved. Return to the original Session and review it before sending.",
   "itermConsent.done": "Done",
   "shell.menuEdit": "Edit",
   "shell.menuUndo": "Undo",
@@ -8880,7 +8880,7 @@
   "shell.pairInvitationAsks": "Show a pairing QR code for this machine?",
   "shell.pairInvitationBody": "Scan the code from the phone or browser you want to pair. The code allows a signed-in browser on your Cloud account to receive this machine’s encrypted content key. It expires automatically.",
   "browserPairing.androidTitle": "Android",
-  "browserPairing.androidOpen": "Open app.clawdline.com in Chrome and sign in to the same GitHub account. You can also install Clawdline from Chrome’s menu before pairing.",
+  "browserPairing.androidOpen": "Open app.clawdline.com in Chrome. If you want the installed app, install it from Chrome’s menu first. Sign in in the browser or app you will keep using.",
   "browserPairing.androidScan": "In that browser or installed app, choose Pair → Scan the QR on the machine, then allow the camera. If the camera is unavailable, use the QR-image option.",
   "browserPairing.androidCheck": "Compare the fingerprints, then check that the machine’s Sessions appear. Keep using the same browser profile or installed app.",
   "shell.pairLinkDone": "Browser paired",
@@ -8901,5 +8901,7 @@
   "browserPairing.machineFingerprint": "Machine fingerprint",
   "browserPairing.viewerFingerprint": "Browser fingerprint",
   "browserPairing.mismatch": "The fingerprints differ. Do not continue. On the machine, revoke this browser with the command below, then generate a new QR code. This does not remove the machine from your account.",
-  "browserPairing.retry": "Try again"
+  "browserPairing.retry": "Try again",
+  "next.quotaSettingDesktopTitle": "Show quota bar on desktop",
+  "next.quotaSettingMobileTitle": "Show quota bar in the mobile Session list"
 }
