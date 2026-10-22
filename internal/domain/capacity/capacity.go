@@ -330,6 +330,11 @@ const (
 	// The typed refusals one wire channel may have owed at once: each answers
 	// one refused read by its own id, so there may be more than one.
 	CloudSpoolRefusals = "cloud.spool_refusals"
+	// The inbound replay window's claims, kept on disk so a reconnect, a key
+	// rotation or a restart does not forget an envelope it already answered.
+	CloudReplayJournalRows    = "cloud.replay_journal_rows"
+	CloudReplayJournalBytes   = "cloud.replay_journal_bytes"
+	CloudReplayJournalSeconds = "cloud.replay_journal_seconds"
 	// The reference-image thumbnails drawn for Board cards and to-do rows.
 	CacheImageThumbs = "cache.image_thumbs"
 	// The slash menu's skills, per working directory and assistant.

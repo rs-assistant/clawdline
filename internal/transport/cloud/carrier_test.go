@@ -235,10 +235,15 @@ func TestACarrierClosesOnlyWhenItsDeviceIsDenied(t *testing.T) {
 	if _, err := file.Set(map[string]any{adaptercloud.KeyEnabled: true, adaptercloud.KeyCommands: true}); err != nil {
 		t.Fatal(err)
 	}
-	// Cloud on, commands on, the device's key authenticated, and no roster to
-	// ask: unverified, not denied.
+	// Cloud on, commands on, the device paired here and its key authenticated,
+	// and no roster to ask: unverified, not denied.
 	f.l.file = file
 	f.l.settings = adaptercloud.Settings{Enabled: true, TerminalDirect: true}
+	f.l.pinned = adaptercloud.NewPinnedStore(t.TempDir())
+	if err := f.l.pinned.Pin("account", adaptercloud.PinnedDevice{DeviceID: "viewer",
+		PublicKey: base64.StdEncoding.EncodeToString(f.viewer.PublicKey())}); err != nil {
+		t.Fatal(err)
+	}
 	f.l.terminalMu.Lock()
 	f.l.terminalAuthenticated = map[string]ed25519.PublicKey{"viewer": f.viewer.PublicKey()}
 	f.l.terminalMu.Unlock()

@@ -79,7 +79,6 @@
   "devices.roster_only": "somente no cadastro",
   "devices.revoked_here": "revogado aqui",
   "devices.pinned_here": "fixado aqui",
-  "devices.account_only_legend": "somente conta: um navegador da sua conta Clawdline Cloud que foi pareado com outra das suas máquinas, não com esta. Ele também é aceito aqui; `clawdline cloud revoke <device-id>` o recusa nesta máquina.",
   "revoke.usage": "uso: clawdline cloud revoke <device-id>",
   "revoke.no_change": "sem alteração: %s não era um navegador fixado nesta máquina\n",
   "revoke.revoked": "revogado   %s\n",

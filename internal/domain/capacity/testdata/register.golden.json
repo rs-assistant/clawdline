@@ -848,6 +848,65 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.replay_journal_bytes",
+    "Class": "idempotency",
+    "Unit": "bytes",
+    "Limit": 8388608,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.ReplayJournalBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.replay_journal_rows",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.ReplayJournalRowsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.replay_journal_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 600,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.ReplayJournalSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.roster_short_read_attempts",
     "Class": "buffer",
     "Unit": "rows",

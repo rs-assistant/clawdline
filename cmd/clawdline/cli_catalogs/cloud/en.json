@@ -87,7 +87,6 @@
   "devices.roster_only": "account only",
   "devices.revoked_here": "revoked here",
   "devices.pinned_here": "paired here",
-  "devices.account_only_legend": "account only: a browser on your Clawdline Cloud account that was paired with another of your machines, not this one. It is admitted here too; `clawdline cloud revoke <device-id>` refuses it on this machine.",
   "revoke.usage": "usage: clawdline cloud revoke <device-id>",
   "revoke.no_change": "nothing changed: %s was not a browser this machine had pinned\n",
   "revoke.revoked": "revoked    %s\n",
@@ -100,5 +99,12 @@
   "rotate.cancelled": "nothing was rotated",
   "rotate.rotated": "rotated    %s (was %s)\n",
   "rotate.epoch": "epoch      key %d, identity %d\n",
-  "rotate.reconnecting": "           the line went down and is coming back on the new key"
+  "rotate.reconnecting": "           the line went down and is coming back on the new key",
+  "devices.account_only_unpaired": "account only: a browser on your Clawdline Cloud account that was paired with another of your machines, not this one. It is not admitted here: this machine trusts only browsers it paired itself. Run `clawdline cloud pair` to pair it here.",
+  "revoke.secret_kept": "           this machine's content key was NOT replaced, so the revoked browser may still read what this machine sends",
+  "revoke.secret_replaced": "           this machine's content key was replaced, so the revoked browser cannot read what this machine sends from now on",
+  "revoke.reconnecting": "           the line went down and is coming back on the new key",
+  "revoke.repair_none": "No other browser was paired with this machine, so nothing has to be paired again.",
+  "revoke.repair_1": "Every other browser paired with this machine held the replaced key. Each one",
+  "revoke.repair_2": "has to be paired again (`clawdline cloud pair`) before it can read or send:"
 }

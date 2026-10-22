@@ -79,7 +79,6 @@
   "devices.roster_only": "名簿にのみ登録",
   "devices.revoked_here": "ここで取り消し済み",
   "devices.pinned_here": "ここで固定済み",
-  "devices.account_only_legend": "アカウントのみ：Clawdline Cloud アカウント上のブラウザで、このマシンではなく別のマシンとペアリングされたものです。このマシンでも受け入れられます。`clawdline cloud revoke <device-id>` でこのマシンでは拒否できます。",
   "revoke.usage": "使い方: clawdline cloud revoke <device-id>",
   "revoke.no_change": "変更なし: %s はこのマシンで固定されたブラウザーではありません\n",
   "revoke.revoked": "取り消し済み %s\n",

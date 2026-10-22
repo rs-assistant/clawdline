@@ -195,6 +195,21 @@
     "Note": true
   },
   {
+    "Name": "cloud.replay_journal_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.replay_journal_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.replay_journal_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.roster_short_read_attempts",
     "Known": true,
     "Note": true

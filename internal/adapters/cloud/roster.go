@@ -12,9 +12,10 @@ package cloud
 // read with this machine's credential. That route is the control plane's
 // answer to "which browsers and phones has this person enrolled", and each row
 // carries the device's Ed25519 `public_key` — the same key the viewer signs
-// its envelopes with. Approval happens in the account, on a device the person
-// already trusts; this machine does not get a second vote and does not keep a
-// list of its own.
+// its envelopes with. It was once the whole admission; it is now only a way to
+// take admission away. This machine keeps a list of its own — the devices it
+// paired (`pinned.go`) — and a roster row can revoke one of those, but a key
+// the roster names never admits a sender.
 //
 // Three properties that are not decoration:
 //
@@ -97,7 +98,12 @@ func NewRoster(apiBase, credential string, now func() time.Time) *Roster {
 // roster.
 var ErrRosterUnreadable = errors.New("the account's device roster could not be read")
 
-// PublicKeyFor answers the pinned key for a sender, refreshing when stale.
+// PublicKeyFor answers the roster's key for a sender, refreshing when stale.
+//
+// It is not an admission source. The machine admits only senders it pinned
+// itself (`internal/transport/cloud` `publicKeyFor`); a key the control plane
+// names is the operator's word, and the roster may take a device away but not
+// supply one.
 //
 // It never blocks on the network while holding a verdict: a refresh that fails
 // leaves the previous answer standing, because a viewer that was admitted a

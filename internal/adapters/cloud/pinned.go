@@ -3,16 +3,17 @@ package cloud
 // Who this machine pinned, and who it threw out.
 //
 // `roster.go` reads the account's device list from the control plane, which is
-// what let the fourth wave admit a viewer at all. A roster key alone does not
-// prove pairing: the viewer must also produce an authenticated envelope under
-// this machine's content key. A local pin is stronger identity evidence and
-// takes precedence over a substituted roster key.
+// what let the fourth wave admit a viewer at all. A roster key does not prove
+// pairing, and since 2026-10-22 it admits nothing: whoever controls the roster
+// could otherwise name a key of their choosing for a device and, holding an
+// old copy of this machine's content key, send as it.
 //
-// This file is that local root. It holds one row per browser this machine
-// itself handed the machine content key to, written at the moment of pairing, with the
-// Ed25519 public key that came inside the sealed offer — bytes the cloud never
-// saw in the clear. `PublicKeyFor` prefers it; the roster is the fallback for
-// a device paired before this file existed, and the *refused* list beats both.
+// This file is the only admitting root. It holds one row per browser this
+// machine itself handed the machine content key to, written at the moment of
+// pairing, with the Ed25519 public key that came inside the sealed offer —
+// bytes the cloud never saw in the clear. The link's sender lookup reads only
+// this; the roster may still take a pinned device away, and the *refused* list
+// beats both.
 //
 // Three rules worth naming:
 //
@@ -26,8 +27,9 @@ package cloud
 //     here stops that sender at the next envelope, and keeps stopping it even
 //     if the roster comes back saying otherwise.
 //   - **Unreadable is not empty.** A pin file that exists and will not parse is
-//     an error. Reading it as "nobody is paired" would silently fall back to
-//     the cloud's list, which is the exact substitution the pins exist against.
+//     an error, and it refuses every sender: reading it as "nobody is paired"
+//     would invite a fallback to the cloud's list, which is the exact
+//     substitution the pins exist against.
 
 import (
 	"crypto/ed25519"
@@ -146,10 +148,9 @@ func (s *PinnedStore) Devices() ([]PinnedDevice, error) {
 //
 // The three answers are distinct on purpose. `(key, true, nil)` is a live pin.
 // `(nil, false, nil)` is "this store holds nothing about that sender", which
-// lets a caller fall back to the roster. A refused device answers
-// `(nil, false, nil)` too — but `Refused` says so, and the caller checks that
-// first, because falling back to the roster for a device this machine threw
-// out would undo the revocation.
+// the link answers as an unknown sender: it does not fall back to the roster.
+// A refused device answers `(nil, false, nil)` too — but `Refused` says so,
+// and the caller checks that first, so a revocation reads as itself.
 func (s *PinnedStore) PublicKeyFor(sender string) (ed25519.PublicKey, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

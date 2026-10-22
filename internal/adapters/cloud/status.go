@@ -71,6 +71,12 @@ const (
 	DropDecryptFailed    = "decrypt_failed"
 	DropReplay           = "replay"
 	DropReplayWindowFull = "replay_window_full"
+	// DropClockSkew is a machine's refusal of a viewer envelope whose signed
+	// ts is further than cloud.MaxTimestampSkew from this machine's clock.
+	DropClockSkew = "clock_skew"
+	// DropReplayUnrecorded is an envelope whose replay claim could not be
+	// written to the replay journal, so it was not acted on.
+	DropReplayUnrecorded = "replay_unrecorded"
 )
 
 // StatusRecorder collects the snapshot. It uses a plain mutex rather than a
