@@ -1,13 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="620" height="128" viewBox="0 0 620 128" role="img" aria-labelledby="title desc">
-  <title id="title">下載 Clawdline macOS 版</title>
-  <desc id="desc">版本 2.1.2。Apple Silicon。macOS 13 以上。DMG 安裝映像。</desc>
-  <rect x="1" y="1" width="618" height="126" rx="18" fill="#fff6ee" stroke="#e8c9b4" stroke-width="2"/>
-  <rect x="22" y="26" width="76" height="76" rx="18" fill="#c55e33"/>
-  <path d="M60 42v31m-12-12 12 12 12-12M43 78v10h34V78" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <g font-family="-apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif">
-    <text x="120" y="48" fill="#362d27" font-size="25" font-weight="700">下載 macOS 版</text>
-    <text x="120" y="78" fill="#6a5546" font-size="18">Apple Silicon · macOS 13 以上</text>
-    <text x="120" y="103" fill="#6a5546" font-size="15">Clawdline v2.1.2 · DMG 安裝映像</text>
-    <path d="m568 53 11 11-11 11" fill="none" stroke="#a34927" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="56" viewBox="0 0 180 56" role="img" aria-labelledby="title">
+  <title id="title">下載 Mac 版</title>
+  <rect x=".5" y=".5" width="179" height="55" rx="9" fill="#080808" stroke="#a6a6a6"/>
+  <g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="16" y="14" width="28" height="20" rx="2"/>
+    <path d="M12 39h36M25 34l-2 5m12-5 2 5"/>
+  </g>
+  <g fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="60" y="22" font-size="11">下載</text>
+    <text x="59" y="43" font-size="23" font-weight="500">Mac 版</text>
   </g>
 </svg>

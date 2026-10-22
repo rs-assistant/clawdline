@@ -56,7 +56,7 @@ Clawdline 在你自己的機器上讀取 Claude Code 與 Codex 對話、終端�
 
 [![下載 Clawdline v2.1.2 macOS 版 — Apple Silicon、macOS 13 以上](docs/assets/download-macos-zh-TW.svg)](https://github.com/sainteye/clawdline/releases/download/v2.1.2/Clawdline-v2.1.2-macos-arm64.dmg)
 
-下載 DMG，將 **Clawdline Next** 拖到 **Applications** 後開啟。Linux 或命令列安裝請使用下方會驗簽的安裝器。
+Apple Silicon · macOS 13+ · [安裝教學](https://clawdline.com/docs/install/#mac-dmg)
 
 使用 macOS 13 以上或 Linux 的命令列安裝器時，先安裝 Claude Code 或 Codex、受信任的 Python 3 與 OpenSSL 3 以上版本。macOS 內建的 LibreSSL 不足以驗證；請看[驗證工具需求](docs/user/install.md#before-you-start)。接著執行：
 
