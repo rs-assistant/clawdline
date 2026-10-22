@@ -166,11 +166,28 @@ function Guide() {
   // The app step starts its device sign-in as soon as it is shown, so the
   // button that opens the sign-in page is a real link the press opens; a page
   // opened after an await is a popup the browser, and the app, refuse.
+  //
+  //
+  // The login route says "complete" whenever an identity is on disk; the line
+  // loads it only once it is switched on, so until then `configured` is false
+  // for a machine that is signed in. Signed in is either. A credential the
+  // control plane no longer accepts shows up on the line as `not_signed_in`
+  // or `device_not_approved`, and only then is a new sign-in asked to replace it.
+  const staleLogin = !!cloud && cloud.state !== "connected" &&
+    (cloud.last_error_kind === "not_signed_in" || cloud.last_error_kind === "device_not_approved")
+  const signedIn = (configured || login?.phase === "complete") && !staleLogin
+  const signIn = useCallback((replace: boolean) => {
+    asked.current.login = true
+    startCloudLogin(replace).then(setLogin, fail)
+  }, [])
   useEffect(() => {
     if (screen !== "app" || configured || asked.current.login || status === undefined) return
     asked.current.login = true
-    startCloudLogin(login?.phase === "failed").then(setLogin, fail)
-  }, [screen, configured, status, login?.phase])
+    readCloudLogin().then((answer) => {
+      setLogin(answer)
+      if (answer.phase !== "complete" && answer.phase !== "waiting") signIn(answer.phase === "failed")
+    }, fail)
+  }, [screen, configured, status, signIn])
 
   useEffect(() => {
     if (screen !== "app" || login?.phase !== "waiting") return
@@ -183,7 +200,10 @@ function Guide() {
   useEffect(() => {
     if (!running || !cloud) return
     if (done.app) { setRunning(false); return }
-    if (configured && !cloud.enabled && !asked.current.line) {
+    // Not signed in and no sign-in waiting: nothing will move by itself, so
+    // the button must be pressable again rather than read "Connecting…".
+    if (!signedIn && login?.phase !== "waiting") { setRunning(false); return }
+    if (signedIn && !cloud.enabled && !asked.current.line) {
       asked.current.line = true
       setCloudEnabled(true).then(() => setCloudCommands(true)).then(() => void refresh(), fail)
       return
@@ -197,7 +217,7 @@ function Guide() {
       asked.current.app = pairing.invitation_id ?? "asked"
       appBridge()?.postMessage({ link: pairing.link })
     }).catch(fail)
-  }, [running, cloud, configured, lineUp, inApp, done.app, refresh])
+  }, [running, cloud, signedIn, lineUp, inApp, done.app, refresh, login?.phase])
 
   // The browser and phone steps each hold one invitation while they are shown.
   useEffect(() => {
@@ -237,8 +257,9 @@ function Guide() {
           {screen === "done" && <Ending title={nextWord("setupDoneTitle")} body={nextWord("setupDoneBody")}
             primary={{ label: nextWord("setupDoneClose"), run: close }}
             secondary={{ label: nextWord("setupDoneAnother"), run: () => { asked.current.pairing = ""; show("phone") } }} />}
-          {screen === "app" && <AppStep login={login} configured={configured} lineUp={lineUp} paired={done.app}
+          {screen === "app" && <AppStep login={login} configured={signedIn} lineUp={lineUp} paired={done.app}
             running={running} inApp={inApp} onRun={() => { setSaid(""); setRunning(true) }}
+            onSignIn={() => { setSaid(""); signIn(login?.phase !== "idle") }}
             onBack={() => show("welcome")} onLater={close} onNext={() => show(after("app"))} />}
           {screen === "browser" && <BrowserStep pairing={cloud?.pairing} opened={opened} paired={done.browser}
             onOpen={() => setOpened(true)} onBack={() => show(before("browser"))}
@@ -352,7 +373,7 @@ function Steps({ steps }: { steps: Step[] }) {
   )
 }
 
-function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onBack, onLater, onNext }: {
+function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onSignIn, onBack, onLater, onNext }: {
   login: CloudLogin | null
   configured: boolean
   lineUp: boolean
@@ -360,6 +381,8 @@ function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onB
   running: boolean
   inApp: boolean
   onRun: () => void
+  /** Ask the daemon for a fresh sign-in, for when none is waiting. */
+  onSignIn: () => void
   onBack: () => void
   onLater: () => void
   onNext: () => void
@@ -394,7 +417,8 @@ function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onB
         ) : startLink ? (
           <a className="setup-primary" href={startLink} target="_blank" rel="noopener noreferrer" onClick={onRun}>{nextWord("setupAppStart")}</a>
         ) : (
-          <button type="button" className="setup-primary" disabled={running || (!configured && login?.phase !== "waiting")} onClick={onRun}>
+          <button type="button" className="setup-primary" disabled={running}
+            onClick={!configured && login?.phase !== "waiting" ? onSignIn : onRun}>
             {running ? nextWord("setupAppBusy") : configured ? nextWord("setupAppContinue") : nextWord("setupAppStart")}
           </button>
         )}
