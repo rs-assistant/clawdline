@@ -5,6 +5,144 @@ Windows. The daemon owns port 7727 on this machine. `README.md` says what it is 
 how each part was decided. This page holds the rules; `docs/working-rules.md` holds the incidents
 and procedures behind them — read its section when you reach the thing it covers.
 
+## This fork: rs-assistant/clawdline
+
+This fork runs Clawdline **only from source we have reviewed**. It is not a release install and
+does not take upstream releases or self-updates. Open items for the next session are in
+`handoff.yaml`; everything durable is here.
+
+### Repository and branch
+
+- Fork `rs-assistant/clawdline`, upstream `sainteye/clawdline`. Remote names depend on the
+  checkout: a cloud-container clone has the fork as `origin` and no upstream remote. Read
+  `git remote -v` before fetching or pushing; to compare with upstream,
+  `git remote add upstream https://github.com/sainteye/clawdline`.
+- Work happens on `local-source-build`, cut from upstream `418bac7` (security-reviewed on
+  2026-10-19). Merging upstream brings unreviewed code: review the diff against the last reviewed
+  commit and rerun govulncheck before merging.
+- The person wants Claude and Codex to cross-review changes. Present their disagreements instead
+  of resolving them silently.
+
+### Build and run (source build only)
+
+```sh
+(cd web && npm ci --ignore-scripts && npm run build)   # lockfile integrity, no install scripts
+go build -o bin/clawdline ./cmd/clawdline              # go.mod pins toolchain go1.27.3
+CLAWDLINE_NEXT_UPDATE_CHECK=off \
+CLAWDLINE_NEXT_WEB="$PWD/web/console/dist" \
+./bin/clawdline serve
+```
+
+- Do not use `install.sh` or `clawdline update`. A source build never starts the GitHub release
+  updater (`internal/transport/http/update.go`, `kind != install.KindRelease`). `install.sh`
+  checks only a same-origin SHA-256 and then runs the downloaded binary, which verifies its own
+  signature; verifying release assets with `go run ./tools/release verify` still installs
+  upstream-built binaries and turns the release updater on. Both were rejected on 2026-10-22.
+- `CLAWDLINE_NEXT_UPDATE_CHECK=off` is required: without it the daemon GETs
+  `app.clawdline.com/BUILD.json` every 30 min (`internal/adapters/updatecheck`, checked in `Run`
+  and `Refresh`).
+- After a dependency change, run `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` and
+  `(cd web && npm audit)`. Third-party Go and npm dependencies are hash-verified, not
+  code-reviewed. Pick fixed versions that have been published for at least two weeks.
+
+### Operating policy
+
+- Cloud stays off (`cloud_enabled` unset or false). Do not run `clawdline cloud login`.
+  `clawdline cloud off` stops a live relay line on a daemon built from this branch after the
+  2026-10-22 fix; an older build keeps the line up until the daemon restarts.
+- Do not enable `remote_tunnel`.
+- Dispatch with `--permission-mode ask`, the default on this branch. `full` is
+  `bypassPermissions` / `--ask-for-approval never`. Never add `clawdline` to an agent's Bash
+  allowlist.
+- Leave `documents_contain_project_root` unset or `true` (contained is the default on this
+  branch): `false` lets an `artifacts` symlink widen what a read-only device can read.
+- Do not open untrusted services on other `127.0.0.1` ports in the browser signed in to the
+  console. Browsers do not scope cookies by port, so they receive the session cookie.
+
+### Dependency changes on this branch
+
+- 2026-10-22, Go: `golang.org/x/net` v0.50.0 → v0.60.0 and `toolchain go1.27.3`. govulncheck had
+  found 13 reachable vulnerabilities (x/net HTTP/2 and DNS, stdlib in go1.27.1); after the bump, 0.
+  It raised the `go` directive 1.25.0 → 1.26.0, `x/crypto` to v0.57.0 and `x/sys` to v0.48.0;
+  `go mod tidy` made goldmark and `x/crypto` direct; the README badge and `docs/user/install.md`
+  say Go 1.26.
+- 2026-10-22, npm: `npm audit` found 2 high, both build-time only: vite 6.4.3 (five advisories in
+  the dev server and launch-editor) and source-map-js 1.2.1 (DoS from a crafted source map,
+  through postcss). Bumped to vite 6.4.4 and source-map-js 1.2.2 (`e496fa9`); `npm audit` then
+  found 0.
+
+### Security review
+
+Static review of `418bac7` on 2026-10-19: Claude (five subagents) and Codex (two runs), verdicts
+spot-checked against the source.
+
+Fixed on this branch on 2026-10-22 in `8d4bf41`, each with a test that failed before the fix:
+
+- Medium: dispatch defaulted to `full`. A brief or CLI call that names no mode now runs `ask`
+  (`internal/app/orchestrator/draft.go`, `cmd/clawdline/dispatch.go`).
+- Medium: `clawdline cloud off` wrote the file first, so the route found no change and left the
+  relay line up (`internal/transport/http/cloud_onboarding.go`). It now compares with the live line.
+- Medium (Codex only): `/v1/events` stayed open after device revocation. The stream now
+  re-verifies its credential on every tick and heartbeat (`gate.go` `stillAdmitted`, `stream.go`).
+  The terminal stream already checked access.
+- Medium (Codex only): an `artifacts` symlink widened document reads. Containment is now the
+  default (`internal/transport/http/documents.go` `containsProjectRoot`).
+- Low: console pages had no `frame-ancestors`. `page.go` now sends
+  `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY` and `nosniff`.
+- Low: an unvalidated pre-release segment in a version string could name a path.
+  `ParseVersion` now accepts only semver identifiers.
+- Low: `install.sh` let curl use http. It is https-only, redirects included, unless
+  `CLAWDLINE_INSTALL_BASE_URL` names an http test server. The wget path is unchanged.
+
+Not fixed, and why:
+
+- High: revoking a device does not rotate the shared account master secret, and unpinned senders
+  fall back to the Cloud roster key (`internal/transport/cloud/link.go` `publicKeyFor`). Whoever
+  holds an old master secret and can add a roster device keeps decrypting, and can send commands
+  if `cloud_commands` is on. This is a Cloud protocol change, and Cloud is off.
+- High: the hosted console JS from `app.clawdline.com` holds the keys and cannot be verified
+  against the repository. It matters only if the operator is compromised or malicious, and only
+  with Cloud on.
+- Medium: `install.sh` runs the downloaded binary before an independent signature check (Codex
+  rated High). This fork does not use `install.sh`.
+- Medium: there is no envelope timestamp check, and the replay window lives in memory and is
+  rebuilt on every `wire()`. A malicious relay can delay or replay commands that have no durable
+  receipt, such as `work-gate-settings-update` (`internal/adapters/cloud/transport.go`,
+  `internal/transport/cloud/link.go`). Cloud only.
+- Medium: the session cookie is not port-scoped. This is the browser cookie model; see the
+  operating policy above.
+- Medium: Secret Handoff does not stop a prompt-injected agent from running
+  `secret run -- curl` (`cmd/clawdline/secret.go`). This is a design limit.
+- Disputed: `ctl/` reads skip re-authorization (`internal/app/cloudops/cloudops.go`
+  `serveRead`). Codex rated it High and Claude Low; it was assessed Medium because every paired
+  device already gets Read and Send. Cloud only.
+- Low: on multi-user Linux, another user can squat port 7727, `clawdline open` puts the token in
+  argv, and the global 24 h pairing lockout can be used to deny pairing. Downgrades can be forced
+  and manifests do not expire (release updater, unused here).
+
+Found sound: no telemetry, analytics or crash SDKs; local HTTP has CSRF, Origin and Host checks;
+no exploitable XSS; no `sh -c` injection; the release updater verifies the ed25519 signature
+before parsing; token and key files are 0600.
+
+### What leaves the machine
+
+- With a source build, Cloud off and the update check off, nothing goes to the Clawdline operator
+  or to GitHub. What remains, none of it to the operator: AI auto-naming sends conversation
+  snippets and paths to Anthropic or OpenAI through the local `claude` or `codex` CLI; browser
+  push subscriptions go to Apple or Google push services, end-to-end encrypted; documentation and
+  plan links open `clawdline.com`.
+- With Cloud on, the operator sees the hostname as the machine name (renameable), the OS, the
+  version and the account. The relay sees the machine id, session ids, timing, sizes, and which
+  device reads which session. Titles, projects, transcripts and terminal content are end-to-end
+  encrypted, but `app.clawdline.com` serves the JS that decrypts them. Cloud direct uses Google
+  and Cloudflare STUN, which see the public IP.
+- Local collection: the daemon scans every `~/.claude/projects/*.jsonl` and `~/.codex/sessions`
+  file, including sessions Clawdline did not start, for token counts only (kept 57 days, no
+  opt-out). It does not read Claude or Codex credential files; only
+  `experiments/personas/round5/run.mjs` copies `~/.codex/auth.json`, and no daemon path runs it.
+  Voice transcripts persist in idempotency receipts for 24 h. Security audit segments are never
+  deleted automatically.
+
 ## The retired Swift app
 
 The Swift app stopped on 2026-09-19 and was archived on 2026-09-22; keep its archive read-only and
