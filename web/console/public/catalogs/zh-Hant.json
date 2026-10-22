@@ -5713,6 +5713,8 @@
   "capacityRow.update.fetch_timeout_seconds.full": "時間到就放棄這次查詢；更新狀態保留上次成功的結果，並在旁邊顯示錯誤。之後會自己再試。",
   "capacityRow.update.build_body_bytes.what": "比較原始碼版本和線上 console 時，Clawdline 從 app.clawdline.com 或自己的網頁檔讀的那個小版本檔最多多大。真正的檔案很小，比這大的就不是它。",
   "capacityRow.update.build_body_bytes.full": "太大的回應會被當成不是版本檔而拒絕；更新狀態會顯示錯誤，並保留上次成功的結果。你不用做任何事。",
+  "capacityRow.release.manifest_age_seconds.what": "一個版本從它的 commit 算起最多多舊，還能被當成最新版本提供。真正的版本本身不會過期，所以這能防止舊版本一直被冒充成最新版本。",
+  "capacityRow.release.manifest_age_seconds.full": "太舊的版本不會被提供或自動安裝；版本面板會說無法確認最新版本。指名版本號的版本仍然可以安裝。正在執行的版本不受影響。",
   "capacityRow.release.manifest_bytes.what": "已安裝的 Clawdline 檢查更新時，描述一個版本的簽章清單最多多大。正常的檔案很小，設上限是擋掉損壞或惡意的下載吃掉記憶體。",
   "capacityRow.release.manifest_bytes.full": "太大的清單會被當成格式錯誤而拒絕，裡面的內容一概不採用，也不會因此提供更新；版本面板會顯示錯誤。正在執行的版本不受影響。",
   "capacityRow.release.signature_bytes.what": "證明某個版本是真品的簽章檔最多多大。它只需要放幾個簽章，比這大的就視為可疑。",

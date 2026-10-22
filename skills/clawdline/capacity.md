@@ -205,6 +205,7 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `release.health_wait_seconds` | 60 | `seconds` | `refuse` | `diagnostics` | — |
 | `release.list_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics` | — |
 | `release.lock_stale_seconds` | 1800 | `seconds` | `expire` | `diagnostics` | — |
+| `release.manifest_age_seconds` | 15552000 | `seconds` | `evict_oldest` | `diagnostics` | — |
 | `release.manifest_bytes` | 65536 | `bytes` | `refuse` | `diagnostics` | — |
 | `release.pending_deadline_seconds` | 600 | `seconds` | `refuse` | `diagnostics` | — |
 | `release.previous_releases_kept` | 2 | `rows` | `evict_oldest` | `diagnostics` | — |

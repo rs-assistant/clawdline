@@ -291,6 +291,7 @@ const (
 	// A release's signed manifest and its signature list (docs/releasing.md).
 	ReleaseManifestBytes  = "release.manifest_bytes"
 	ReleaseSignatureBytes = "release.signature_bytes"
+	ReleaseManifestAge    = "release.manifest_age_seconds"
 	// A release install updating itself (docs/updates.md).
 	ReleaseCheckIntervalSeconds   = "release.check_interval_seconds"
 	ReleaseCheckJitterSeconds     = "release.check_jitter_seconds"

@@ -50,7 +50,7 @@ for archive in "$dir"/*.tar.gz; do
   mkdir -p "$d"
   tar -xzf "$archive" -C "$d"
 done
-cp "$dir/manifest.json" "$dir/manifest.sig.json" "$dir/SHA256SUMS" "$work/unpacked/"
+cp "$dir/manifest.json" "$dir/manifest.sig.json" "$dir/manifest.sshsig" "$dir/SHA256SUMS" "$work/unpacked/"
 
 set +e
 tools/check-private.sh -dir "$work/unpacked"

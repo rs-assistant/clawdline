@@ -168,6 +168,11 @@ func (c *Checker) Refresh(ctx context.Context) Check {
 	if err == nil {
 		m, err = c.Env.Fetch(ctx, base)
 	}
+	if err == nil {
+		// A manifest signed too long ago is not taken as the newest
+		// release: it may be an old one served in place of the real one.
+		err = m.Fresh(c.Env.now())
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if base != "" {
@@ -175,8 +180,11 @@ func (c *Checker) Refresh(ctx context.Context) Check {
 	}
 	if err != nil {
 		c.lastErr = err
-		// A release taken down is not the last good one any more.
+		// A release taken down is not the last good one any more, and the
+		// one held is dropped once it is itself too old to be the newest.
 		if ue, ok := err.(*Error); ok && ue.Code == CodeNoReleasePublished {
+			c.latest = nil
+		} else if c.latest != nil && c.latest.Fresh(c.Env.now()) != nil {
 			c.latest = nil
 		}
 	} else {

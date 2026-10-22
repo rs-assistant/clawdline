@@ -11,6 +11,7 @@ existing work folder. Each step ends with a check.
 | macOS 13+ (Apple silicon or Intel) or Linux (x86-64 or ARM64) | `uname -sm` |
 | *(optional)* tmux 3.0 or later — a release carries its own when you have none | `tmux -V` |
 | Claude Code or Codex | `claude --version` or `codex --version` |
+| curl, and something that checks an Ed25519 signature: OpenSSL 3, or OpenSSH 8.1+ `ssh-keygen` (every Mac has one) | `curl --version`; `openssl version` or `ssh-keygen -Y 2>&1 \| head -1` |
 | *(optional)* a Claude Code status line that writes `~/.claude/statusline-cache/rate-limits.json` | `ls ~/.claude/statusline-cache/rate-limits.json` |
 
 You do not need Go, Node.js, Xcode, an account or `sudo`. The installer checks the assistants
@@ -32,8 +33,14 @@ Line's right edge reads `Plan limits unknown`. [usage.md](usage.md) says what to
 curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
 ```
 
-It downloads the latest release for your system, checks it against the release's checksums and
-signature, and runs `clawdline setup` from it, which:
+It downloads the latest release's manifest, checks its signature with the release key written in
+the script itself — with OpenSSL 3 when this machine has it, otherwise with `ssh-keygen`, never with
+anything it downloaded — then downloads the archive the signed manifest names, checks its sha256,
+and only then unpacks it and runs `clawdline setup` from it. Without `--version` it takes the newest
+release only when it was committed within the last 180 days, and it never replaces an installed
+release with an older one unless you pass `--allow-downgrade`. When neither OpenSSL 3 nor a
+suitable `ssh-keygen` is there, it stops and says what to install; it does not fall back to
+running the download unchecked. `clawdline setup`:
 
 - puts the release in `~/.local/share/clawdline-next/releases/<version>/` and links
   `~/.local/bin/clawdline` to it — if `~/.local/bin` is not on your `PATH`, it prints the one
@@ -68,7 +75,8 @@ curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh 
 | `--no-app` | macOS: the service only, no app |
 | `--no-autostart` | Start now, but not at login or boot |
 | `--channel beta` | Follow pre-releases too |
-| `--version vX.Y.Z` | Install that release instead of the latest |
+| `--version vX.Y.Z` | Install that release instead of the latest, however old it is |
+| `--allow-downgrade` | Install a release older than the one installed |
 | `--port N` | Listen on another port than 7727 (it gets its own service name) |
 | `--verbose` | Also print the paths and versions behind each check |
 | `--adopt` | Take over an installation made from a source checkout (below) |
