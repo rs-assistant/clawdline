@@ -5,12 +5,13 @@ pointers:
   repository: https://github.com/rs-assistant/clawdline
   branch: local-source-build
   reviewed_base_commit: 418bac778938e1099d0c895ac2431abe66b75fef
-  fixes_commit: 8d4bf41  # npm bump: e496fa9
+  fix_commits: [e496fa9, 8d4bf41, 5c8ca6c, d8b1cf2, 125bb2d, cbc74e4, 181ab79]
 
 next:
-  - Have Codex cross-review the 2026-10-22 fixes (fixes_commit) and present any disagreement to the person.
-  - Ask the person whether to fix any finding under "Not fixed" in AGENTS.md. All of them except
-    install.sh and Secret Handoff matter only with Cloud on.
-  - When the daemon is to run on a real machine (it has not been started anywhere yet), ask
-    whether to install a service that sets CLAWDLINE_NEXT_UPDATE_CHECK=off and
-    CLAWDLINE_NEXT_WEB (a LaunchAgent on macOS, a systemd user unit on Linux).
+  - Run the console's browser end-to-end tests (web/console/src/session/human-interventions.e2e.ts)
+    on a machine with a browser; they were updated for Secret Handoff commands but not run.
+  - Nothing in this round ran on a Mac. Before relying on install.sh's signature check or the
+    daemon there, build and run it on macOS.
+
+deferred:
+  - A LaunchAgent or systemd user unit for the daemon. The person said not yet (2026-10-22).

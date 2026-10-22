@@ -57,7 +57,10 @@ CLAWDLINE_NEXT_WEB="$PWD/web/console/dist" \
 - Leave `documents_contain_project_root` unset or `true` (contained is the default on this
   branch): `false` lets an `artifacts` symlink widen what a read-only device can read.
 - Do not open untrusted services on other `127.0.0.1` ports in the browser signed in to the
-  console. Browsers do not scope cookies by port, so they receive the session cookie.
+  console. Browsers do not scope cookies by port, so they receive the session cookie; on Linux the
+  daemon refuses it from another user's process, not from a process of the person's own.
+- Before handing off a Secret Handoff value, read the command the Note shows: that program gets
+  the value. A shell, curl or an unfamiliar address is a reason to stop.
 
 ### Dependency changes on this branch
 
@@ -74,9 +77,11 @@ CLAWDLINE_NEXT_WEB="$PWD/web/console/dist" \
 ### Security review
 
 Static review of `418bac7` on 2026-10-19: Claude (five subagents) and Codex (two runs), verdicts
-spot-checked against the source.
+spot-checked against the source. Every finding below was fixed on this branch on 2026-10-22, each
+with a test that failed before its fix, except where "Still open" says otherwise. The fixes are
+not cross-reviewed; the person dropped the Codex cross-review.
 
-Fixed on this branch on 2026-10-22 in `8d4bf41`, each with a test that failed before the fix:
+First round, `8d4bf41` and `5c8ca6c`:
 
 - Medium: dispatch defaulted to `full`. A brief or CLI call that names no mode now runs `ask`
   (`internal/app/orchestrator/draft.go`, `cmd/clawdline/dispatch.go`).
@@ -84,58 +89,76 @@ Fixed on this branch on 2026-10-22 in `8d4bf41`, each with a test that failed be
   relay line up (`internal/transport/http/cloud_onboarding.go`). It now compares with the live line.
 - Medium (Codex only): `/v1/events` stayed open after device revocation. The stream now
   re-verifies its credential on every tick and heartbeat (`gate.go` `stillAdmitted`, `stream.go`).
-  The terminal stream already checked access.
 - Medium (Codex only): an `artifacts` symlink widened document reads. Containment is now the
   default (`internal/transport/http/documents.go` `containsProjectRoot`).
 - Low: console pages had no `frame-ancestors`. `page.go` now sends
-  `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY` and `nosniff`.
+  `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff` and
+  `Referrer-Policy: no-referrer` (a link out no longer names `127.0.0.1:7727` to the site).
 - Low: an unvalidated pre-release segment in a version string could name a path.
   `ParseVersion` now accepts only semver identifiers.
-- Low: `install.sh` let curl use http. It is https-only, redirects included, unless
-  `CLAWDLINE_INSTALL_BASE_URL` names an http test server. The wget path is unchanged.
 
-Not fixed, and why:
+Second round:
 
-- High: revoking a device does not rotate the shared account master secret, and unpinned senders
-  fall back to the Cloud roster key (`internal/transport/cloud/link.go` `publicKeyFor`). Whoever
-  holds an old master secret and can add a roster device keeps decrypting, and can send commands
-  if `cloud_commands` is on. This is a Cloud protocol change, and Cloud is off.
+- High, `181ab79`: unpinned senders fell back to the Cloud roster key. Only browsers in this
+  machine's own pin file are admitted (`link.go` `publicKeyFor`, `authority`,
+  `terminalAuthority`, `transcriptAuthority`); the roster can still deny but never supplies a key.
+- High, `181ab79`: revoking a device did not replace the master secret. `clawdline cloud revoke`
+  and `POST /v1/cloud/devices/revoke` now save a new secret and rebuild the line, and name every
+  browser that must pair again; a revocation that could not replace the key answers 500
+  `secret_not_replaced`.
+- Medium, `181ab79`: no envelope timestamp check, replay window in memory. An envelope whose
+  signed `ts` is more than 5 min from this machine's clock is dropped (`clock_skew`); accepted
+  claims go to `cloud/replay-journal-v1` (0600) before the envelope is opened, so a reconnect or
+  restart does not reopen the window (register rows `cloud.replay_journal_*`).
+- Disputed (Codex High, Claude Low, assessed Medium), `181ab79`: `ctl/` reads skipped
+  re-authorization. `serveRead` now re-checks the same authority as writes.
+- Medium, `d8b1cf2`: Secret Handoff fed the value to any command the agent chose. The Note now
+  declares the exact argv (absolute executable); the console shows it beside the field and repeats
+  it in the submission; a claim with any other argv gets nothing, the waiting value is wiped and
+  the Note closes as refused.
+- Medium, `125bb2d`: the session cookie is not port-scoped. On Linux, a cookie, bearer,
+  orchestrator token or task secret arriving from a loopback socket another uid owns is refused
+  (`peer.go`, `internal/adapters/sockowner`); an unreadable `/proc` refuses local credentials.
+- Low, `125bb2d`: on multi-user Linux, every CLI call checks that its loopback peer is its own
+  uid before writing a credential (`listenerowner.go`, on `http.DefaultTransport`; the daemon is
+  the same binary, so its own loopback calls to another user's socket are refused too);
+  `clawdline open` passes a one-time five-minute code instead of the device token;
+  `clawdline pair --reset` (local token only) reopens pairing that wrong codes closed.
+- Medium (Codex High), `cbc74e4`: `install.sh` ran the downloaded binary before an independent
+  signature check. It now verifies `manifest.json` against the embedded release keys with OpenSSL
+  3 or `ssh-keygen -Y verify` (new `manifest.sshsig` asset) before anything runs, and refuses when
+  neither verifier exists. wget is no longer used (its `--https-only` did not stop http
+  redirects); curl is https-only.
+- Low, `cbc74e4`: forced downgrade and non-expiring manifests. `install.sh` refuses an older
+  release without `--allow-downgrade` (the updater already needed `--force`); a manifest whose
+  signed `committed_at` is missing or older than 180 days is not "the newest release"
+  (`release.manifest_age_seconds`). A version named on purpose still installs.
+
+What the hosted console (deployed by the operator from upstream) loses against this daemon:
+browsers only on the account roster cannot reach it until `clawdline cloud pair` pins them; after
+a revocation every other browser stops decrypting until it pairs again, with no prompt; envelopes
+stamped more than 5 min off are dropped silently; `ctl/` reads fail while the roster is
+unreadable; a hosted console built before `d8b1cf2` cannot hand off a Secret Handoff value.
+
+Still open:
+
 - High: the hosted console JS from `app.clawdline.com` holds the keys and cannot be verified
-  against the repository. It matters only if the operator is compromised or malicious, and only
-  with Cloud on.
-- Medium: `install.sh` runs the downloaded binary before an independent signature check (Codex
-  rated High). This fork does not use `install.sh`.
-- Medium: there is no envelope timestamp check, and the replay window lives in memory and is
-  rebuilt on every `wire()`. A malicious relay can delay or replay commands that have no durable
-  receipt, such as `work-gate-settings-update` (`internal/adapters/cloud/transport.go`,
-  `internal/transport/cloud/link.go`). Cloud only.
-- Medium: the session cookie is not port-scoped. This is the browser cookie model; see the
-  operating policy above. On Linux a cookie replayed by another user's process is now refused
-  (below); a service of the person's own user, and macOS and Windows, are not covered.
-- Medium: Secret Handoff does not stop a prompt-injected agent from running
-  `secret run -- curl` (`cmd/clawdline/secret.go`). This is a design limit.
-- Disputed: `ctl/` reads skip re-authorization (`internal/app/cloudops/cloudops.go`
-  `serveRead`). Codex rated it High and Claude Low; it was assessed Medium because every paired
-  device already gets Read and Send. Cloud only.
-- Low: downgrades can be forced and manifests do not expire (release updater, unused here).
-
-Fixed on this branch on 2026-10-22, second round (branch `security-loopback-peer-fixes`), each
-with a test that failed before the fix:
-
-- The cookie, a bearer, the orchestrator token, a task secret or a token handed to
-  `/v1/auth/adopt` from a loopback socket another uid owns is refused 403 (Linux,
-  `/proc/net/tcp{,6}`; `internal/transport/http/peer.go`, `internal/adapters/sockowner`). An
-  unreadable `/proc` refuses every local credential and logs why. In-process Cloud requests have
-  no connection and are judged as before.
-- Every CLI call checks that the far end of its loopback connection is its own uid's socket
-  before writing, so a squatter on 7727 gets no token (Linux; `cmd/clawdline/listenerowner.go`,
-  on `http.DefaultTransport`).
-- `clawdline open` puts a one-time code (five minutes, sixteen waiting at most; register rows
-  `devices.open_code_seconds`, `devices.open_codes_pending`) on the browser's command line
-  instead of the device's token (`internal/transport/http/open_code.go`).
-- `clawdline pair --reset` (local token only) reopens pairing that five wrong codes closed for a
-  day, and audits `pair.reset`. An attacker who keeps guessing can close it again; each reset
-  buys at most five guesses.
+  against the repository. No daemon-side change can fix it; it matters only with Cloud on.
+- A revocation made in the hosted console (on the account roster) denies the device but does not
+  replace the key; devices revoked before `181ab79` are not re-keyed by revoking again. The CLI
+  viewer and `clawdline cloud connect` keep an in-memory replay window. Replay-journal appends are
+  not fsynced per envelope.
+- The cookie still reaches a service of the person's own user; the socket-owner checks do not
+  exist on macOS or Windows.
+- A declared Secret Handoff command that is itself a shell or curl still receives the value: the
+  person's check of the shown command is the protection.
+- Whoever keeps guessing pairing codes can close pairing again after a reset (five guesses each).
+- Releases published before `cbc74e4` have no `manifest.sshsig`, so a Mac without OpenSSL 3
+  cannot use `install.sh` until a newer release exists. Stable releases must follow each other
+  within 180 days. The beta channel's tag list is unsigned. `clawdline setup` from an older
+  unpacked release, and `--force`, still downgrade on an explicit ask. Not run on macOS.
+- Browser end-to-end tests for the Secret Handoff console were updated but not run (no browser in
+  the container).
 
 Found sound: no telemetry, analytics or crash SDKs; local HTTP has CSRF, Origin and Host checks;
 no exploitable XSS; no `sh -c` injection; the release updater verifies the ed25519 signature
@@ -147,7 +170,7 @@ before parsing; token and key files are 0600.
   or to GitHub. What remains, none of it to the operator: AI auto-naming sends conversation
   snippets and paths to Anthropic or OpenAI through the local `claude` or `codex` CLI; browser
   push subscriptions go to Apple or Google push services, end-to-end encrypted; documentation and
-  plan links open `clawdline.com`.
+  plan links open `clawdline.com` or `app.clawdline.com`, which then see the IP but no referrer.
 - With Cloud on, the operator sees the hostname as the machine name (renameable), the OS, the
   version and the account. The relay sees the machine id, session ids, timing, sizes, and which
   device reads which session. Titles, projects, transcripts and terminal content are end-to-end
