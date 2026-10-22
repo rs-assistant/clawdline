@@ -268,5 +268,9 @@
   "image.failed": "clawdline image send：",
   "image.whoami_no_terminal": "clawdline image send：whoami 的回答沒有 terminal id。沒有送出任何東西。",
   "image.stored_shown": "已存好 %d 張圖，給 Session %s。它們會出現在這個 Session 之後第一則寫進紀錄的回覆底下，通常就是執行這個指令的那則訊息；回覆裡不需要寫任何東西。\n",
-  "image.check": "存好不等於看到：那則回覆寫出後，GET /v1/transcript?session=%s 會在它的 artifacts 裡列出這些圖。\n"
+  "image.check": "存好不等於看到：那則回覆寫出後，GET /v1/transcript?session=%s 會在它的 artifacts 裡列出這些圖。\n",
+  "listener.other_user": "%s 被另一個使用者的程序佔用（uid %d），不是你的 Clawdline daemon（uid %d），所以沒有把任何憑證送過去。請停掉佔用這個連接埠的程式，或讓你的 daemon 改用其他連接埠（CLAWDLINE_NEXT_PORT）",
+  "listener.unknown": "無法判斷是哪個使用者在 %s 上監聽（%v），所以沒有把任何憑證送過去",
+  "pair.reset_done": "配對已重新開放：忘掉了 %d 次錯誤代碼和 %d 次配對要求。如果那些代碼不是你輸入的，就是其他連得到這台機器的人輸入的。\n",
+  "pair.reset_help": "在錯誤代碼讓配對關閉後重新開放配對，然後結束"
 }

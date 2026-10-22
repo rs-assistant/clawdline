@@ -707,7 +707,10 @@ not a feature, and personality cannot be ported to a screen with no notch. What 
 
 WebKitGTK needs cgo, and cgo would break "one machine builds six platforms". `plan.md` §3 already says "WebKitGTK,
 **or just use the browser**" — the recommendation is the latter, and `clawdline open` has already done it: it issues a device that can read and send,
-carries the token in the fragment, exchanges it for a cookie at `/v1/auth/adopt`, and redirects to `/`.
+carries a one-time code in the fragment, exchanges it for a cookie at `/v1/auth/adopt`, and redirects to `/`. The
+address is a code and not the device's token because it goes on `xdg-open`'s and the browser's command line, which
+every user of a Linux machine can read; the code works once and expires after five minutes
+(`devices.open_code_seconds`).
 
 **The cost has to be listed plainly: this is a whole row of features that do not exist**:
 

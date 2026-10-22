@@ -195,10 +195,14 @@ const (
 	CloudViewerEventsSeen  = "cloud.viewer_events_seen_batches"
 	CloudReloadStopSeconds = "cloud.reload_stop_seconds"
 	// C2: the things that had no limit at all (limits §3.3, §7.2 wave 2).
-	LogDaemon             = "log.daemon"
-	DevicesList           = "devices.list"
-	PushSubscriptions     = "push.subscriptions"
-	CacheTranscriptTitles = "cache.transcript_titles"
+	LogDaemon   = "log.daemon"
+	DevicesList = "devices.list"
+	// The one-time codes `clawdline open` puts in a browser's address in
+	// place of the device's token (internal/transport/http open_code.go).
+	DevicesOpenCodeSeconds  = "devices.open_code_seconds"
+	DevicesOpenCodesPending = "devices.open_codes_pending"
+	PushSubscriptions       = "push.subscriptions"
+	CacheTranscriptTitles   = "cache.transcript_titles"
 	// C3: the quiet failures made loud (limits §3.2, §7.2 wave 3).
 	SSEScreenPending   = "sse.screen_pending"
 	ArtifactsImages    = "artifacts.images"

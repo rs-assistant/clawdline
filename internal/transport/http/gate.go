@@ -123,6 +123,9 @@ type gate struct {
 	// tunnel and the gate in front of it never disagree about its name.
 	hostname atomic.Pointer[string]
 	port     int
+	// opens is the one-time codes `clawdline open` handed a browser and the
+	// browser has not traded yet (open_code.go).
+	opens openCodes
 	// dir is the state directory used by the gate and local adapters.
 	dir string
 
@@ -282,6 +285,13 @@ func (g *gate) wrap(next http.Handler) http.Handler {
 			return
 		}
 		p := routePath(r)
+		// And who opened the connection, before any credential is read: on a
+		// machine with other users, a credential that came from one of their
+		// processes is refused, whatever it is (peer.go).
+		if msg := peerRefusal(r, p); msg != "" {
+			writeAuthRefusal(w, http.StatusForbidden, "forbidden", msg)
+			return
+		}
 		device := judgedAsDevice(r)
 		machine := machineScoped(p) && !device &&
 			g.verifyMachine(r.Header.Get(machineHeader))

@@ -32,6 +32,12 @@ func (s *Server) daemonCapacityMeasures() map[string]func() capacity.Reading {
 			}
 			return g.files.DevicesReading()
 		},
+		capacity.DevicesOpenCodeSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-code expiry; no retained wait"}
+		},
+		capacity.DevicesOpenCodesPending: func() capacity.Reading {
+			return capacity.Reading{Known: true, Used: int64(s.gate().opens.waiting())}
+		},
 		capacity.PushSubscriptions: func() capacity.Reading {
 			// Measuring does not make the push directory: a machine nobody
 			// has asked to notify them holds no subscriptions, and that is a
