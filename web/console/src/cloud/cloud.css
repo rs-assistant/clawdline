@@ -52,7 +52,8 @@
 .door[data-cloud-screen="machines"] .fine { overflow-wrap: anywhere; }
 /* A long machine roster must scroll inside the picker. Centering an oversized
    door card clips its first rows above the viewport on a narrow phone. */
-.door[data-cloud-screen="machines"] .door-card {
+.door[data-cloud-screen="machines"] .door-card,
+.door[data-cloud-screen="pairing"] .door-card {
     box-sizing: border-box;
     max-height: calc(100dvh - 48px);
     overflow-y: auto;

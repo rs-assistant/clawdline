@@ -1,3 +1,5 @@
+import { BrowserPairingBlock } from "../pages/settings/BrowserPairingBlock.js"
+import { LocalMachineSetup } from "./LocalMachineSetup.js"
 import { accessProblemAfterRead } from "./state.js"
 import { CloudReadProblem } from "./CloudReadProblem.js"
 import { dashboardFetch } from "./dashboard-reader.js"
@@ -1910,13 +1912,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           },
           device: pairDevice(),
           onScan: readInvitation,
-          onMismatch: (id: string) => {
-            // The machine that answered is not the one on the person's screen:
-            // put the forget question for it in front of them.
-            const answered = machinesRef.current?.find((m) => m.id === id) ?? null
-            closePairing()
-            if (answered) askForget(answered)
-          },
+          viewerID: session.current?.deviceID ?? "",
+          // A comparison failure must never revoke the account's whole machine.
+          // Keep the machine-side viewer-revocation instruction in the panel.
+          onMismatch: () => {},
         }
       : null
   // Once drawn, the console stays: the copied modules bind to the document
@@ -2494,6 +2493,7 @@ function GateCard(props: {
           <>
             <p className="lede">{nextWord("cloudConnectLede")}</p>
             <p className="fine">{nextWord("cloudConnectFine")}</p>
+            <LocalMachineSetup onPair={onPair}><BrowserPairingBlock shown /></LocalMachineSetup>
             <button className="go" type="button" id="cloud-pair-start" onClick={() => onPair(null)}>
               {nextWord("cloudPairStart")}
             </button>
@@ -2732,6 +2732,7 @@ function GateCard(props: {
             {machineList.phase === "empty_authoritative" && (
               <>
                 <p className="fine">{nextWord("cloudConnectFine")}</p>
+            <LocalMachineSetup onPair={onPair}><BrowserPairingBlock shown /></LocalMachineSetup>
                 <button className="go" type="button" id="cloud-machines-pair" onClick={() => onPair(null)}>
                   {nextWord("cloudPairStart")}
                 </button>

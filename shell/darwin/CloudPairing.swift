@@ -233,6 +233,15 @@ final class CloudPairAgent: NSObject, WKScriptMessageHandlerWithReply {
 final class CloudPairLocal: NSObject, WKScriptMessageHandlerWithReply {
     static let name = "clawdlinePairLocal"
     private var busy = false
+    private var invitationAllowed = false
+    private var connectionAllowed = false
+    private var connectionAttempt: UUID?
+    private var connection: [String: Any] = ["phase": "idle"]
+    private static var linkBusy = false
+
+    private struct LocalFailure: Error {
+        let code: String
+    }
 
     private func isAllowed(_ message: WKScriptMessage) -> Bool {
         let origin = message.frameInfo.securityOrigin
@@ -247,57 +256,233 @@ final class CloudPairLocal: NSObject, WKScriptMessageHandlerWithReply {
             replyHandler(["ok": false, "error": "not_cloud"], nil)
             return
         }
+        // Cancel the local intent even while a login poll is awaiting its reply.
+        // This does not claim to withdraw an approval already sent to Cloud.
+        if body["kind"] as? String == "connection-cancel" {
+            connectionAllowed = false
+            connectionAttempt = nil
+            connection = ["phase": "idle"]
+            replyHandler(["ok": true, "native_setup": true, "connection": connection], nil)
+            return
+        }
         guard !busy else { replyHandler(["ok": false, "error": "busy"], nil); return }
         busy = true
         Task { @MainActor in
             defer { busy = false }
-            guard let status = await request("GET", path: "v1/cloud/status"),
-                  let machine = status["machine_id"] as? String, !machine.isEmpty else {
-                replyHandler(["ok": false, "error": "unavailable"], nil); return
+            do {
+                var status = try await request("GET", path: "v1/cloud/status")
+                if body["kind"] as? String == "status" {
+                    replyHandler(statusReply(status), nil); return
+                }
+                if body["kind"] as? String == "connect" {
+                    guard let window = message.webView?.window else { throw LocalFailure(code: "unavailable") }
+                    let alert = NSAlert()
+                    alert.messageText = L.t.cloudConnectAsks(machineName(status))
+                    alert.informativeText = L.t.cloudConnectBody
+                    alert.addButton(withTitle: L.t.cloudConnectStart)
+                    alert.addButton(withTitle: L.t.dialogCancel)
+                    let accepted: Bool = await withCheckedContinuation { done in
+                        alert.beginSheetModal(for: window) { done.resume(returning: $0 == .alertFirstButtonReturn) }
+                    }
+                    guard accepted, isAllowed(message) else { throw LocalFailure(code: "cancelled") }
+                    let attempt = UUID()
+                    connectionAttempt = attempt
+                    connectionAllowed = true
+                    let started = try await request("POST", path: "v1/cloud/login")
+                    guard connectionAttempt == attempt else { throw LocalFailure(code: "cancelled") }
+                    connection = started
+                    guard isAllowed(message) else { throw LocalFailure(code: "not_cloud") }
+                    if connection["phase"] as? String == "waiting",
+                       let raw = connection["verification_url"] as? String,
+                       let url = URL(string: raw), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                        // This URL comes from the authenticated daemon, never from the page.
+                        // If Launch Services cannot open it, the reply still offers the URL.
+                        _ = NSWorkspace.shared.open(url)
+                    }
+                    status = try await finishConnection(status, message: message)
+                    replyHandler(statusReply(status), nil); return
+                }
+                if body["kind"] as? String == "connection-status" {
+                    if connectionAllowed, connection["phase"] as? String == "waiting" {
+                        let next = connection["next_poll_at"] as? Double ?? 0
+                        if Date().timeIntervalSince1970 >= next {
+                            let attempt = connectionAttempt
+                            let polled = try await request("GET", path: "v1/cloud/login")
+                            guard connectionAttempt == attempt, connectionAllowed else { throw LocalFailure(code: "cancelled") }
+                            connection = polled
+                        }
+                    }
+                    status = try await finishConnection(status, message: message)
+                    replyHandler(statusReply(status), nil); return
+                }
+                guard let machine = status["machine_id"] as? String, !machine.isEmpty,
+                      status["configured"] as? Bool == true else {
+                    throw LocalFailure(code: "cloud_not_signed_in")
+                }
+                if body["kind"] as? String == "invitation-status" {
+                    guard invitationAllowed, isAllowed(message) else {
+                        replyHandler(["ok": false, "error": "confirmation_required"], nil); return
+                    }
+                    replyHandler(["ok": true, "pairing": status["pairing"] ?? ["phase": "idle"]], nil); return
+                }
+                if body["kind"] as? String == "invitation" {
+                    guard body["machine_id"] as? String == machine, isAllowed(message),
+                          let window = message.webView?.window else {
+                        replyHandler(["ok": false, "error": "not_this_machine"], nil); return
+                    }
+                    let alert = NSAlert()
+                    alert.messageText = L.t.pairInvitationAsks
+                    alert.informativeText = L.t.pairInvitationBody
+                    alert.addButton(withTitle: L.t.pairLocalStart)
+                    alert.addButton(withTitle: L.t.dialogCancel)
+                    let accepted: Bool = await withCheckedContinuation { done in
+                        alert.beginSheetModal(for: window) { done.resume(returning: $0 == .alertFirstButtonReturn) }
+                    }
+                    guard accepted, isAllowed(message) else {
+                        replyHandler(["ok": false, "error": "cancelled"], nil); return
+                    }
+                    let result = try await request("POST", path: "v1/cloud/pairing")
+                    invitationAllowed = true
+                    replyHandler(["ok": true, "pairing": result], nil); return
+                }
+                guard body["machine_id"] as? String == machine,
+                      let offer = body["offer"] as? String, !offer.isEmpty, offer.utf8.count <= 4096,
+                      isAllowed(message), let window = message.webView?.window else {
+                    replyHandler(["ok": false, "error": "not_this_machine"], nil); return
+                }
+                let result = try await finishOffer(offer, status: status, in: window, stillAllowed: { self.isAllowed(message) })
+                replyHandler(["ok": true, "machine_id": machine, "pairing": result], nil)
+            } catch {
+                let code = (error as? LocalFailure)?.code ?? "unavailable"
+                if body["kind"] as? String == "connect" {
+                    connectionAllowed = false
+                    connectionAttempt = nil
+                    connection = ["phase": "failed", "code": code]
+                }
+                replyHandler(["ok": false, "error": code], nil)
             }
-            if body["kind"] as? String == "status" {
-                replyHandler(["ok": true, "machine_id": machine], nil); return
-            }
-            guard body["machine_id"] as? String == machine,
-                  let offer = body["offer"] as? String, !offer.isEmpty, offer.utf8.count <= 4096,
-                  isAllowed(message), let window = message.webView?.window else {
-                replyHandler(["ok": false, "error": "not_this_machine"], nil); return
-            }
-            let alert = NSAlert()
-            // The machine name comes from the authenticated local daemon, not
-            // from hosted JavaScript. No code or credential appears in the sheet.
-            alert.messageText = L.t.pairLocalAsks(status["machine_name"] as? String ?? machine)
-            alert.informativeText = L.t.pairLocalBody
-            alert.addButton(withTitle: L.t.pairLocalStart)
-            alert.addButton(withTitle: L.t.dialogCancel)
-            let accepted: Bool = await withCheckedContinuation { done in
-                alert.beginSheetModal(for: window) { done.resume(returning: $0 == .alertFirstButtonReturn) }
-            }
-            guard accepted, isAllowed(message) else {
-                replyHandler(["ok": false, "error": "cancelled"], nil); return
-            }
-            // Omitted scope preserves an existing pin. The normal offer route
-            // verifies the account, expiry and cryptographic proof before saving.
-            guard let result = await request("POST", path: "v1/cloud/pairing/offer", body: ["offer": offer]),
-                  result["phase"] as? String == "paired" else {
-                replyHandler(["ok": false, "error": "pairing_failed"], nil); return
-            }
-            replyHandler(["ok": true, "machine_id": machine], nil)
         }
     }
 
-    private func request(_ method: String, path: String, body: [String: String]? = nil) async -> [String: Any]? {
-        guard let token = LocalToken.read() else { return nil }
+    private func machineName(_ status: [String: Any]) -> String {
+        status["machine_name"] as? String ?? Host.current().localizedName ?? ProcessInfo.processInfo.hostName
+    }
+
+    private func statusReply(_ status: [String: Any]) -> [String: Any] {
+        ["ok": true, "native_setup": true,
+         "configured": status["configured"] as? Bool ?? false,
+         "enabled": status["enabled"] as? Bool ?? false,
+         "state": status["state"] as? String ?? "off",
+         "machine_id": status["machine_id"] as? String ?? "",
+         "machine_name": machineName(status),
+         "fingerprint": status["fingerprint"] as? String ?? "",
+         "pairing_invitation": true, "connection": connection]
+    }
+
+    /// Reading someone else's completed login never authorizes turning Cloud on.
+    /// Only this handler's current, explicit native consent may finish the setup.
+    private func finishConnection(_ status: [String: Any], message: WKScriptMessage) async throws -> [String: Any] {
+        guard connectionAllowed else { return status }
+        guard isAllowed(message) else {
+            connectionAllowed = false
+            throw LocalFailure(code: "not_cloud")
+        }
+        if connection["phase"] as? String == "failed" {
+            connectionAllowed = false
+            return status
+        }
+        guard connection["phase"] as? String == "complete" else { return status }
+        // Consume consent before the write: a failed reply cannot repeat it silently.
+        connectionAllowed = false
+        _ = try await request("POST", path: "v1/cloud/enabled", body: ["enabled": true])
+        return try await request("GET", path: "v1/cloud/status")
+    }
+
+    /// A browser on this Mac can ask the installed app directly. The URL is
+    /// untrusted input: the daemon names the machine and verifies the offer,
+    /// and a native confirmation still precedes every handover.
+    static func pairFromLink(_ url: URL, in window: NSWindow) async -> String {
+        guard !linkBusy else { return "busy" }
+        linkBusy = true
+        defer { linkBusy = false }
+        guard url.scheme == "clawdline-next", url.host == "pair-browser",
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+              items.filter({ $0.name == "offer" }).count == 1,
+              items.filter({ $0.name == "machine_id" }).count <= 1,
+              let offer = items.first(where: { $0.name == "offer" })?.value,
+              !offer.isEmpty, offer.utf8.count <= 4096 else { return "bad_request" }
+        let requestedMachine = items.first(where: { $0.name == "machine_id" })
+        if let requestedMachine, requestedMachine.value?.isEmpty != false { return "bad_request" }
+        let handler = CloudPairLocal()
+        do {
+            let status = try await handler.request("GET", path: "v1/cloud/status")
+            guard let machine = status["machine_id"] as? String, !machine.isEmpty,
+                  status["configured"] as? Bool == true else { return "cloud_not_signed_in" }
+            if let requestedMachine, requestedMachine.value != machine { return "not_this_machine" }
+            _ = try await handler.finishOffer(offer, status: status, in: window, stillAllowed: { true })
+            return ""
+        } catch { return (error as? LocalFailure)?.code ?? "unavailable" }
+    }
+
+    private func finishOffer(_ offer: String, status: [String: Any], in window: NSWindow,
+                             stillAllowed: () -> Bool) async throws -> [String: Any] {
+        let alert = NSAlert()
+        // The machine name comes from the authenticated local daemon, not
+        // from hosted JavaScript. No code or credential appears in the sheet.
+        alert.messageText = L.t.pairLocalAsks(status["machine_name"] as? String ?? status["machine_id"] as? String ?? "")
+        alert.informativeText = L.t.pairLocalBody + "\n\n" + L.t.pairMachineFingerprint(status["fingerprint"] as? String ?? "")
+        alert.addButton(withTitle: L.t.pairLocalStart)
+        alert.addButton(withTitle: L.t.dialogCancel)
+        let accepted: Bool = await withCheckedContinuation { done in
+            alert.beginSheetModal(for: window) { done.resume(returning: $0 == .alertFirstButtonReturn) }
+        }
+        guard accepted, stillAllowed() else { throw LocalFailure(code: "cancelled") }
+        // Omitted scope preserves an existing pin. The normal offer route
+        // verifies the account, expiry and cryptographic proof before saving.
+        let result = try await request("POST", path: "v1/cloud/pairing/offer", body: ["offer": offer])
+        guard result["phase"] as? String == "paired" else { throw LocalFailure(code: "pairing_failed") }
+        let done = NSAlert()
+        done.messageText = L.t.pairLinkDone
+        done.informativeText = L.t.pairMachineFingerprint(result["machine_fingerprint"] as? String ?? status["fingerprint"] as? String ?? "")
+            + "\n\n" + L.t.pairBrowserFingerprint(result["viewer_fingerprint"] as? String ?? "")
+            + "\n\n" + L.t.pairLinkReturn
+        done.addButton(withTitle: L.t.dialogOK)
+        _ = await done.beginSheetModal(for: window)
+        return result
+    }
+
+    static func pairingFailureText(_ code: String) -> String {
+        switch code {
+        case "not_this_machine": return L.t.pairWrongMachine
+        case "cloud_not_signed_in", "cloud_not_configured", "cloud_off": return L.t.pairNeedsCloud
+        case "offer_expired", "pairing_expired", "invitation_expired", "pairing_gone", "unknown_pairing": return L.t.pairCodeExpired
+        case "wrong_account", "wrong_invitation": return L.t.pairWrongAccount
+        case "unavailable", "no_token": return L.t.pairUnavailable
+        default: return L.t.pairLinkRetry
+        }
+    }
+
+    private func request(_ method: String, path: String, body: [String: Any]? = nil) async throws -> [String: Any] {
+        guard let token = LocalToken.read() else { throw LocalFailure(code: "no_token") }
         var req = URLRequest(url: home.appendingPathComponent(path))
         req.httpMethod = method
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.timeoutInterval = 30
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
-        guard let (data, response) = try? await URLSession.shared.data(for: req),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        let data: Data
+        let response: URLResponse
+        do { (data, response) = try await URLSession.shared.data(for: req) }
+        catch { throw LocalFailure(code: "unavailable") }
+        let reply = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            let code = (reply?["error"] as? [String: Any])?["code"] as? String
+                ?? reply?["error"] as? String ?? "pairing_failed"
+            throw LocalFailure(code: code)
+        }
+        guard let reply else { throw LocalFailure(code: "bad_response") }
+        return reply
     }
 }

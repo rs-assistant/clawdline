@@ -8,6 +8,13 @@
 .workflow-setting-help { padding: 0 0 4px; color: var(--dim); font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
 .workflow-setting-help p { margin: 8px 0; }
 .workflow-setting-help strong { color: var(--ink); }
+.settings-browser-pairing { margin-top: 24px; }
+.settings-browser-pairing label { display: block; margin-top: 20px; color: var(--ink); }
+.settings-browser-pairing textarea {
+  box-sizing: border-box; display: block; width: 100%; margin: 8px 0 12px; padding: 10px;
+  color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  font: inherit; overflow-wrap: anywhere; resize: vertical;
+}
 @media (max-width: 440px) { .workflow-setting-row { gap: 8px; } .workflow-setting-label { gap: 0; } }
 
 .sw-window .settings-workflow {
@@ -18,3 +25,12 @@
 .sw-window .settings-workflow > b { font-size: 15px; }
 .sw-window .settings-workflow .say { color: var(--sw-soft); line-height: 1.65; }
 
+
+.settings-browser-pairing {
+  --sw-label: var(--ink); --sw-soft: var(--dim); --sw-faint: var(--faint);
+  --sw-accent: var(--accent);
+}
+.settings-browser-pairing code { overflow-wrap: anywhere; }
+.cloud-local-setup { margin: 20px 0; padding: 16px 0; border-top: 1px solid var(--line); }
+.cloud-local-setup .settings-browser-pairing { text-align: left; }
+.cloud-local-setup .chip { min-height: 44px; }

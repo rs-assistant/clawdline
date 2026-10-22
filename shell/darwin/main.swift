@@ -796,6 +796,22 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
                                    action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         appItem.submenu = appMenu
         main.addItem(appItem)
+        // Standard responder actions also reach the Settings WKWebView. Only
+        // ConsoleWindow had an editing-key fallback, so Cmd-V did nothing in
+        // the pairing-code field in a separate native settings window.
+        let editItem = NSMenuItem(title: L.t.menuEdit, action: nil, keyEquivalent: "")
+        let editMenu = NSMenu(title: L.t.menuEdit)
+        for (title, action, key) in [
+            (L.t.menuUndo, Selector(("undo:")), "z"),
+            (L.t.menuCut, #selector(NSText.cut(_:)), "x"),
+            (L.t.menuCopy, #selector(NSText.copy(_:)), "c"),
+            (L.t.menuPaste, #selector(NSText.paste(_:)), "v"),
+            (L.t.menuSelectAll, #selector(NSText.selectAll(_:)), "a"),
+        ] {
+            editMenu.addItem(NSMenuItem(title: title, action: action, keyEquivalent: key))
+        }
+        editItem.submenu = editMenu
+        main.addItem(editItem)
         main.addItem(browserMenuItem())
 
         let windowItem = NSMenuItem(title: L.t.menuWindow, action: nil, keyEquivalent: "")
@@ -1105,7 +1121,7 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
     /// summon the window without the built-in combination. Its own scheme: the
     /// Swift app owns clawdline://. Only what this app can do is answered.
     func application(_ application: NSApplication, open urls: [URL]) {
-        shellLog("url: \(urls.map { $0.host == "cloud-signed-in" ? "clawdline-next://cloud-signed-in" : $0.absoluteString }.joined(separator: " "))")
+        shellLog("url: \(urls.map { ["cloud-signed-in", "pair-browser"].contains($0.host ?? "") ? "clawdline-next://\($0.host ?? "")" : $0.absoluteString }.joined(separator: " "))")
         guard let url = urls.first else { return }
         switch url.host ?? "" {
         case "toggle":
@@ -1114,6 +1130,18 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
             showConsole()
         case "setup":
             showAgentSetup()
+        case "pair-browser":
+            showConsole()
+            guard let window else { return }
+            Task { @MainActor in
+                let failure = await CloudPairLocal.pairFromLink(url, in: window)
+                guard !failure.isEmpty, failure != "cancelled", failure != "busy" else { return }
+                let alert = NSAlert()
+                alert.messageText = L.t.pairLinkFailed
+                alert.informativeText = CloudPairLocal.pairingFailureText(failure)
+                alert.addButton(withTitle: L.t.dialogOK)
+                _ = await alert.beginSheetModal(for: window)
+            }
         case "cloud-signed-in":
             // The browser sign-in's answer, when it reached the app rather than
             // the sign-in session that asked for it (Browser.swift). Without
