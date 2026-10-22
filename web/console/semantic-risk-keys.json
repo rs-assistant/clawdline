@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6257,
+  "englishKeys": 6259,
   "counts": {
-    "negation": 1972,
-    "state": 1106,
+    "negation": 1974,
+    "state": 1107,
     "permission": 387,
     "deletion": 164,
     "uncertainty": 182
   },
-  "unionCount": 2971,
+  "unionCount": 2973,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -261,6 +261,8 @@
       "capacityRow.release.fetch_timeout_seconds.what",
       "capacityRow.release.health_wait_seconds.full",
       "capacityRow.release.list_bytes.full",
+      "capacityRow.release.manifest_age_seconds.full",
+      "capacityRow.release.manifest_age_seconds.what",
       "capacityRow.release.manifest_bytes.full",
       "capacityRow.release.pending_deadline_seconds.full",
       "capacityRow.release.previous_releases_kept.full",
@@ -2179,6 +2181,7 @@
       "capacityRow.release.health_wait_seconds.what",
       "capacityRow.release.lock_stale_seconds.full",
       "capacityRow.release.lock_stale_seconds.what",
+      "capacityRow.release.manifest_age_seconds.full",
       "capacityRow.release.manifest_bytes.full",
       "capacityRow.release.pending_deadline_seconds.what",
       "capacityRow.release.signature_bytes.full",
@@ -4161,6 +4164,8 @@
     "capacityRow.release.list_bytes.full",
     "capacityRow.release.lock_stale_seconds.full",
     "capacityRow.release.lock_stale_seconds.what",
+    "capacityRow.release.manifest_age_seconds.full",
+    "capacityRow.release.manifest_age_seconds.what",
     "capacityRow.release.manifest_bytes.full",
     "capacityRow.release.pending_deadline_seconds.full",
     "capacityRow.release.pending_deadline_seconds.what",

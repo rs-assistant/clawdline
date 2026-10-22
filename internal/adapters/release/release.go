@@ -3,10 +3,11 @@
 // signatures that make the manifest trustworthy, and the checks an artifact
 // must pass before anything installs it (docs/releasing.md, docs/updates.md).
 //
-// The first download of an install trusts HTTPS to the host serving it; every
-// install after that trusts only a manifest signed by a key compiled into the
-// binary already running. A manifest is never followed on the strength of
-// where it came from.
+// The first install trusts only a manifest signed by a key written into
+// install.sh, which checks it with openssl or ssh-keygen before it runs
+// anything it downloaded; every install after that trusts only a manifest
+// signed by a key compiled into the binary already running. A manifest is
+// never followed on the strength of where it came from.
 package release
 
 import (
@@ -20,6 +21,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Bounds of what is read from a release host. A longer answer is refused as
@@ -33,6 +35,19 @@ const (
 // this package.
 func MaxManifestBytes() int64  { return maxManifestBytes }
 func MaxSignatureBytes() int64 { return maxSignatureBytes }
+
+// maxManifestAgeSeconds is the oldest a signed manifest's committed_at may be
+// when it answers "is there something newer": the channel's newest release,
+// the release check, auto-apply, and install.sh without --version. A signed
+// manifest never expires by itself, so without this a host (or anyone in
+// front of it) could keep serving an old signed release as the newest one
+// forever. A release named on purpose (`update --version`, `install.sh
+// --version`) is not held to it. install.sh carries the same number in days
+// (TestInstallScriptCarriesTheReleaseKeysAndBounds).
+const maxManifestAgeSeconds = 180 * 24 * 3600
+
+// MaxManifestAge is that bound for readers outside this package.
+func MaxManifestAge() time.Duration { return maxManifestAgeSeconds * time.Second }
 
 // Kinds of artifact. A daemon archive holds `clawdline` and `dist/`, the
 // layout `current` points at; an app archive holds `Clawdline Next.app`.
@@ -94,6 +109,9 @@ const (
 	CodeArtifactSHA256     = "artifact_sha256_mismatch"
 	CodeNoTrustedKey       = "no_trusted_key"
 	CodeVersionUnparseable = "version_unparseable"
+	// CodeManifestStale: the channel's newest signed manifest is older than
+	// MaxManifestAge, or carries no committed_at to tell its age by.
+	CodeManifestStale = "manifest_stale"
 )
 
 func refuse(code, format string, a ...any) error {
@@ -205,6 +223,25 @@ func (m Manifest) validate() error {
 		if strings.ContainsAny(a.Name, `/\`) || a.Name == "." || a.Name == ".." {
 			return refuse(CodeManifestMalformed, "artifact name %q is not a plain file name", a.Name)
 		}
+	}
+	return nil
+}
+
+// Fresh refuses m as the answer to "is there something newer" when its signed
+// committed_at is missing, unreadable, or older than MaxManifestAge at now.
+// committed_at is the commit's time, so a release is at least as old as it
+// says: the bound can only be reached early, never late. A manifest with no
+// committed_at is refused rather than let through, because an attacker
+// replaying an old signed manifest would choose one without it; every
+// manifest tools/release builds carries it.
+func (m Manifest) Fresh(now time.Time) error {
+	at, err := time.Parse(time.RFC3339, m.CommittedAt)
+	if err != nil {
+		return refuse(CodeManifestStale, "release %s carries no readable committed_at (%q), so its age is unknown; install a release by name to take it anyway", m.Version, m.CommittedAt)
+	}
+	if age := now.Sub(at); age > MaxManifestAge() {
+		return refuse(CodeManifestStale, "release %s was committed %s, %d days ago, more than the %d days a newest release may be; the release host may be serving an old release, or none has been published since. Install a release by name to take it anyway",
+			m.Version, m.CommittedAt, int(age.Hours()/24), int(MaxManifestAge().Hours()/24))
 	}
 	return nil
 }

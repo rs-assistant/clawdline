@@ -3991,6 +3991,25 @@
   },
   {
     "Register": "daemon",
+    "Name": "release.manifest_age_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 15552000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release.maxManifestAgeSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "release.manifest_bytes",
     "Class": "buffer",
     "Unit": "bytes",

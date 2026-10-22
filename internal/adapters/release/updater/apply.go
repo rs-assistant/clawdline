@@ -23,7 +23,9 @@ import (
 type Request struct {
 	// Version installs that release instead of the channel's newest.
 	Version string
-	// Force installs Version even when it is not newer than the running one.
+	// Force installs Version even when it is older than the running one: a
+	// downgrade happens only when the person names the version and asks for
+	// it (`update --apply --version vX --force`).
 	Force bool
 	// Auto is auto-apply's ask: it never installs a version that rolled
 	// back before.
@@ -129,6 +131,14 @@ func (e Env) decide(ctx context.Context, from string, req Request) (*Plan, error
 	if req.Version != "" && m.Version != req.Version {
 		return nil, &release.Error{Code: release.CodeManifestMalformed,
 			Detail: fmt.Sprintf("asked for %s and the manifest at %s is %s", req.Version, base, m.Version)}
+	}
+	// "Is there something newer" — the channel's newest, or auto-apply's
+	// pick of it — only believes a manifest signed recently enough. A
+	// version the person names is installed whatever its age.
+	if req.Version == "" || req.Auto {
+		if err := m.Fresh(e.now()); err != nil {
+			return nil, err
+		}
 	}
 	running, err := release.ParseVersion(from)
 	if err != nil {

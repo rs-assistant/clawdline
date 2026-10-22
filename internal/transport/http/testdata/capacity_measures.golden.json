@@ -986,6 +986,11 @@
     "Note": true
   },
   {
+    "Name": "release.manifest_age_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "release.manifest_bytes",
     "Known": true,
     "Note": true

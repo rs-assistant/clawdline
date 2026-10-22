@@ -11,14 +11,32 @@ published, and how the signing key is kept. What a machine does with a release i
 | --- | --- |
 | `clawdline_<v>_<os>_<arch>.tar.gz` (linux amd64/arm64, darwin arm64/amd64) | `clawdline` and `dist/` (the local console, with `BUILD.json`) at the archive root — the layout `~/.local/share/clawdline-next/current` points at |
 | `Clawdline-<v>-macos-arm64.tar.gz` | `Clawdline Next.app` (tar, so modes, symlinks and the signature survive) |
-| `SHA256SUMS` | for `install.sh`, which cannot read JSON |
+| `SHA256SUMS` | for a person checking by hand; nothing reads it |
 | `manifest.json` | version, commit, `committed_at`, channel, `min_version`, `non_additive_migration`, and each artifact's os, arch, kind, URL, size and sha256 |
 | `manifest.sig.json` | a list of `{key_id, sig}` Ed25519 signatures over `manifest.json`'s exact bytes |
+| `manifest.sshsig` | the same key's Ed25519 signature over `manifest.json` in OpenSSH's SSHSIG format (namespace `clawdline-release`), for `ssh-keygen -Y verify` |
 
 A daemon follows a manifest only when one signature in the list is by a key compiled into it
 (`internal/adapters/release/keys.go`), and installs an artifact only when its size and sha256 are
-the manifest's. The first install trusts HTTPS to github.com for the binary that then checks the
-signature; every later update trusts only the signature.
+the manifest's. The first install trusts the same key: `install.sh` carries the public keys
+(`release_keys`, held equal to `keys.go` by `TestInstallScriptCarriesTheReleaseKeysAndBounds`) and
+checks `manifest.sig.json` with OpenSSL 3 (`openssl pkeyutl -verify -rawin`, proved first on an
+RFC 8032 test vector), or, where `openssl` cannot verify Ed25519 — the LibreSSL every Mac ships,
+OpenSSL 1.1 — `manifest.sshsig` with `ssh-keygen -Y verify` (OpenSSH 8.1+). It then takes the
+archive's sha256 from the verified manifest, and runs nothing it downloaded before both checks
+pass. With neither verifier it stops and names what to install. What `install.sh` still trusts
+HTTPS for is only which release is the newest; that is bounded by the next paragraph.
+
+`committed_at` is required (`tools/release manifest -committed-at`, checked again by `verify`). It
+is the release's signed age: the newest release — the daemon's check, an update with no
+`--version`, auto-apply, `install.sh` with no `--version` — is believed only while it is at most
+180 days old (`release.manifest_age_seconds`). Without it a host, or anyone in front of it, could
+serve an old signed release as the newest for ever. It is the commit's time, not the signing
+time, so a release built from an older commit reaches the bound sooner, never later. A stable
+release must therefore follow the previous one within 180 days, or machines report that they
+cannot confirm the newest release. A release named by version is installed whatever its age.
+Neither the updater nor `install.sh` replaces a release with an older one unless asked
+(`update --apply --version vX --force`, `install.sh --allow-downgrade`).
 
 Versions are `vX.Y.Z` on the `stable` channel and `vX.Y.Z-beta.N` on `beta`. The stable pointer is
 `https://github.com/sainteye/clawdline/releases/latest/download/manifest.json`, which GitHub serves
@@ -69,6 +87,9 @@ go run ./tools/release sign -key /somewhere/outside/the/repo/test.key /tmp/rel/v
 (cd /tmp/rel && python3 -m http.server 18080)
 ```
 
+`install.sh` installs it with `CLAWDLINE_INSTALL_BASE_URL=http://127.0.0.1:18080/v0.10.0-test.1
+CLAWDLINE_INSTALL_TEST_KEY=<public key>`; it honours the test key only beside that base URL.
+
 `--test-key` compiles one extra trusted key into those binaries. It is accepted only for a
 `-test.N` version, the workflow refuses such a version, and `--no-app` is required, so no
 published binary trusts a key that is not in `keys.go`.
@@ -107,9 +128,10 @@ compilation if the selected identity is not Developer ID Application.
 - **Creating one**: `go run ./tools/release keygen <file outside the repo>`; put the printed
   public key in `releaseKeys` (`internal/adapters/release/keys.go`), the seed in the environment
   secret, and the file in offline storage; then delete the file.
-- **Rotating**: add the new public key to `releaseKeys` and ship a release signed by **both** keys
-  (`tools/release sign` adds a signature and keeps the ones already in `manifest.sig.json`). Once
-  installs have that release, a later one may drop the old key.
+- **Rotating**: add the new public key to `releaseKeys` and to `install.sh`'s `release_keys`, and
+  ship a release signed by **both** keys (`tools/release sign` adds a signature and keeps the ones
+  already in `manifest.sig.json`; `manifest.sshsig` holds the last key's, which both lists then
+  trust). Once installs have that release, a later one may drop the old key from both.
 - **If the key leaks**: rotate as above at once, signing with the new key only, and say so in the
   release notes. Installs older than the release that added the new key cannot verify the new
   releases and need the installer run again.

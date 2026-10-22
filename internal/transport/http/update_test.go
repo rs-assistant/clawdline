@@ -44,6 +44,7 @@ func releaseUpdateServer(t *testing.T, dir, published string) (*Server, *atomic.
 	if published != "" {
 		sum := sha256.Sum256([]byte("x"))
 		m, _ := json.Marshal(release.Manifest{Version: published, Commit: commit, Channel: "stable",
+			CommittedAt: time.Now().UTC().Add(-time.Hour).Format(time.RFC3339),
 			Artifacts: []release.Artifact{{OS: "linux", Arch: "amd64", Kind: release.KindDaemon, Name: "a.tar.gz",
 				URL: "http://127.0.0.1:1/a.tar.gz", Size: 1, SHA256: hex.EncodeToString(sum[:])}}})
 		sig, _ := json.Marshal([]release.Signature{release.Sign(m, priv)})

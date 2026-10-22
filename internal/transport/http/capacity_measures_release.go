@@ -14,6 +14,9 @@ func (s *Server) releaseCapacityMeasures() map[string]func() capacity.Reading {
 		capacity.ReleaseSignatureBytes: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-read guard on one manifest signature list; no retained buffer"}
 		},
+		capacity.ReleaseManifestAge: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "an age ceiling on the signed manifest taken as the newest release; checked at each release check"}
+		},
 		capacity.ReleaseCheckIntervalSeconds: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "a timing ceiling of the release updater; no retained buffer"}
 		},

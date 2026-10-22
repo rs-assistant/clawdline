@@ -939,3 +939,52 @@ func TestAWaitingAutoApplyStartsOnceTheSessionsAreIdle(t *testing.T) {
 		t.Fatalf("logged the wait %d times, want once per check", waits)
 	}
 }
+
+// A signed manifest never expires by itself, so the newest release is only
+// believed while its signed committed_at is recent: an old signed release
+// served as the newest one is refused by the check, by an update that names
+// no version, and by auto-apply, while naming the version still installs it.
+func TestOnlyARecentlyCommittedReleaseIsTheNewest(t *testing.T) {
+	f := newFixture(t, "v0.10.0")
+	ctx := context.Background()
+	old := f.clock.Add(-release.MaxManifestAge() - time.Hour).Format(time.RFC3339)
+	f.publish("v0.11.0", commitOf('b'), daemonArchive(t, commitOf('b')), true, func(m *release.Manifest) { m.CommittedAt = old })
+
+	if _, err := f.env.Begin(ctx, f.exe, Request{}); errCode(err) != release.CodeManifestStale {
+		t.Fatalf("an old newest release with no version named: %v", err)
+	}
+	if _, err := f.env.Begin(ctx, f.exe, Request{Version: "v0.11.0", Auto: true}); errCode(err) != release.CodeManifestStale {
+		t.Fatalf("auto-apply of an old release: %v", err)
+	}
+	if p, err := f.env.Begin(ctx, f.exe, Request{Version: "v0.11.0"}); err != nil {
+		t.Fatalf("an old release named on purpose: %v", err)
+	} else {
+		p.Abandon()
+	}
+
+	d := NewDaemon(f.env, f.exe)
+	if c := d.Checker.Refresh(ctx); c.Latest != nil || errCode(c.Err) != release.CodeManifestStale {
+		t.Fatalf("the check took an old release as the newest: %+v", c)
+	}
+	if st := d.Status(); st.State != contract.UpdateStateUnknown || !strings.Contains(st.Reason, release.CodeManifestStale) {
+		t.Fatalf("status with only an old release: %+v", st)
+	}
+
+	// One with no committed_at is refused too: a replayed manifest would be
+	// picked for lacking it.
+	f.publish("v0.11.0", commitOf('b'), daemonArchive(t, commitOf('b')), true, func(m *release.Manifest) { m.CommittedAt = "" })
+	if _, err := f.env.Begin(ctx, f.exe, Request{}); errCode(err) != release.CodeManifestStale {
+		t.Fatalf("a newest release with no committed_at: %v", err)
+	}
+
+	// A recent one is taken, and once the clock passes the bound the check
+	// stops holding it as the newest.
+	f.publish("v0.11.0", commitOf('b'), daemonArchive(t, commitOf('b')), true, nil)
+	if c := d.Checker.Refresh(ctx); c.Latest == nil || c.Err != nil {
+		t.Fatalf("a recent release: %+v", c)
+	}
+	f.clock = f.clock.Add(release.MaxManifestAge())
+	if c := d.Checker.Refresh(ctx); c.Latest != nil || errCode(c.Err) != release.CodeManifestStale {
+		t.Fatalf("a release that aged past the bound is still the newest: %+v", c)
+	}
+}
