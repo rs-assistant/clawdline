@@ -153,6 +153,17 @@ function Guide() {
     setScreen(null)
   }
 
+  // "Keep it local" from any step: the header then shows the quiet Local
+  // mark, and pressing it brings this guide back.
+  const keepLocal = () => {
+    setRunning(false)
+    const pairing = status && typeof status === "object" ? status.pairing : undefined
+    if (asked.current.pairing && pairing?.phase === "waiting") void cancelCloudPairing().catch(() => undefined)
+    asked.current.pairing = ""
+    void saveSettings({ setup_mode: "local" })
+    show("local")
+  }
+
   const fail = (error: unknown) => {
     setRunning(false)
     setSaid(nextWord("setupFailed", { why: settingsFailureSentence(error) }))
@@ -247,9 +258,9 @@ function Guide() {
       <HeaderButton chip={chip} onOpen={() => show(chip.kind === "progress" && (chip.count > 0 || settings?.mode === "cloud")
         ? chip.next : chip.kind === "done" ? "done" : "welcome")} />
       {screen && (
-        <Wizard onClose={close} step={items.indexOf(screen as SetupItem) + 1} total={items.length}>
+        <Wizard onClose={close} items={items} current={items.includes(screen as SetupItem) ? screen as SetupItem : null} done={done}>
           {screen === "welcome" && <Welcome
-            onLocal={() => { void saveSettings({ setup_mode: "local" }); show("local") }}
+            onLocal={keepLocal}
             onStart={() => { void saveSettings({ setup_mode: "cloud" }); show(firstOpen) }} />}
           {screen === "local" && <Ending title={nextWord("setupLocalTitle")} body={nextWord("setupLocalBody")} local
             primary={{ label: nextWord("setupLocalOk"), run: close }}
@@ -260,13 +271,13 @@ function Guide() {
           {screen === "app" && <AppStep login={login} configured={signedIn} lineUp={lineUp} paired={done.app}
             running={running} inApp={inApp} onRun={() => { setSaid(""); setRunning(true) }}
             onSignIn={() => { setSaid(""); signIn(login?.phase !== "idle") }}
-            onBack={() => show("welcome")} onLater={close} onNext={() => show(after("app"))} />}
+            onBack={() => show("welcome")} onLocal={keepLocal} onNext={() => show(after("app"))} />}
           {screen === "browser" && <BrowserStep pairing={cloud?.pairing} opened={opened} paired={done.browser}
-            onOpen={() => setOpened(true)} onBack={() => show(before("browser"))}
+            onOpen={() => setOpened(true)} onBack={() => show(before("browser"))} onLocal={keepLocal}
             onSkip={() => { asked.current.pairing = ""; show(after("browser")) }} />}
           {screen === "phone" && <PhoneStep pairing={cloud?.pairing}
             onRenew={() => { asked.current.pairing = "phone"; beginCloudPairing().then(() => void refresh(), fail) }}
-            onBack={() => { asked.current.pairing = ""; show(before("phone")) }} onLater={close} />}
+            onBack={() => { asked.current.pairing = ""; show(before("phone")) }} onLocal={keepLocal} />}
           {said && <p className="setup-said" role="alert">{said}</p>}
         </Wizard>
       )}
@@ -304,7 +315,19 @@ function HeaderButton({ chip, onOpen }: { chip: ReturnType<typeof setupChip>; on
   )
 }
 
-function Wizard({ step, total, onClose, children }: { step: number; total: number; onClose: () => void; children: ReactNode }) {
+const ITEM_WORD = { app: "setupItemApp", browser: "setupItemBrowser", phone: "setupItemPhone" } as const
+
+/**
+ * The wizard. Its top names every item setup is made of — the app, a browser,
+ * a phone — so the steps inside one item are never read as the whole of it.
+ */
+function Wizard({ items, current, done, onClose, children }: {
+  items: readonly SetupItem[]
+  current: SetupItem | null
+  done: Record<SetupItem, boolean>
+  onClose: () => void
+  children: ReactNode
+}) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     showModalWithoutChoice(dialog.current)
@@ -313,14 +336,16 @@ function Wizard({ step, total, onClose, children }: { step: number; total: numbe
     <dialog ref={dialog} className="setup-dialog" aria-label={nextWord("setupDialog")}
       onCancel={(event) => { event.preventDefault(); onClose() }}>
       <div className="setup-top">
-        {step > 0 ? (
-          <div className="setup-count">
-            <span className="setup-dots" aria-hidden="true">
-              {Array.from({ length: total }, (_, index) => index + 1).map((i) =>
-                <span key={i} data-on={i <= step ? "true" : undefined} data-current={i === step ? "true" : undefined} />)}
-            </span>
-            <span>{nextWord("setupStepOf", { step, total })}</span>
-          </div>
+        {current ? (
+          <ol className="setup-track">
+            {items.map((item) => (
+              <li key={item} data-current={item === current ? "true" : undefined} data-done={done[item] ? "true" : undefined}
+                aria-current={item === current ? "step" : undefined}>
+                {done[item] ? <CheckIcon /> : <span className="setup-track-dot" aria-hidden="true" />}
+                <span>{nextWord(ITEM_WORD[item])}</span>
+              </li>
+            ))}
+          </ol>
         ) : <span />}
         <button type="button" className="setup-x" aria-label={nextWord("setupClose")} onClick={onClose}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -350,7 +375,7 @@ function Welcome({ onLocal, onStart }: { onLocal: () => void; onStart: () => voi
         ))}
       </ul>
       <div className="setup-actions">
-        <button type="button" className="setup-quiet" onClick={onLocal}>{nextWord("setupLocalOnly")}</button>
+        <button type="button" className="setup-quiet" onClick={onLocal}>{nextWord("setupStayLocal")}</button>
         <button type="button" className="setup-primary" onClick={onStart}>{nextWord("setupStart")}</button>
       </div>
     </div>
@@ -373,7 +398,7 @@ function Steps({ steps }: { steps: Step[] }) {
   )
 }
 
-function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onSignIn, onBack, onLater, onNext }: {
+function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onSignIn, onBack, onLocal, onNext }: {
   login: CloudLogin | null
   configured: boolean
   lineUp: boolean
@@ -384,7 +409,7 @@ function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onS
   /** Ask the daemon for a fresh sign-in, for when none is waiting. */
   onSignIn: () => void
   onBack: () => void
-  onLater: () => void
+  onLocal: () => void
   onNext: () => void
 }) {
   const signing = !configured && login?.phase === "waiting"
@@ -410,7 +435,7 @@ function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onS
       <div className="setup-actions">
         <span className="setup-actions-quiet">
           <button type="button" className="setup-quiet" onClick={onBack}>{nextWord("setupBack")}</button>
-          <button type="button" className="setup-quiet" onClick={onLater}>{nextWord("setupLater")}</button>
+          <button type="button" className="setup-quiet" onClick={onLocal}>{nextWord("setupStayLocal")}</button>
         </span>
         {paired || (lineUp && !inApp) ? (
           <button type="button" className="setup-primary" onClick={onNext}>{nextWord("setupNext")}</button>
@@ -427,12 +452,13 @@ function AppStep({ login, configured, lineUp, paired, running, inApp, onRun, onS
   )
 }
 
-function BrowserStep({ pairing, opened, paired, onOpen, onBack, onSkip }: {
+function BrowserStep({ pairing, opened, paired, onOpen, onBack, onLocal, onSkip }: {
   pairing: CloudPairing | undefined
   opened: boolean
   paired: boolean
   onOpen: () => void
   onBack: () => void
+  onLocal: () => void
   onSkip: () => void
 }) {
   const link = pairing?.phase === "waiting" ? pairing.link ?? "" : ""
@@ -452,6 +478,7 @@ function BrowserStep({ pairing, opened, paired, onOpen, onBack, onSkip }: {
         <span className="setup-actions-quiet">
           <button type="button" className="setup-quiet" onClick={onBack}>{nextWord("setupBack")}</button>
           <button type="button" className="setup-quiet" onClick={onSkip}>{nextWord("setupSkip")}</button>
+          <button type="button" className="setup-quiet" onClick={onLocal}>{nextWord("setupStayLocal")}</button>
         </span>
         {waiting || !link ? (
           <button type="button" className="setup-primary" disabled>{nextWord("setupBrowserBusy")}</button>
@@ -463,12 +490,13 @@ function BrowserStep({ pairing, opened, paired, onOpen, onBack, onSkip }: {
   )
 }
 
-function PhoneStep({ pairing, onRenew, onBack, onLater }: {
+function PhoneStep({ pairing, onRenew, onBack, onLocal }: {
   pairing: CloudPairing | undefined
   onRenew: () => void
   onBack: () => void
-  onLater: () => void
+  onLocal: () => void
 }) {
+  const [platform, setPlatform] = useState<"apple" | "android">("apple")
   const expired = pairing?.phase === "failed" || (pairing?.phase === "waiting" && !!pairing.expires_at && pairing.expires_at * 1000 < Date.now())
   const link = pairing?.phase === "waiting" && !expired ? pairing.link ?? "" : ""
   const comparing = pairing?.phase === "sealing" || (!!pairing?.viewer_fingerprint && pairing.phase !== "failed")
@@ -489,27 +517,36 @@ function PhoneStep({ pairing, onRenew, onBack, onLater }: {
             <span className="setup-qr-state"><span className="setup-wait-dot" aria-hidden="true" />{nextWord("setupPhoneWaiting")}</span>
           )}
         </div>
-        <ol className="setup-numbered">
-          <li>
-            <PhoneOpenLine />
-            <small>{nextWord("setupPhoneOpenHint")}</small>
-          </li>
-          <li><span>{nextWord("setupPhoneSignIn")}</span></li>
-          <li><span>{nextWord("setupPhoneScan")}</span></li>
-        </ol>
+        <div className="setup-phone-steps">
+          <div className="setup-tabs" role="tablist">
+            {(["apple", "android"] as const).map((name) => (
+              <button key={name} type="button" role="tab" aria-selected={platform === name}
+                className="setup-tab" onClick={() => setPlatform(name)}>
+                {nextWord(name === "apple" ? "setupPhoneApple" : "setupPhoneAndroid")}
+              </button>
+            ))}
+          </div>
+          <ol className="setup-numbered" role="tabpanel">
+            <li><SiteLine word={platform === "apple" ? "setupPhoneAppleOpen" : "setupPhoneAndroidOpen"} /></li>
+            <li><span>{nextWord("setupPhoneSignIn")}</span></li>
+            <li><span>{nextWord("setupPhoneScan")}</span></li>
+          </ol>
+        </div>
       </div>
       <div className="setup-actions">
-        <button type="button" className="setup-quiet" onClick={onBack}>{nextWord("setupBack")}</button>
-        <button type="button" className="setup-secondary" onClick={onLater}>{nextWord("setupLater")}</button>
+        <span className="setup-actions-quiet">
+          <button type="button" className="setup-quiet" onClick={onBack}>{nextWord("setupBack")}</button>
+          <button type="button" className="setup-quiet" onClick={onLocal}>{nextWord("setupStayLocal")}</button>
+        </span>
       </div>
     </div>
   )
 }
 
-/** The site name inside the first phone line, drawn in the accent without splitting a translation. */
-function PhoneOpenLine() {
+/** The site name inside a phone line, drawn in the accent without splitting a translation. */
+function SiteLine({ word }: { word: "setupPhoneAppleOpen" | "setupPhoneAndroidOpen" }) {
   const marker = "\u0000"
-  const [before, after] = nextWord("setupPhoneOpen", { site: marker }).split(marker)
+  const [before, after] = nextWord(word, { site: marker }).split(marker)
   return <span className="setup-phone-open">{before}<code>{PHONE_SITE}</code>{after}</span>
 }
 

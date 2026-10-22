@@ -44,11 +44,13 @@
 .setup-dialog::backdrop { background: rgba(8, 8, 10, 0.7); }
 
 .setup-top { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
-.setup-count { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
-.setup-dots { display: flex; align-items: center; gap: 6px; }
-.setup-dots > span { width: 6px; height: 6px; border-radius: 3px; background: var(--line); }
-.setup-dots > span[data-on] { background: var(--accent); }
-.setup-dots > span[data-current] { width: 20px; }
+.setup-track { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.setup-track li { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dim); }
+.setup-track li + li::before { content: ""; width: 16px; height: 1px; margin-right: 10px; background: var(--line); }
+.setup-track li[data-current] { color: var(--ink); font-weight: 600; }
+.setup-track li[data-done] { color: var(--ok); }
+.setup-track-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
+.setup-track li[data-current] .setup-track-dot { background: var(--accent); }
 .setup-x {
   width: 44px; height: 44px; margin-right: -12px;
   display: flex; align-items: center; justify-content: center;
@@ -119,7 +121,11 @@
 .setup-qr-state { display: flex; align-items: center; gap: 8px; max-width: 260px; font-size: 13px; line-height: 1.5; color: var(--dim); text-align: center; }
 .setup-qr-state[data-accent] { color: var(--accent); }
 .setup-wait-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: 0 0 auto; }
-.setup-numbered { margin: 0; padding: 0; list-style: none; counter-reset: setup; display: flex; flex-direction: column; gap: 18px; flex: 1 1 200px; min-width: 0; }
+.setup-phone-steps { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+.setup-tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; align-self: flex-start; }
+.setup-tab { min-height: 32px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--dim); font: inherit; font-size: 13px; cursor: pointer; }
+.setup-tab[aria-selected="true"] { background: var(--card-hi); color: var(--ink); }
+.setup-numbered { margin: 0; padding: 0; list-style: none; counter-reset: setup; display: flex; flex-direction: column; gap: 18px; }
 .setup-numbered li { counter-increment: setup; position: relative; padding-left: 36px; font-size: 15px; line-height: 1.55; }
 .setup-numbered li::before {
   content: counter(setup); position: absolute; left: 0; top: 0;
