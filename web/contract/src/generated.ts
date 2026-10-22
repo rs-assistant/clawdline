@@ -7554,6 +7554,15 @@ export interface SettingsRequest {
   product_language: string | null
 
   /**
+   * Whether the quota footer asks Gemini and Grok for quota: the daemon reads their
+   * CLI credential files (~/.gemini/oauth_creds.json, ~/.grok/auth.json) and sends
+   * those tokens to Google and xAI. Absent or false means off, and off reads and
+   * sends nothing; Claude and Codex quota still comes from local files. Only the
+   * local token may change it.
+   */
+  provider_quota_remote: boolean | null
+
+  /**
    * Notify after the app release is verified.
    */
   push_on_app_release_success: boolean | null
@@ -7887,6 +7896,15 @@ export interface SettingsSnapshot {
    * unsupported saved values render as English.
    */
   product_language: string | null
+
+  /**
+   * Whether the quota footer asks Gemini and Grok for quota: the daemon reads their
+   * CLI credential files (~/.gemini/oauth_creds.json, ~/.grok/auth.json) and sends
+   * those tokens to Google and xAI. Absent or false means off, and off reads and
+   * sends nothing; Claude and Codex quota still comes from local files. Only the
+   * local token may change it.
+   */
+  provider_quota_remote: boolean | null
 
   /**
    * Notify after the app release is verified.

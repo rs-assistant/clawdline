@@ -201,6 +201,7 @@
         "push_on_release_failure": { "description": "Notify when an App install or Cloud verification fails.", "nullable": true, "type": "boolean" },
         "cloud_health_upload": { "description": "Whether this daemon uploads its connection-health records to Cloud. Absent or false means off, and off makes no request. Only the local token may change it. Owner diagnostics (location, age, deadline) are never sent.", "nullable": true, "type": "boolean" },
         "cloud_health_owner_retention": { "description": "Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud as ciphertext only paired owner devices can open. Separate from cloud_health_upload, which never permits it. Absent or false means off, and off makes no request. Only the local token may change it.", "nullable": true, "type": "boolean" },
+        "provider_quota_remote": { "description": "Whether the quota footer asks Gemini and Grok for quota: the daemon reads their CLI credential files (~/.gemini/oauth_creds.json, ~/.grok/auth.json) and sends those tokens to Google and xAI. Absent or false means off, and off reads and sends nothing; Claude and Codex quota still comes from local files. Only the local token may change it.", "nullable": true, "type": "boolean" },
         "orchestrator_agent_notify": {
           "description": "Whether an agent may push a sentence of its own.",
           "nullable": true,
@@ -455,6 +456,7 @@
         "push_on_release_failure": { "description": "Notify when an App install or Cloud verification fails.", "nullable": true, "type": "boolean" },
         "cloud_health_upload": { "description": "Whether this daemon uploads its connection-health records to Cloud. Absent or false means off, and off makes no request. Only the local token may change it. Owner diagnostics (location, age, deadline) are never sent.", "nullable": true, "type": "boolean" },
         "cloud_health_owner_retention": { "description": "Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud as ciphertext only paired owner devices can open. Separate from cloud_health_upload, which never permits it. Absent or false means off, and off makes no request. Only the local token may change it.", "nullable": true, "type": "boolean" },
+        "provider_quota_remote": { "description": "Whether the quota footer asks Gemini and Grok for quota: the daemon reads their CLI credential files (~/.gemini/oauth_creds.json, ~/.grok/auth.json) and sends those tokens to Google and xAI. Absent or false means off, and off reads and sends nothing; Claude and Codex quota still comes from local files. Only the local token may change it.", "nullable": true, "type": "boolean" },
         "orchestrator_agent_notify": {
           "description": "Whether an agent may push a sentence of its own.",
           "nullable": true,

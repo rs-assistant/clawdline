@@ -22,6 +22,11 @@ the saved browser preference.
 
 ## Sources and ownership
 
+In this fork, Gemini and Grok are asked only when this machine's `config.json` sets
+`provider_quota_remote: true` (`clawdline setting provider_quota_remote on`; only the local token
+may change it). Absent or false, the daemon does not read their credential files and sends nothing
+to Google or xAI, and their rows are not shown; Claude and Codex still come from local files.
+
 | Provider | Read source | Login ownership |
 | --- | --- | --- |
 | Claude Code | Existing `limits.Reader`: status-line `rate-limits.json` | No credential access or login change |

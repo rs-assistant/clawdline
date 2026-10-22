@@ -14,6 +14,18 @@ func (s *Server) providerQuotaReader() *providerquota.Service {
 			home, _ := os.UserHomeDir()
 			s.providerQuotaService = providerquota.New(home, quotaReader())
 		}
+		// Read on every snapshot, so turning it on or off is a file edit and
+		// not a restart. An unreadable file keeps it off.
+		if s.providerQuotaService.Remote == nil {
+			s.providerQuotaService.Remote = func() bool {
+				values, err := s.settingsFile().Read()
+				if err != nil {
+					return false
+				}
+				on, set := values.Bool("provider_quota_remote")
+				return set && on
+			}
+		}
 	})
 	return s.providerQuotaService
 }

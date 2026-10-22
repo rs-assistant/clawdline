@@ -6280,6 +6280,13 @@ type SettingsRequest struct {
 	// human-readable CLI copy only.
 	ProductLanguage *string `json:"product_language"`
 
+	// Whether the quota footer asks Gemini and Grok for quota: the daemon reads their
+	// CLI credential files (~/.gemini/oauth_creds.json, ~/.grok/auth.json) and sends
+	// those tokens to Google and xAI. Absent or false means off, and off reads and
+	// sends nothing; Claude and Codex quota still comes from local files. Only the
+	// local token may change it.
+	ProviderQuotaRemote *bool `json:"provider_quota_remote"`
+
 	// Notify after the app release is verified.
 	PushOnAppReleaseSuccess *bool `json:"push_on_app_release_success"`
 
@@ -6493,6 +6500,13 @@ type SettingsSnapshot struct {
 	// Daemon notifications and human-readable CLI copy. Absent, malformed or
 	// unsupported saved values render as English.
 	ProductLanguage *string `json:"product_language"`
+
+	// Whether the quota footer asks Gemini and Grok for quota: the daemon reads their
+	// CLI credential files (~/.gemini/oauth_creds.json, ~/.grok/auth.json) and sends
+	// those tokens to Google and xAI. Absent or false means off, and off reads and
+	// sends nothing; Claude and Codex quota still comes from local files. Only the
+	// local token may change it.
+	ProviderQuotaRemote *bool `json:"provider_quota_remote"`
 
 	// Notify after the app release is verified.
 	PushOnAppReleaseSuccess *bool `json:"push_on_app_release_success"`

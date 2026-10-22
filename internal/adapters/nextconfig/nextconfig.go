@@ -541,6 +541,9 @@ var Settables = []Settable{
 	// Opt-in for the connection-health uploader (cmd/clawdline/health.go);
 	// absent is off.
 	{Name: "cloud_health_upload", Kind: "bool"},
+	// Whether the provider-quota footer asks Gemini and Grok, with their CLI
+	// credentials, for quota. Absent is off (providerquota.Service.Remote).
+	{Name: "provider_quota_remote", Kind: "bool"},
 	// Separate opt-in for owner-sealed diagnostic retention
 	// (internal/adapters/healthsealed); cloud_health_upload alone never
 	// permits it, and absent is off.

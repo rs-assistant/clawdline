@@ -91,6 +91,7 @@ func waitFinished(t *testing.T, s *Service) {
 }
 func TestMissingCredentialsNeverCallProviders(t *testing.T) {
 	s := New(t.TempDir(), nil)
+	s.Remote = func() bool { return true }
 	s.getenv = func(string) string { return "" }
 	s.client.Transport = transportFunc(func(*http.Request) (*http.Response, error) {
 		t.Error("provider called without credentials")
@@ -110,6 +111,7 @@ func TestSingleFlightCooldownFailuresAndAccountChanges(t *testing.T) {
 	home := t.TempDir()
 	writeCredential(t, home, "grok", `{"https://auth.x.ai":{"key":"synthetic-token","user_id":"synthetic-user"}}`)
 	s := New(home, nil)
+	s.Remote = func() bool { return true }
 	s.getenv = func(string) string { return "" }
 	var hits atomic.Int64
 	var status atomic.Int64
@@ -168,6 +170,7 @@ func TestGeminiQueriesOnlyQuotaMetadata(t *testing.T) {
 	home := t.TempDir()
 	writeCredential(t, home, "gemini", `{"access_token":"synthetic-token","expiry_date":4102444800000}`)
 	s := New(home, nil)
+	s.Remote = func() bool { return true }
 	s.getenv = func(string) string { return "" }
 	var hits atomic.Int64
 	s.client.Transport = transportFunc(func(r *http.Request) (*http.Response, error) {
@@ -196,6 +199,7 @@ func TestGeminiQueriesOnlyQuotaMetadata(t *testing.T) {
 }
 func TestRateLimitAndResponseSizeAreBounded(t *testing.T) {
 	s := New(t.TempDir(), nil)
+	s.Remote = func() bool { return true }
 	s.client.Transport = transportFunc(func(*http.Request) (*http.Response, error) {
 		r := response(429, "")
 		r.Header.Set("Retry-After", "3600")
@@ -217,6 +221,7 @@ func TestExpiredCredentialsDoNotRefreshOrWriteLogin(t *testing.T) {
 	home := t.TempDir()
 	writeCredential(t, home, "gemini", `{"access_token":"synthetic","expiry_date":1}`)
 	s := New(home, nil)
+	s.Remote = func() bool { return true }
 	s.client.Transport = transportFunc(func(*http.Request) (*http.Response, error) {
 		t.Error("expired credential made an HTTP call")
 		return response(500, ""), nil
@@ -226,5 +231,28 @@ func TestExpiredCredentialsDoNotRefreshOrWriteLogin(t *testing.T) {
 	after, _ := os.ReadFile(filepath.Join(home, ".gemini/oauth_creds.json"))
 	if string(before) != string(after) || got.Providers[0].Problem != "reauth_required" {
 		t.Fatalf("%+v", got)
+	}
+}
+
+// Gemini and Grok are asked only when this machine turned them on: off (or
+// unset), their credential files are not read and nothing is sent, and their
+// rows are not shown.
+func TestGeminiAndGrokAreNotAskedUnlessTurnedOn(t *testing.T) {
+	home := t.TempDir()
+	writeCredential(t, home, "gemini", `{"access_token":"synthetic-token","expiry_date":4102444800000}`)
+	for _, remote := range []func() bool{nil, func() bool { return false }} {
+		s := New(home, nil)
+		s.Remote = remote
+		reads := 0
+		s.readFile = func(string) ([]byte, error) { reads++; return nil, os.ErrNotExist }
+		var hits atomic.Int64
+		s.client.Transport = transportFunc(func(*http.Request) (*http.Response, error) {
+			hits.Add(1)
+			return response(200, "{}"), nil
+		})
+		got := s.Snapshot(time.Now())
+		if reads != 0 || hits.Load() != 0 || len(got.Providers) != 0 || got.Updating {
+			t.Fatalf("with the switch off: reads=%d requests=%d snapshot=%+v", reads, hits.Load(), got)
+		}
 	}
 }
