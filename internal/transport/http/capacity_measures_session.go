@@ -31,6 +31,12 @@ func (s *Server) sessionCapacityMeasures() map[string]func() capacity.Reading {
 		capacity.SecretHandoffDeliverySeconds: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-loopback delivery deadline; no retained wait"}
 		},
+		capacity.SecretHandoffCommandArgs: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Note creation guard; no retained buffer"}
+		},
+		capacity.SecretHandoffCommandBytes: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Note creation guard; no retained buffer"}
+		},
 		capacity.ScheduleRunTranscriptsProbed: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-lookup guard; no retained buffer"}
 		},

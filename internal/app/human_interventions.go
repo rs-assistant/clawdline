@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -49,6 +50,9 @@ type CreateHumanIntervention struct {
 	Detail             string                         `json:"detail"`
 	Options            []work.HumanInterventionOption `json:"options"`
 	DocumentURL        string                         `json:"document_url"`
+	// Command is the argv a Secret Handoff Note declares will receive the
+	// value. Required for kind "secret", refused for every other kind.
+	Command []string `json:"command"`
 	// RequestedByPerson is true only when the person explicitly asked the
 	// agent to create this note; such a note needs no separate push.
 	RequestedByPerson bool `json:"requested_by_person"`
@@ -150,6 +154,13 @@ func validateHumanIntervention(c CreateHumanIntervention) error {
 	if c.Kind == "secret" && (c.Detail != "" || c.DocumentURL != "") {
 		return humanInterventionError("secret_note_content_invalid", "A Secret Handoff Note cannot contain detail or a document link.")
 	}
+	if c.Kind == "secret" {
+		if err := ValidateSecretHandoffCommand(c.Command); err != nil {
+			return err
+		}
+	} else if c.Command != nil {
+		return humanInterventionError("intervention_command_invalid", "Only a Secret Handoff Note names a receiving command.")
+	}
 	for _, o := range c.Options {
 		if !humanText(o.Label, humanInterventionTitleLimit) || !humanText(o.Draft, humanInterventionDraftLimit) {
 			return humanInterventionError("intervention_options_invalid", "Each suggestion needs a label and editable draft.")
@@ -178,6 +189,9 @@ func (h *HumanInterventions) CreateWithEffect(ctx context.Context, c CreateHuman
 		TargetConversation: c.TargetConversation, TargetSession: c.TargetSession, Kind: c.Kind, Title: strings.TrimSpace(c.Title),
 		Summary: strings.TrimSpace(c.Summary), Action: strings.TrimSpace(c.Action), Reason: strings.TrimSpace(c.Reason),
 		Detail: c.Detail, Options: c.Options, DocumentURL: c.DocumentURL, CreatedAt: at, Version: 1}
+	if c.Kind == "secret" {
+		out.Command = slices.Clone(c.Command)
+	}
 	err := h.Store.WriteWorkV2(ctx, func(tx *store.WorkV2Tx) error {
 		if err := tx.AddHumanIntervention(out, at); err != nil {
 			return err

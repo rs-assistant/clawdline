@@ -236,6 +236,8 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `session.report_open_todo_characters` | 120 | `characters` | `refuse` | `diagnostics, sender` | — |
 | `session.report_open_todo_rows` | 20 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `session.secret_handoff_bytes` | 16384 | `bytes` | `refuse` | `diagnostics, sender` | — |
+| `session.secret_handoff_command_args` | 32 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `session.secret_handoff_command_bytes` | 2048 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `session.secret_handoff_delivery_seconds` | 5 | `seconds` | `refuse` | `diagnostics, sender` | — |
 | `session.secret_handoff_pending` | 128 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `session.secret_handoff_seconds` | 900 | `seconds` | `expire` | `diagnostics, sender` | — |

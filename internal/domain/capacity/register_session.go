@@ -132,6 +132,21 @@ func sessionBounds() []Entry {
 			Sources: []string{"internal/app.MaxSecretHandoffDeliverySeconds"},
 		},
 		{
+			// The receiving command a Secret Handoff Note declares, shown
+			// whole to the person before they hand off: argv entries, then
+			// bytes across all of them. A longer one is refused at creation.
+			Name: SecretHandoffCommandArgs, Class: Buffer, Unit: Rows,
+			Limit: 32, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/app.MaxSecretHandoffCommandArgs"},
+		},
+		{
+			Name: SecretHandoffCommandBytes, Class: Buffer, Unit: Bytes,
+			Limit: 2 << 10, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/app.MaxSecretHandoffCommandBytes"},
+		},
+		{
 			Name: SessionDirectTodoBytes, Class: Evidence, Unit: Bytes,
 			Limit: 8 << 10, AtLimit: Refuse,
 			Told: []Channel{Diagnostics, Sender, Health}, EvictedBy: Person,

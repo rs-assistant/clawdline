@@ -1129,6 +1129,16 @@
     "Note": true
   },
   {
+    "Name": "session.secret_handoff_command_args",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.secret_handoff_command_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "session.secret_handoff_delivery_seconds",
     "Known": true,
     "Note": true

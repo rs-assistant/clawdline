@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6246,
-  "riskKeys": 2963,
-  "nonRiskCount": 3283,
+  "englishContentKeys": 6253,
+  "riskKeys": 2967,
+  "nonRiskCount": 3286,
   "groups": [
     {
       "name": "bar / other",
@@ -43,7 +43,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 146,
+      "count": 148,
       "sources": [
         null
       ],
@@ -145,6 +145,8 @@
         "capacityRow.session.human_intervention_title_bytes.what",
         "capacityRow.session.report_open_todo_characters.full",
         "capacityRow.session.report_open_todo_characters.what",
+        "capacityRow.session.secret_handoff_command_args.what",
+        "capacityRow.session.secret_handoff_command_bytes.what",
         "capacityRow.session.title_characters.what",
         "capacityRow.session.title_request_bytes.what",
         "capacityRow.session.title_rows.full",
@@ -2121,7 +2123,7 @@
     },
     {
       "name": "next / other",
-      "count": 270,
+      "count": 271,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2258,6 +2260,7 @@
         "next.schedulesListLabel",
         "next.schedulesLoading",
         "next.screenSessionGone",
+        "next.secretHandoffDestination",
         "next.secretHandoffLabel",
         "next.secretHandoffName",
         "next.secretHandoffPlaceholder",

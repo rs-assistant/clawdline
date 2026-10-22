@@ -243,6 +243,8 @@ const (
 	SecretHandoffPending         = "session.secret_handoff_pending"
 	SecretHandoffSeconds         = "session.secret_handoff_seconds"
 	SecretHandoffDeliverySeconds = "session.secret_handoff_delivery_seconds"
+	SecretHandoffCommandArgs     = "session.secret_handoff_command_args"
+	SecretHandoffCommandBytes    = "session.secret_handoff_command_bytes"
 	SettingsRequestBodyBytes     = "settings.request_body_bytes"
 	NotificationRulesRows        = "notification.rules_rows"
 	NotificationRuleLabel        = "notification.rule_label_characters"
