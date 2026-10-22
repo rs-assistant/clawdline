@@ -109,8 +109,13 @@ func (p *page) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// The console is never framed, by itself or by anybody: a page elsewhere
 	// that framed it could lay its own buttons over this one's (clickjacking).
+	// And it talks to nothing but this daemon: connect-src 'self' keeps any
+	// fetch, EventSource or WebSocket on this origin, so no code in the bundle
+	// can send this machine's data to another host, whatever a later change
+	// adds (the onboarding survey that posted to api.clawdline.com is not
+	// mounted in this fork's console).
 	h := w.Header()
-	h.Set("Content-Security-Policy", "frame-ancestors 'none'")
+	h.Set("Content-Security-Policy", "frame-ancestors 'none'; connect-src 'self'")
 	h.Set("X-Frame-Options", "DENY")
 	h.Set("X-Content-Type-Options", "nosniff")
 	// A link out of the console (clawdline.com, the plan page) does not tell

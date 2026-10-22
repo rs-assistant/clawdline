@@ -25,7 +25,7 @@ func TestTheConsoleRefusesToBeFramed(t *testing.T) {
 			t.Fatalf("%s: %d", path, rec.Code)
 		}
 		h := rec.Header()
-		if h.Get("Content-Security-Policy") != "frame-ancestors 'none'" || h.Get("X-Frame-Options") != "DENY" ||
+		if h.Get("Content-Security-Policy") != "frame-ancestors 'none'; connect-src 'self'" || h.Get("X-Frame-Options") != "DENY" ||
 			h.Get("X-Content-Type-Options") != "nosniff" || h.Get("Referrer-Policy") != "no-referrer" {
 			t.Fatalf("%s: framing headers %v", path, h)
 		}

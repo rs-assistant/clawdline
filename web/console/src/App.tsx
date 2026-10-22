@@ -1,8 +1,6 @@
 import { QuotaBar } from "./provider-quota/QuotaBar.js"
 import { SessionStateFilterControl } from "./session/SessionStateFilter.js"
 import { matchesLocalStateFilter, stateFilterCounts, type SessionStateFilter } from "./session/state-filter.js"
-import { SurveyCoordinator } from "./onboarding/Survey.js"
-import { useCloudAccount } from "./cloud/account-context.js"
 import { catalogWord, catalogWordLanguage } from "./catalog.js"
 import { transparencyURL } from "./pages/transparency/public-url.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
@@ -313,7 +311,6 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
   // screen at a time, and `data-pane` is the desk's second column on or off.
   // Each is mirrored in a ref because the keyboard reads them between renders,
   // as the original reads its state object.
-  const surveyAccount = useCloudAccount()
   const [selected, setSelectedState] = useState<string | null>(null)
   const [openId, setOpenState] = useState<string | null>(null)
   const [view, setViewState] = useState<"list" | "detail">("list")
@@ -1182,7 +1179,6 @@ export default function App({ aside, cloudSessions, cloudOperationsAccess = fals
         // the document and only hides them.
         <Component key={id} shown={page === id && knowsHere(id)} />
       ))}
-      {!surveyAccount ? <SurveyCoordinator /> : null}
       <QuotaBar mobileListShown={page === "sessions" && view === "list" && !machine} key={fleetReaderMachine ?? "local"} machineName={quotaMachineName} offline={!!cloudMachineOffline} />
       <Overlays />
       {machine ? <MachineDashboard
