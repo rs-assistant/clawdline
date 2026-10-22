@@ -85,7 +85,7 @@ function QuotaReading({ machineName, offline }: { machineName?: string; offline:
   const open = (button: HTMLButtonElement) => { opener.current = button; setExpanded(true) }
   return <>
     <footer ref={footer} className="provider-quota-bar" aria-label={nextWord("quotaTitle")}>
-      <span className="quota-machine" title={machineName}>{machineName || nextWord("quotaThisMachine")}</span>
+      {machineName && <span className="quota-machine" title={machineName}>{machineName}</span>}
       <div className="quota-providers">
         {shown.map((row) => <button key={row.id} className="quota-provider" type="button" data-provider={row.id}
           data-stale={stale(row) || undefined} aria-label={`${row.label} · ${nextWord("quotaUsed", { percent: Math.round(tightestWindow(row).used_percent) })}`} aria-haspopup="dialog" aria-controls="provider-quota-detail"

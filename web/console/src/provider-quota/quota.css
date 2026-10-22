@@ -9,7 +9,7 @@
   font-size: 11px; font-variant-numeric: tabular-nums;
 }
 .quota-machine { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.quota-providers { display: flex; align-items: center; gap: 18px; flex: 1; min-width: 0; overflow: hidden; }
+.quota-providers { display: flex; align-items: center; gap: 18px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
 .quota-provider { display: flex; align-items: center; gap: 7px; white-space: nowrap; min-width: 0; padding: 3px 0; }
 .quota-provider:hover { color: var(--ink); }
 .quota-logo, .quota-logo svg { display: block; width: 16px; height: 16px; flex: 0 0 16px; }
@@ -44,16 +44,16 @@
 .quota-caption, .quota-problem { font-size: 12px; margin: 7px 0; }
 .quota-problem { color: var(--warn); }
 @media (max-width: 1300px) {
-  .quota-full-windows { display: none; }
-  .quota-compact-window { display: inline-flex; }
   .quota-provider-name { display: none; }
-  .quota-compact-window .quota-window-name { display: none; }
 }
 @media (max-width: 899px) {
   .provider-quota-bar {
     gap: 8px; padding: 8px 10px calc(8px + max(var(--indicator, 0px), env(safe-area-inset-bottom, 0px), 12px));
   }
   .app[data-view="detail"] ~ .provider-quota-bar { display: none; }
+  .quota-full-windows { display: none; }
+  .quota-compact-window { display: inline-flex; }
+  .quota-compact-window .quota-window-name { display: none; }
   .quota-machine { display: none; }
   .quota-providers { gap: 12px; }
   .quota-compact-window progress, .quota-compact-window .quota-reset { display: none; }

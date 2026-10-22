@@ -54,7 +54,7 @@ Mobile shows it only in the Session list, with clearance above the home indicato
 and other pages have no quota footer. It shows Claude Code, Codex, Gemini and
 Grok when that machine has numeric quota data for them. Providers without data stay hidden.
 Click a provider to see all known windows, reset times, sources and the age of the reading.
-Smaller desktop widths show the most used window for each provider. Mobile shows the two
+Desktop keeps each provider's windows together with middle dots. Mobile shows the two
 tightest providers, with remaining providers available through **+N**.
 
 **Settings → Browser → Show provider quota bar** is on by default. Turn it off to hide the bar in
