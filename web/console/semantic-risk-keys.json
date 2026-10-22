@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8971,
+  "englishKeys": 8973,
   "counts": {
-    "negation": 2587,
+    "negation": 2588,
     "state": 1472,
-    "permission": 534,
+    "permission": 536,
     "deletion": 199,
     "uncertainty": 271
   },
-  "unionCount": 3987,
+  "unionCount": 3989,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -1992,6 +1992,7 @@
       "next.cloudPeerMachineUnreadable",
       "next.cloudPeerMachineViewOnly",
       "next.cloudPeerSourcesUnread",
+      "next.cloudReadNeedsPairing",
       "next.cloudReadPairingRequired",
       "next.cloudReadUnknownFailure",
       "next.cloudRenameAbsent",
@@ -4436,6 +4437,8 @@
       "next.cloudPeerStepScopes",
       "next.cloudPeerSync",
       "next.cloudPeerWriteUnavailable",
+      "next.cloudReadNeedsPairing",
+      "next.cloudReadPairAgain",
       "next.cloudReadPairingRequired",
       "next.cloudRevoked",
       "next.cloudSignInFine",
@@ -8038,6 +8041,8 @@
     "next.cloudPeerSync",
     "next.cloudPeerTargetReceipt",
     "next.cloudPeerWriteUnavailable",
+    "next.cloudReadNeedsPairing",
+    "next.cloudReadPairAgain",
     "next.cloudReadPairingRequired",
     "next.cloudReadUnknownFailure",
     "next.cloudRenameAbsent",

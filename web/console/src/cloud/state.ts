@@ -130,6 +130,22 @@ function string(value: unknown): string | null {
   return typeof value === "string" && value ? value : null
 }
 
+/**
+ * Whether the read problem should offer to pair this browser with the machine
+ * again.
+ *
+ * A machine that revoked this device cannot tell it so: the device's envelope
+ * no longer verifies, so the machine drops it unanswered and the read times
+ * out. What this page can see is the machine still reporting to the account
+ * while not answering this device; that, or a failure already named as a
+ * pairing problem, is when scanning the machine's QR again is the way back.
+ * A machine that stopped reporting is offline, and pairing would not help.
+ */
+export function readProblemOffersPairing(code: string, presence: "current" | "stale" | "unknown" | undefined): boolean {
+  if (PAIR_CODES.has(code)) return true
+  return presence === "current" && (code === "cloud_read_timeout" || code === "cloud_read_unavailable")
+}
+
 /** Cached publications and another machine answering cannot repair this read path. */
 export function accessProblemAfterRead(held: AccessProblem | null, event: AccessEvent): AccessProblem | null {
   const machine = event.machine ?? event.identity?.machine

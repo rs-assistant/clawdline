@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/relay-reader.test.ts.
-import { accessProblemAfterRead, machineAccessProblem, machineListAnswer, machineListRefusal, retryReason } from "./state.ts"
+import { accessProblemAfterRead, machineAccessProblem, machineListAnswer, machineListRefusal, readProblemOffersPairing, retryReason } from "./state.ts"
 
 test("the machine list keeps loading, authoritative empty, and refusal apart", () => {
   assert.deepEqual(machineListAnswer({ machines: [], syncing: true }), { phase: "loading" })
@@ -72,4 +72,13 @@ test("cached data and other machines do not clear a failed read", () => {
     {type:"read", machine:"m", realign:true}, {type:"read", machine:"m", error:{code:"offline"}},
   ]) assert.equal(accessProblemAfterRead(held,event),held)
   assert.equal(accessProblemAfterRead(held,{type:"read", identity:{machine:"m"}}),null)
+})
+
+test("a machine that reports to the account but does not answer this device offers pairing again", () => {
+  assert.equal(readProblemOffersPairing("cloud_read_timeout", "current"), true, "revoked here: dropped unanswered")
+  assert.equal(readProblemOffersPairing("cloud_read_unavailable", "current"), true)
+  assert.equal(readProblemOffersPairing("cloud_read_timeout", "stale"), false, "an offline machine is not fixed by pairing")
+  assert.equal(readProblemOffersPairing("cloud_read_timeout", "unknown"), false)
+  assert.equal(readProblemOffersPairing("unknown_sender", "stale"), true, "a named pairing failure offers it anyway")
+  assert.equal(readProblemOffersPairing("socket_error", "current"), false, "this browser's own connection is not a pairing problem")
 })

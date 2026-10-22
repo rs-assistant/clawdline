@@ -1,6 +1,6 @@
 import { BrowserPairingBlock } from "../pages/settings/BrowserPairingBlock.js"
 import { LocalMachineSetup } from "./LocalMachineSetup.js"
-import { accessProblemAfterRead } from "./state.js"
+import { accessProblemAfterRead, readProblemOffersPairing } from "./state.js"
 import { CloudReadProblem } from "./CloudReadProblem.js"
 import { dashboardFetch } from "./dashboard-reader.js"
 import { readMachineUsage } from "../machine/read.js"
@@ -1957,14 +1957,17 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   return (
     <>
       <IdentityHandoverDialog relay={screen.at === "pairing" ? "pairing_required" : "connected"} />
-      {problem && (screen.at === "console" || screen.at === "machines") && (
-        <CloudReadProblem key={problem.machine + ":" + problem.code}
-          message={nextWord("cloudReadUnknownFailure", {
-            machine: machinesRef.current?.find((row) => row.id === problem.machine)?.label ?? problem.machine,
-          })} code={problem.code} trace={problem.trace} retryLabel={nextWord("cloudRetry")}
+      {problem && (screen.at === "console" || screen.at === "machines") && (() => {
+        const row = machinesRef.current?.find((machine) => machine.id === problem.machine)
+        const name = row?.label ?? problem.machine
+        const pair = readProblemOffersPairing(problem.code, row?.freshness)
+        return <CloudReadProblem key={problem.machine + ":" + problem.code}
+          message={nextWord(pair ? "cloudReadNeedsPairing" : "cloudReadUnknownFailure", { machine: name })}
+          code={problem.code} trace={problem.trace} retryLabel={nextWord("cloudRetry")}
           dismissLabel={nextWord("updateBannerDismiss")}
+          pair={pair ? { label: nextWord("cloudReadPairAgain"), run: () => openPairing({ id: problem.machine, name }) } : undefined}
           onRetry={() => { line.current?.retry(); listMachines() }} />
-      )}
+      })()}
       {words && who && transport.kind === "cloud" ? <SurveyCoordinator key={who.account}
         account={{ id: who.account, apiOrigin: transport.config.apiOrigin }}
         eligible={!pairing && !asking && !naming && (screen.at === "machines" || screen.at === "console")}
