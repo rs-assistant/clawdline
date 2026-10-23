@@ -6,12 +6,11 @@ pointers:
   repository: https://github.com/rs-assistant/clawdline
   branch: local-source-build
   reviewed_base_commit: 418bac778938e1099d0c895ac2431abe66b75fef
-  reviewed_upstream_merged: 9e5a7ad1  # merged on 2026-10-22 after a five-part review
+  reviewed_upstream_merged: d8961793  # 9e5a7ad1 on 2026-10-22, d8961793 on 2026-10-23
 
 next:
-  - Upstream main moves on. Before the next merge, review 9e5a7ad1..<target> (27 commits up to
-    7099ba8f on 2026-10-22, including pairing from a QR or link without a fingerprint screen),
-    rerun govulncheck and npm audit, and merge the exact reviewed commit.
+  - Upstream main moves on. Before the next merge, review d8961793..<target>, rerun govulncheck
+    and npm audit, and merge the exact reviewed commit.
   - Nothing has run on a Mac. Before relying on the daemon, install.sh's signature check or the
     console e2e tests there, build and run them on macOS.
 

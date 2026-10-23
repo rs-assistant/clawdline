@@ -18,10 +18,10 @@ does not take upstream releases or self-updates. Open items for the next session
   `git remote -v` before fetching or pushing; to compare with upstream,
   `git remote add upstream https://github.com/sainteye/clawdline`.
 - Work happens on `local-source-build`, cut from upstream `418bac7` (security-reviewed on
-  2026-10-19), with upstream `9e5a7ad1` merged on 2026-10-22 after its own review ("Upstream
-  merge" below). The last reviewed upstream commit is `9e5a7ad1`. Merging upstream brings
-  unreviewed code: review the diff from that commit and rerun govulncheck before merging, and
-  merge the exact commit that was reviewed, not a moving `main`.
+  2026-10-19), with upstream `9e5a7ad1` merged on 2026-10-22 and `d8961793` on 2026-10-23, each
+  after its own review ("Upstream merge" below). The last reviewed upstream commit is
+  `d8961793`. Merging upstream brings unreviewed code: review the diff from that commit and rerun
+  govulncheck before merging, and merge the exact commit that was reviewed, not a moving `main`.
 - The person dropped the Codex cross-review on 2026-10-22; nothing on this branch since then has
   had a second reviewer. Where Claude and Codex both review, present their disagreements instead of
   resolving them silently.
@@ -187,6 +187,19 @@ console and shown in a `sandbox=""` frame. No new route answers without a creden
 own `install.sh` rewrite (Python verifier) was replaced by this branch's; its size caps, duplicate
 field refusal and `umask 077` were ported, its zh-Hant installer messages were not.
 
+Second merge, `9e5a7ad1..d8961793` (21 commits, 2026-10-23), reviewed by Claude in this session
+(about 430 lines of Go and 1,400 of console code): a bounded FIFO of 64 for Cloud reads behind the
+8 read workers and a separate queue of 16 for busy replies (both registered); four setup-wizard
+settings (`setup_mode`, `setup_completed_at`, `setup_app_device`, `setup_skipped`), validated
+and inert; the macOS app's Cloud tab labels itself `ClawdlineApp/1` and pairs on the console's
+request; the hosted console drops the fingerprint screen for a pairing from the machine's own QR
+or link (hosted only, no daemon change). The person chose on 2026-10-23 not to mount the new
+setup wizard in the local console: on a Mac it opened by itself and, once its app step was
+shown, started a Cloud sign-in (`/v1/cloud/login`, which registers the machine with
+`api.clawdline.com`) and then turned Cloud and Cloud commands on, which `connect-src` cannot stop
+because the daemon makes the call. Upstream's `clawdline.com/install.sh` short URL is not used:
+it serves upstream's installer, not this branch's.
+
 Upstream findings noted, Cloud-only, not acted on: identity-pairing routes use `requireLocal`, not
 `requireCloudLocal`; `healthsealed` accepts an `http://` loopback API base; the rekey admission
 interval is spent before the offer's signature is checked; a pending readonly reservation counts
@@ -216,9 +229,6 @@ Still open:
   cannot use `install.sh` until a newer release exists. Stable releases must follow each other
   within 180 days. The beta channel's tag list is unsigned. `clawdline setup` from an older
   unpacked release, and `--force`, still downgrade on an explicit ask. Not run on macOS.
-- Upstream commits after `9e5a7ad1` (27 as of 2026-10-22, up to `7099ba8f`) are not reviewed or
-  merged. One of them lets pairing from a machine's QR or link finish without a fingerprint
-  screen; review it before merging.
 - Console browser e2e tests (`web/console/src/**/*.e2e.ts`) default to a Mac Chrome path. In a
   Linux cloud container they run with `CHROME` set to a wrapper that adds `--no-sandbox` to
   `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (root needs it). On 2026-10-22 the Secret
