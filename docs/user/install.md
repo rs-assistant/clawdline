@@ -75,10 +75,10 @@ autostart off or remove Clawdline, each with `--port` when you chose another por
 "Next" in `Clawdline Next.app`, `clawdline-next.service` and `~/.config/clawdline-next` is this
 generation's internal name; the product is Clawdline.
 
-Pass options to the downloaded script:
+Pass options through the one-line installer:
 
 ```sh
-sh ./clawdline-install.sh --version v2.1.3 --headless
+curl -fsSL https://clawdline.com/install.sh | sh -s -- --headless
 ```
 
 | Option | Does |

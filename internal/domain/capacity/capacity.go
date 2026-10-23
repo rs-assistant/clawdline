@@ -173,6 +173,8 @@ const (
 	CacheSessionProjectKeys = "cache.session_project_keys"
 	BoardReceipts           = "board.receipts"
 	CloudRelayQueue         = "cloud.relay_queue"
+	CloudReadQueue          = "cloud.read_queue"
+	CloudLaneRefusals       = "cloud.lane_refusals"
 	StoreReceipts           = "store.receipts"
 	// How long the store keeps what nothing reads any more.
 	StoreDoneEffectRetention       = "store.done_effect_retention_seconds"

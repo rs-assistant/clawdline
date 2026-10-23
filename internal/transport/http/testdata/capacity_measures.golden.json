@@ -479,6 +479,11 @@
     "Note": true
   },
   {
+    "Name": "cloud.lane_refusals",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.peer_body_bytes",
     "Known": true,
     "Note": true
@@ -518,6 +523,11 @@
   {
     "Name": "cloud.peer_pairs",
     "Known": true
+  },
+  {
+    "Name": "cloud.read_queue",
+    "Known": true,
+    "Note": true
   },
   {
     "Name": "cloud.rekey_body",
