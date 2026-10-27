@@ -227,15 +227,20 @@ Still open:
   (`BenchmarkReplayJournalRecord`). On macOS `Sync` is `F_FULLFSYNC`, not measured; with Cloud
   on, run the benchmark there before relying on Cloud terminal typing.
 - GitHub Actions was off on the fork until the person enabled it on 2026-10-27 (GitHub-made
-  actions only), so `ci.yml`, including its `macos-latest` job, had never run on this branch; it
-  triggers on push to `main`, a pull request or `workflow_dispatch`.
-  On 2026-10-27, `GOOS=darwin` `go vet` (arm64) and `go build` of `./cmd/clawdline` (amd64 and
-  arm64, CGO off) passed in the Linux container. The workflows use actions by tag, not by commit.
+  actions only). The workflows were not registered (the default branch had no push since the
+  fork), so a dispatch answered 404; `ci.yml` runs on the draft pull request
+  rs-assistant/clawdline#1 (`local-source-build` into the fork's `main`, not to be merged), on
+  every push to the branch. Its first run, at `38ea3a97`, was green in all four jobs, including
+  `macos-latest`: Darwin vet, build and Go tests (three tests excluded by name in
+  `tools/test-go-ci.sh` for needing the host process table or iTerm2), the native shell pairing
+  check and the release evidence with the macOS signature cases. The workflows use actions by tag,
+  not by commit. The daemon has still not been run on a Mac.
 - `tools/release/supply-chain.test.sh`: from `cbc74e4` until 2026-10-27, eight provenance cases
   failed because their fixture had no `manifest.sshsig` (fixed, with a case for a missing one).
-  "pins that moved in the checkout do not fail an older release's SBOM" fails in the Linux
-  container on upstream `d8961793` too, with no file or package difference reported; the cause is
-  not found (the container's clone is shallow).
+  "pins that moved in the checkout do not fail an older release's SBOM" fails in the Linux cloud
+  container, on upstream `d8961793` too, with no file or package difference reported, and passes
+  on GitHub's runners (both CI jobs that run the script, 2026-10-27); the cause in the container
+  is not found (its clone is shallow).
 - The cookie still reaches a service of the person's own user; the socket-owner checks do not
   exist on macOS or Windows.
 - A declared Secret Handoff command that is itself a shell or curl still receives the value: the
