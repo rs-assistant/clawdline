@@ -584,6 +584,9 @@ func newSealedCloud(t *testing.T) (*sealedCloud, string) {
 	c := &sealedCloud{stored: map[string][]byte{}, identity: 3}
 	srv := httptest.NewServer(c)
 	t.Cleanup(srv.Close)
+	// The stand-in is plain http on loopback, which the daemon refuses.
+	sealedAllowLoopbackHTTP = true
+	t.Cleanup(func() { sealedAllowLoopbackHTTP = false })
 	return c, srv.URL
 }
 

@@ -135,8 +135,9 @@ func TestIdentityPairingEndToEnd(t *testing.T) {
 	}
 
 	up := &healthsealed.Uploader{
-		Endpoint: cfg.BaseURL,
-		Enabled:  func() bool { return true },
+		Endpoint:          cfg.BaseURL,
+		AllowLoopbackHTTP: true,
+		Enabled:           func() bool { return true },
 		Keys: healthsealed.ProviderSource{
 			Identity: func(context.Context) (string, string, string, int64, error) {
 				return cfg.AccountID, cfg.MachineID, cfg.Credential, 0, nil

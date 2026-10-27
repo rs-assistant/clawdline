@@ -218,7 +218,10 @@ func (s *PinnedStore) Devices() ([]PinnedDevice, error) {
 // `(nil, false, nil)` is "this store holds nothing about that sender", which
 // the link answers as an unknown sender: it does not fall back to the roster.
 // A refused device answers `(nil, false, nil)` too — but `Refused` says so,
-// and the caller checks that first, so a revocation reads as itself.
+// and the caller checks that first, so a revocation reads as itself. A
+// pending readonly reservation (ReserveReadOnly) answers `(nil, false, nil)`
+// as well: it caps a device's scope but is not a pin until the pairing
+// completes.
 func (s *PinnedStore) PublicKeyFor(sender string) (ed25519.PublicKey, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -228,6 +231,12 @@ func (s *PinnedStore) PublicKeyFor(sender string) (ed25519.PublicKey, bool, erro
 	for _, device := range s.record.Devices {
 		if device.DeviceID != sender || !device.Active() {
 			continue
+		}
+		if device.PairingPending {
+			// A reservation written before the content key was released is
+			// not a pairing yet, and only a pin admits; the completed
+			// handover's pin clears this.
+			return nil, false, nil
 		}
 		if key, ok := device.Key(); ok {
 			return key, true, nil

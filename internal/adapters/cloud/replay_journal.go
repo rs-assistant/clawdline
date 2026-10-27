@@ -29,13 +29,13 @@ package cloud
 // past them a claim is refused rather than a younger row forgotten, because a
 // forgotten row is exactly the replay this exists against.
 //
-// Appends are not synced one by one. A daemon that crashes or is restarted
-// keeps every line (they are in the kernel's page cache already); a machine
-// that loses power within the skew window may lose the last lines, and with
-// them the memory of envelopes from the last moments before it went down.
-// Syncing every terminal keystroke's envelope was the alternative, and it
-// costs a disk flush per keystroke for a case that also needs the relay to
-// be hostile at that exact moment.
+// Every append is synced before Record returns, so a claim is on the disk,
+// not only in the kernel's page cache, before its envelope is acted on: a
+// machine that loses power inside the skew window still remembers the
+// envelopes it answered. Upstream left appends unsynced to spare a disk flush
+// per terminal keystroke's envelope; this fork takes that cost, which only
+// exists with Cloud on. On macOS (*os.File).Sync is F_FULLFSYNC, the slower of
+// the two flushes.
 
 import (
 	"errors"
@@ -101,6 +101,9 @@ type ReplayJournal struct {
 	// ReplayJournalBytesLimit unless a test lowers them.
 	rows int
 	size int64
+	// syncFile confirms an appended line with the disk; nil is (*os.File).Sync.
+	// A test replaces it to make the disk refuse.
+	syncFile func(*os.File) error
 }
 
 var _ ReplayRecorder = (*ReplayJournal)(nil)
@@ -291,6 +294,14 @@ func (j *ReplayJournal) append(line string) error {
 		return err
 	}
 	if _, err := file.WriteString(line); err != nil {
+		_ = file.Close()
+		return err
+	}
+	sync := j.syncFile
+	if sync == nil {
+		sync = (*os.File).Sync
+	}
+	if err := sync(file); err != nil {
 		_ = file.Close()
 		return err
 	}

@@ -215,3 +215,44 @@ func replayFixture(t *testing.T, recorder ReplayRecorder) (*Transport, []byte) {
 	}
 	return tr, raw
 }
+
+// A claim is on disk, not only in the page cache, before its envelope is
+// acted on: a write the disk did not confirm refuses the envelope, and the
+// claim is not counted as held.
+func TestAReplayClaimTheDiskDidNotConfirmIsRefused(t *testing.T) {
+	now := time.Now()
+	clock := func() time.Time { return now }
+	journal, err := OpenReplayJournal(t.TempDir(), clock, cloud.NewReplayWindow(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	synced := 0
+	journal.syncFile = func(*os.File) error { synced++; return nil }
+	if err := journal.Record("viewer-01", 1, ms(now)); err != nil {
+		t.Fatal(err)
+	}
+	if synced != 1 {
+		t.Fatalf("an accepted claim was synced %d times", synced)
+	}
+	journal.syncFile = func(*os.File) error { return errors.New("the disk did not confirm") }
+	if err := journal.Record("viewer-01", 2, ms(now)); err == nil {
+		t.Fatal("a claim the disk did not confirm was accepted")
+	}
+	if journal.Rows() != 1 {
+		t.Fatalf("an unconfirmed claim was counted: %d rows", journal.Rows())
+	}
+}
+
+// The cost of that confirmation, per claim, on this machine's disk.
+func BenchmarkReplayJournalRecord(b *testing.B) {
+	now := time.Now()
+	journal, err := OpenReplayJournal(b.TempDir(), func() time.Time { return now }, cloud.NewReplayWindow(0))
+	if err != nil {
+		b.Fatal(err)
+	}
+	for i := 0; i < b.N; i++ {
+		if err := journal.Record("viewer-01", uint64(i+1), ms(now)); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

@@ -200,10 +200,13 @@ shown, started a Cloud sign-in (`/v1/cloud/login`, which registers the machine w
 because the daemon makes the call. Upstream's `clawdline.com/install.sh` short URL is not used:
 it serves upstream's installer, not this branch's.
 
-Upstream findings noted, Cloud-only, not acted on: identity-pairing routes use `requireLocal`, not
-`requireCloudLocal`; `healthsealed` accepts an `http://` loopback API base; the rekey admission
-interval is spent before the offer's signature is checked; a pending readonly reservation counts
-as a pin.
+Upstream findings, Cloud-only, fixed on 2026-10-27, each with a test that failed first: the
+identity-pairing routes use `requireCloudLocal` (a Cloud request holds the local token; no Cloud
+operation names these routes, so this is defence in depth); `healthsealed` refuses an `http://`
+API base unless a test sets `AllowLoopbackHTTP`, as `healthupload` already did; a pending readonly
+reservation (`ReserveReadOnly`, written before the content key is released) is not a pin, so
+`PinnedStore.PublicKeyFor` admits nobody on it until the pairing completes. Not acted on: the
+rekey admission interval is spent before the offer's signature is checked.
 
 Smoke test on 2026-10-22 (`d946f01`, Linux container, empty `CLAWDLINE_NEXT_DIR`, port 7791,
 Cloud and the update check off): the console loads and signs in through `clawdline open --print`
@@ -218,8 +221,20 @@ Still open:
   against the repository. No daemon-side change can fix it; it matters only with Cloud on.
 - A revocation made in the hosted console (on the account roster) denies the device but does not
   replace the key; devices revoked before `181ab79` are not re-keyed by revoking again. The CLI
-  viewer and `clawdline cloud connect` keep an in-memory replay window. Replay-journal appends are
-  not fsynced per envelope.
+  viewer and `clawdline cloud connect` keep an in-memory replay window. Since 2026-10-27 every
+  replay-journal append is fsynced before its envelope is acted on (upstream did not sync); in
+  the Linux container that took a claim from about 4 µs to about 165 µs
+  (`BenchmarkReplayJournalRecord`). On macOS `Sync` is `F_FULLFSYNC`, not measured; with Cloud
+  on, run the benchmark there before relying on Cloud terminal typing.
+- GitHub Actions is not enabled on the fork, so `ci.yml`, including its `macos-latest` job, has
+  never run on this branch; it triggers on push to `main`, a pull request or `workflow_dispatch`.
+  On 2026-10-27, `GOOS=darwin` `go vet` (arm64) and `go build` of `./cmd/clawdline` (amd64 and
+  arm64, CGO off) passed in the Linux container. The workflows use actions by tag, not by commit.
+- `tools/release/supply-chain.test.sh`: from `cbc74e4` until 2026-10-27, eight provenance cases
+  failed because their fixture had no `manifest.sshsig` (fixed, with a case for a missing one).
+  "pins that moved in the checkout do not fail an older release's SBOM" fails in the Linux
+  container on upstream `d8961793` too, with no file or package difference reported; the cause is
+  not found (the container's clone is shallow).
 - The cookie still reaches a service of the person's own user; the socket-owner checks do not
   exist on macOS or Windows.
 - A declared Secret Handoff command that is itself a shell or curl still receives the value: the
