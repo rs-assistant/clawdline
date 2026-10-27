@@ -13,9 +13,9 @@ next:
     and npm audit, and merge the exact reviewed commit.
   - Nothing has run on a Mac. Before relying on the daemon, install.sh's signature check or the
     console e2e tests there, build and run them on macOS.
-  - GitHub Actions is off on the fork (no workflow is registered; a dispatch of ci.yml answers
-    404). Once the person enables it, dispatch ci.yml on local-source-build to run its
-    macos-latest job. Whether to pin the workflows' actions to commits is the person's choice.
+  - GitHub Actions is on for the fork since 2026-10-27 (GitHub-made actions only). Dispatch
+    ci.yml on local-source-build to run its macos-latest job and read the result. Whether to pin
+    the workflows' actions to commits is the person's choice.
 
 deferred:
   - A LaunchAgent or systemd user unit for the daemon. The person said not yet (2026-10-22).

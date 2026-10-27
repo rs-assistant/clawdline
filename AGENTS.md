@@ -226,8 +226,9 @@ Still open:
   the Linux container that took a claim from about 4 µs to about 165 µs
   (`BenchmarkReplayJournalRecord`). On macOS `Sync` is `F_FULLFSYNC`, not measured; with Cloud
   on, run the benchmark there before relying on Cloud terminal typing.
-- GitHub Actions is not enabled on the fork, so `ci.yml`, including its `macos-latest` job, has
-  never run on this branch; it triggers on push to `main`, a pull request or `workflow_dispatch`.
+- GitHub Actions was off on the fork until the person enabled it on 2026-10-27 (GitHub-made
+  actions only), so `ci.yml`, including its `macos-latest` job, had never run on this branch; it
+  triggers on push to `main`, a pull request or `workflow_dispatch`.
   On 2026-10-27, `GOOS=darwin` `go vet` (arm64) and `go build` of `./cmd/clawdline` (amd64 and
   arm64, CGO off) passed in the Linux container. The workflows use actions by tag, not by commit.
 - `tools/release/supply-chain.test.sh`: from `cbc74e4` until 2026-10-27, eight provenance cases
