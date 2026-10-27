@@ -234,7 +234,10 @@ Still open:
   `macos-latest`: Darwin vet, build and Go tests (three tests excluded by name in
   `tools/test-go-ci.sh` for needing the host process table or iTerm2), the native shell pairing
   check and the release evidence with the macOS signature cases. The workflows use actions by tag,
-  not by commit. The daemon has still not been run on a Mac.
+  not by commit. The daemon has still not been run on a Mac. At `0180a2ff` (only documentation
+  changed since `38ea3a97`) the macOS job failed once in `TestDevicesRoutesRefuseABrowser`: a
+  second `POST /v1/auth/devices/browser` got no headers within 5 s. It passed on re-run and 30 of
+  30 times on Linux; the cause is not found.
 - `tools/release/supply-chain.test.sh`: from `cbc74e4` until 2026-10-27, eight provenance cases
   failed because their fixture had no `manifest.sshsig` (fixed, with a case for a missing one).
   "pins that moved in the checkout do not fail an older release's SBOM" fails in the Linux cloud
