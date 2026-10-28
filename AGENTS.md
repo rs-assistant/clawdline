@@ -58,7 +58,14 @@ CLAWDLINE_NEXT_WEB="$PWD/web/console/dist" ./bin/clawdline serve
   `clawdline cloud off` stops a live relay line on a daemon built from this branch after the
   2026-10-22 fix; an older build keeps the line up until the daemon restarts.
 - Keep `remote` off (Tailscale Serve admission; upstream removed the Cloudflare tunnel and
-  `remote_tunnel`).
+  `remote_tunnel`). Another computer on the LAN reaches the console through an SSH port forward
+  (`docs/user/remote-access.md` A). On 2026-10-28 the person chose not to open access from
+  outside the LAN for now. If that changes, Tailscale Serve needs no code change (it does need
+  `remote` on, and the machine's `ts.net` name lands in public certificate logs); a self-run
+  Cloudflare tunnel is refused by `isAllowedHost`, and rewriting Host to loopback still fails
+  every change on `sameOrigin`, so it would need the tunnel's name allowed again in `gate.go`,
+  with Cloudflare reading every token and terminal byte in clear and the address public unless
+  Cloudflare Access is in front.
 - Dispatch with `--permission-mode ask`. A mode not named follows the machine setting
   `orchestrator_permission`, which is `ask` when unset on this branch. `full` is
   `bypassPermissions` / `--ask-for-approval never`. A paired device with Send can change
