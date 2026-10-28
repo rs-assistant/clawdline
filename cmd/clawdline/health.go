@@ -443,6 +443,11 @@ func (k sealedKeys) Keys(ctx context.Context) (healthsealed.Keys, error) {
 	return healthsealed.Keys{}, &healthsealed.Error{Code: healthsealed.CodeKeyUnavailable}
 }
 
+// sealedAllowLoopbackHTTP lets this package's tests send owner-sealed
+// diagnostics to a plain-http stand-in for Cloud on loopback. The daemon
+// never sets it, so a settings file naming an http:// API base sends nothing.
+var sealedAllowLoopbackHTTP = false
+
 // newSealedDiagnostics makes the owner-sealed diagnostics worker. It is off
 // unless the person opted in to owner retention (healthsealed.SettingKey,
 // off by default) and Cloud is on; both are re-read before every seal and
@@ -454,7 +459,8 @@ func newSealedDiagnostics(stateDir string, foreign []string, machines sealedMach
 	}
 	keys := sealedKeys{stateDir: stateDir, foreign: foreign, machines: machines}
 	u := &healthsealed.Uploader{
-		Client: sealedClient(),
+		Client:            sealedClient(),
+		AllowLoopbackHTTP: sealedAllowLoopbackHTTP,
 		Origin: func() (string, error) {
 			_, settings, err := keys.local()
 			return settings.APIBase, err

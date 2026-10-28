@@ -213,9 +213,10 @@ type Bridge struct {
 	// because a person may turn it off while one is in flight. Nil is off.
 	AllowCommands func() bool
 	// Authority is the roster and the clock, re-read at the point of no
-	// return. Nil trusts the transport's own admission for the roster and the
-	// clock — which is what the Swift app's default does — and still consults
-	// AllowCommands for the write gate.
+	// return: before a command's effect, and before a ctl/ read is answered
+	// (with requiresWriteGate false). Nil trusts the transport's own
+	// admission for the roster and the clock — which is what the Swift app's
+	// default does — and still consults AllowCommands for the write gate.
 	Authority func(ctx context.Context, sender string, verifiedKey ed25519.PublicKey, requiresWriteGate bool) Authority
 	// TranscriptAuthority refreshes the roster for each r/ admission and once
 	// more before sealing its answer. Nil fails closed on that rail.
@@ -475,6 +476,14 @@ func (b Bridge) contentReadAnswer(cmd Command, p plan, answer Answer) Answer {
 // this machine's own network with that switch off, and a viewer that can see
 // every session row but not the messages inside one would be showing less than
 // the same device sees over the tunnel, for no reason anybody chose.
+//
+// **Not behind the write switch is not the same as not behind authority.** A
+// read is asked the same revocable questions a command is — is this device
+// still paired here, still on the roster, still unrevoked — at the moment it
+// is answered, not at the moment it was admitted. Admission can be stale by
+// the time a read is answered: the read lane runs beside the command lane, a
+// revocation can land between the two, and what a read hands out is exactly
+// what a revoked device should stop seeing. Only the write gate is left out.
 func (b Bridge) serveRead(ctx context.Context, cmd Command, parsed body, o op) Answer {
 	// A read rides the command channel and therefore its class, which is what
 	// the relay bills and what the envelope pins. `dispatch` is a command
@@ -487,6 +496,10 @@ func (b Bridge) serveRead(ctx context.Context, cmd Command, parsed body, o op) A
 	if !ok {
 		return b.refuse(cmd, parsed, o.name, Refusal{Status: 400, Code: "malformed_read",
 			Message: "This Cloud read is malformed.", fixedCopy: true})
+	}
+	// After the decode, so the refusal reaches the waiter the read named.
+	if refusal, denied := b.authorize(ctx, cmd.Sender, cmd.VerifiedKey, false); denied {
+		return b.publish(cmd, plan, refusal, nil)
 	}
 	if o.sessions {
 		return b.stateSessions(ctx, cmd, parsed, plan)

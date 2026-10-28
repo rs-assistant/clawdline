@@ -3,7 +3,7 @@
 //
 //	go run ./tools/release keygen <private-key-file>
 //	go run ./tools/release manifest -version v -commit c -committed-at t -channel ch -base-url u <dir>
-//	go run ./tools/release sign -key <private-key-file> <dir>
+//	go run ./tools/release sign -key <private-key-file> <dir>     (manifest.sig.json and manifest.sshsig)
 //	go run ./tools/release verify [-pub base64] <dir>
 //
 // The private key file holds the base64 Ed25519 seed and nothing else. It is
@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/release"
 )
@@ -133,6 +134,12 @@ func manifest(args []string) error {
 	if fs.NArg() != 1 || *version == "" || *commit == "" || *baseURL == "" {
 		usage()
 	}
+	// committed_at is the signed time a machine judges the newest release's
+	// age by (release.Manifest.Fresh); a manifest without it is refused as the
+	// newest one, so none is built.
+	if _, err := time.Parse(time.RFC3339, *committedAt); err != nil {
+		return fmt.Errorf("-committed-at %q is not an RFC3339 time", *committedAt)
+	}
 	dir := fs.Arg(0)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -212,6 +219,13 @@ func sign(args []string) error {
 	if err := os.WriteFile(filepath.Join(dir, "manifest.sig.json"), append(b, '\n'), 0o644); err != nil {
 		return err
 	}
+	// The same signature for install.sh, which checks it with ssh-keygen
+	// before it runs anything it downloaded. It holds one key's signature;
+	// during a rotation install.sh trusts both keys, so the last one to sign
+	// is enough.
+	if err := os.WriteFile(filepath.Join(dir, release.SSHSignatureFile), release.SignSSH(m, priv), 0o644); err != nil {
+		return err
+	}
 	fmt.Printf("signed with key %s\n", s.KeyID)
 	return nil
 }
@@ -243,6 +257,16 @@ func verify(args []string) error {
 	m, err := release.Open(mb, sb, keys)
 	if err != nil {
 		return err
+	}
+	ssh, err := os.ReadFile(filepath.Join(dir, release.SSHSignatureFile))
+	if err != nil {
+		return fmt.Errorf("%v: install.sh verifies a release with it", err)
+	}
+	if err := release.VerifySSH(mb, ssh, keys); err != nil {
+		return err
+	}
+	if _, err := time.Parse(time.RFC3339, m.CommittedAt); err != nil {
+		return fmt.Errorf("the manifest's committed_at %q is not an RFC3339 time; a machine would refuse it as the newest release", m.CommittedAt)
 	}
 	for _, a := range m.Artifacts {
 		f, err := os.Open(filepath.Join(dir, a.Name))

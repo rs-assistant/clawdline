@@ -14,6 +14,7 @@ published, and how the signing key is kept. What a machine does with a release i
 | `SHA256SUMS` | manual checksum comparisons and compatibility with older installers; not a trust root |
 | `manifest.json` | version, commit, `committed_at`, channel, `min_version`, `non_additive_migration`, and each artifact's os, arch, kind, URL, size and sha256 |
 | `manifest.sig.json` | a list of `{key_id, sig}` Ed25519 signatures over `manifest.json`'s exact bytes |
+| `manifest.sshsig` | the same key's Ed25519 signature over `manifest.json` in OpenSSH's SSHSIG format (namespace `clawdline-release`), for `ssh-keygen -Y verify` |
 | `<archive>.spdx.json` | the SPDX 2.3 SBOM of each archive (`tools/release/sbom.sh`) |
 
 Every asset also carries a GitHub artifact attestation of its build provenance, and the macOS
@@ -24,17 +25,30 @@ to the workflow by their attestation, so older installers and updaters read rele
 
 A daemon follows a manifest only when one signature in the list is by a key compiled into it
 (`internal/adapters/release/keys.go`), and installs an artifact only when its size and sha256 are
-the manifest's. The current `install.sh` verifies the manifest with trusted local OpenSSL 3
-and its pinned release public keys, parses it with Python 3, and checks the signed archive size
-and hash before unpacking or executing the release. The script's pinned keys must match
-`internal/adapters/release/keys.go`; the installer policy test holds that trust set and its
-copied release bounds to the Go reader and capacity register. A key rotation ships both keys
-in both places before an old key is removed.
+the manifest's. The first install trusts the same key: `install.sh` carries the public keys
+(`release_keys`, held equal to `keys.go` by `TestInstallScriptCarriesTheReleaseKeysAndBounds`) and
+checks `manifest.sig.json` with OpenSSL 3 (`openssl pkeyutl -verify -rawin`, proved first on an
+RFC 8032 test vector), or, where `openssl` cannot verify Ed25519 — the LibreSSL every Mac ships,
+OpenSSL 1.1 — `manifest.sshsig` with `ssh-keygen -Y verify` (OpenSSH 8.1+). It then takes the
+archive's sha256 from the verified manifest, and runs nothing it downloaded before both checks
+pass. With neither verifier it stops and names what to install. What `install.sh` still trusts
+HTTPS for is only which release is the newest; that is bounded by the next paragraph.
+
+`committed_at` is required (`tools/release manifest -committed-at`, checked again by `verify`). It
+is the release's signed age: the newest release — the daemon's check, an update with no
+`--version`, auto-apply, `install.sh` with no `--version` — is believed only while it is at most
+180 days old (`release.manifest_age_seconds`). Without it a host, or anyone in front of it, could
+serve an old signed release as the newest for ever. It is the commit's time, not the signing
+time, so a release built from an older commit reaches the bound sooner, never later. A stable
+release must therefore follow the previous one within 180 days, or machines report that they
+cannot confirm the newest release. A release named by version is installed whatever its age.
+Neither the updater nor `install.sh` replaces a release with an older one unless asked
+(`update --apply --version vX --force`, `install.sh --allow-downgrade`).
 
 First installation still trusts the reviewed installer script and local tools. A compromised
 release host cannot substitute an unsigned archive, but a compromised installer or signing key
 remains a trust failure. Older installer revisions executed the downloaded binary before it
-checked its own signature; fixing `main/install.sh` does not change those historical scripts.
+checked its own signature; fixing `install.sh` does not change those historical scripts.
 
 Versions are `vX.Y.Z` on the `stable` channel and `vX.Y.Z-beta.N` on `beta`. The stable pointer is
 `https://github.com/sainteye/clawdline/releases/latest/download/manifest.json`, which GitHub serves
@@ -42,10 +56,64 @@ from the newest published non-prerelease. `min_version` is the oldest version a 
 upgraded from and rolled back to; a release whose store change an older binary cannot read sets
 `non_additive_migration` and raises it.
 
-The README and install guide deliberately pin both the installer source commit and a published
-release version. When promoting a later release, update those examples together after verifying
-the chosen public installer revision and the signed release manifest. The installer revision
-may be newer than the program release; do not present them as the same source tree.
+The README and quick installation use `https://clawdline.com/install.sh`, which redirects over
+HTTPS to a reviewed installer commit and selects the latest signed stable release. The advanced
+install guide retains the fixed-script, fixed-version path. The marketing repository pins the
+redirect target in `marketing/marketing-claude/scripts/write-localized-404.mjs`; promote it only
+after comparing the public script bytes with the reviewed commit and verifying the signed release.
+A changing official entry point is not an immutable script pin. The installer revision may be
+newer than the program release; do not present them as the same source tree.
+
+## A release from start to finish
+
+The sections below explain each mechanism. This is the order a root follows, with what proves
+each step done. v2.2.0 was cut this way ([acceptance record](records/release-v2.2.0-acceptance.md)).
+
+1. **Choose the commit and version.** Everything to ship is merged on `main` and passed
+   `tools/check.sh`; read the gate's `check:` line in its log, not the exit code of a wrapper
+   around it. A new feature is a minor version (`vX.Y.0`), fixes only a patch.
+2. **Write the release notes** at `docs/release-notes/<version>.md` and push them to `main`. List
+   everything since the previous tag, not only your own work:
+   `git log --oneline --first-parent <previous-tag>..HEAD`, then check which commits the previous
+   tag already contains with `git merge-base --is-ancestor`.
+3. **Wait for CI on that exact commit**: `gh run watch <run-id> --exit-status`, and confirm the
+   run's `headSha` is the commit you will release.
+4. **Dispatch the Release workflow**: `gh workflow run release.yml --ref main -f version=<version>`.
+   It builds the Linux tmux first, then stops for the `release` environment. Watch
+   `repos/sainteye/clawdline/actions/runs/<run>/pending_deployments`; when it is not empty, the
+   person must approve it in GitHub. Send them the run link with `clawdline notify`: they are
+   often away from the conversation.
+5. **Wait for the draft**: the run concludes `success`, and `gh release view <version>` shows a
+   draft whose `targetCommitish` is the released commit.
+6. **Gate, then publish** (step 3 of *Cutting a release*): `tools/release/gate.sh <version>`, then
+   `--publish`, which repeats every check and publishes only if all pass. `stapler validate`
+   queries Apple (`api.apple-cloudkit.com`) on every run; if it reports *no stapled notarization
+   ticket*, run `xcrun stapler validate -v` on the App it names a few times. A ticket that
+   validates there makes the failure a failed query: run the gate again unchanged. A ticket that
+   never validates is a real failure; do not publish.
+7. **Install the actual DMG**: `tools/release/dmg-install-smoke.sh --dmg <file> --version <version>
+   --commit <commit> --work-dir <dir> --evidence-dir <new-dir> --mode release`. Its `result.json`
+   must say `"accepted": true` and `"cleanup": true`. It runs on its own port and never touches
+   the person's daemon.
+8. **Deploy the hosted console** from the released commit
+   ([hosted-console.md](hosted-console.md)), and verify `BUILD.json` and the `CloudGate` check.
+9. **Move this machine to the release**: `clawdline update --apply --version <version>`. Name the
+   version: a plain `--apply` shortly after publication can still act on the updater's earlier
+   check and install the previous release. Confirm `/v1/health` reports the version and `GET /`
+   answers 200. The new App is staged until the person quits and reopens it.
+10. **Refresh installation references**: update the README download badges and the fixed-version
+    alternative in `docs/user/install.md`. Keep the quick command on the official short URL.
+    Review and promote its verifier pin in the marketing repository. Check the public installer bytes
+    (`raw.githubusercontent.com/.../<commit>/install.sh`) against `git show <commit>:install.sh`,
+    and whether `install.sh` changed since the previous pin. Add
+    `docs/records/release-<version>-acceptance.md` with the evidence and the boundaries not
+    checked, and link it under *Recent acceptance records*.
+11. **Update clawdline.com**: the website's download links and anything it marks as a preview of
+    this version live in the private Cloud service repository; its owner changes them, and the
+    live page is checked, not the repository.
+
+Report each destination separately at the end: GitHub, `app.clawdline.com`, this machine, the
+public Release and `clawdline.com` can each be ahead of or behind the others.
 
 ## Cutting a release
 
@@ -225,6 +293,9 @@ go run ./tools/release sign -key /somewhere/outside/the/repo/test.key /tmp/rel/v
 (cd /tmp/rel && python3 -m http.server 18080)
 ```
 
+`install.sh` installs it with `CLAWDLINE_INSTALL_BASE_URL=http://127.0.0.1:18080/v0.10.0-test.1
+CLAWDLINE_INSTALL_TEST_KEY=<public key>`; it honours the test key only beside that base URL.
+
 A test release also carries SBOMs, so `tools/release/gate.sh <v> --dir <dir>` checks them on it.
 The evidence checks themselves are tested, with a synthetic release and a stub `gh`, by
 `tools/heavy.sh bash tools/release/supply-chain.test.sh`: a missing SBOM, a wrong digest, an
@@ -280,9 +351,15 @@ compilation if the selected identity is not Developer ID Application.
 - **Creating one**: `go run ./tools/release keygen <file outside the repo>`; put the printed
   public key in `releaseKeys` (`internal/adapters/release/keys.go`), the seed in the environment
   secret, and the file in offline storage; then delete the file.
-- **Rotating**: add the new public key to `releaseKeys` and ship a release signed by **both** keys
-  (`tools/release sign` adds a signature and keeps the ones already in `manifest.sig.json`). Once
-  installs have that release, a later one may drop the old key.
+- **Rotating**: add the new public key to `releaseKeys` and to `install.sh`'s `release_keys`, and
+  ship a release signed by **both** keys (`tools/release sign` adds a signature and keeps the ones
+  already in `manifest.sig.json`; `manifest.sshsig` holds the last key's, which both lists then
+  trust). Once installs have that release, a later one may drop the old key from both.
 - **If the key leaks**: rotate as above at once, signing with the new key only, and say so in the
   release notes. Installs older than the release that added the new key cannot verify the new
   releases and need the installer run again.
+
+## Recent acceptance records
+
+- [v2.2.0 installation and publication evidence](records/release-v2.2.0-acceptance.md).
+- [v2.1.3 installation and publication evidence](records/release-v2.1.3-acceptance.md), including the explicitly accepted fresh-account boundary.

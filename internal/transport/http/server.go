@@ -882,9 +882,16 @@ func (s *Server) Serve(ln net.Listener) error {
 	// after a restart, and whether this address shows a page is the thing
 	// they restarted it for.
 	log.Print(consoleLogLine(consoleReading(WebRoot())))
-	srv := &http.Server{
-		Handler:           s.Handler(),
+	return newHTTPServer(s.Handler()).Serve(ln)
+}
+
+// newHTTPServer is the http.Server Serve answers with.
+func newHTTPServer(h http.Handler) *http.Server {
+	return &http.Server{
+		Handler:           h,
 		ReadHeaderTimeout: 10 * time.Second,
+		// Each connection's peer, so the gate can refuse a credential that
+		// another user's process presents (peer.go).
+		ConnContext: connContext,
 	}
-	return srv.Serve(ln)
 }

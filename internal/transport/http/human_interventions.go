@@ -29,6 +29,7 @@ type humanInterventionWire struct {
 	Detail             string                         `json:"detail,omitempty"`
 	Options            []work.HumanInterventionOption `json:"options"`
 	DocumentURL        string                         `json:"document_url,omitempty"`
+	Command            []string                       `json:"command,omitempty"`
 	CreatedAt          int64                          `json:"created_at"`
 	ReadAt             *int64                         `json:"read_at"`
 	ResolvedAt         *int64                         `json:"resolved_at"`
@@ -42,7 +43,7 @@ func humanInterventionOf(v work.HumanIntervention) humanInterventionWire {
 	out := humanInterventionWire{ID: v.ID, SourceConversation: v.SourceConversation, SourceLabel: v.SourceLabel,
 		TargetConversation: v.TargetConversation, TargetSession: v.TargetSession, Kind: v.Kind, Title: v.Title,
 		Summary: v.Summary, Action: v.Action, Reason: v.Reason, Detail: v.Detail, Options: v.Options,
-		DocumentURL: v.DocumentURL, CreatedAt: v.CreatedAt.Unix(), Resolution: v.Resolution, Withdrawn: v.Withdrawn, Version: v.Version}
+		DocumentURL: v.DocumentURL, Command: v.Command, CreatedAt: v.CreatedAt.Unix(), Resolution: v.Resolution, Withdrawn: v.Withdrawn, Version: v.Version}
 	if out.Options == nil {
 		out.Options = []work.HumanInterventionOption{}
 	}

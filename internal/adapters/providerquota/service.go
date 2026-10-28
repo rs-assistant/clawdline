@@ -57,6 +57,12 @@ type Service struct {
 	slots    [CacheLimit]slot
 	readFile func(string) ([]byte, error)
 	getenv   func(string) string
+	// Remote says whether Gemini and Grok are asked at all. Asking them
+	// means reading their CLI credential files and sending those tokens to
+	// Google and xAI, so it is off unless this machine's settings turn it on
+	// (`provider_quota_remote`); nil is off. Off, their rows are not shown
+	// and nothing is read or sent; Claude and Codex come from local files.
+	Remote func() bool
 }
 
 func New(home string, local *limits.Reader) *Service {
@@ -97,6 +103,9 @@ func (s *Service) Snapshot(now time.Time) Snapshot {
 			}
 			out.Providers = append(out.Providers, row)
 		}
+	}
+	if s.Remote == nil || !s.Remote() {
+		return out
 	}
 	for i, p := range []struct{ id, label string }{{"gemini", "Gemini"}, {"grok", "Grok"}} {
 		cred, problem := s.credentials(p.id, now)

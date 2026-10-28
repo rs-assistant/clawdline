@@ -238,10 +238,15 @@ func TestACarrierClosesOnlyWhenItsDeviceIsDenied(t *testing.T) {
 	if _, err := file.Set(map[string]any{adaptercloud.KeyEnabled: true, adaptercloud.KeyCommands: true}); err != nil {
 		t.Fatal(err)
 	}
-	// Cloud on, commands on, the device's key authenticated, and no roster to
-	// ask: unverified, not denied.
+	// Cloud on, commands on, the device paired here and its key authenticated,
+	// and no roster to ask: unverified, not denied.
 	f.l.file = file
 	f.l.settings = adaptercloud.Settings{Enabled: true, TerminalDirect: true}
+	f.l.pinned = adaptercloud.NewPinnedStore(t.TempDir())
+	if err := f.l.pinned.Pin("account", adaptercloud.PinnedDevice{DeviceID: "viewer",
+		PublicKey: base64.StdEncoding.EncodeToString(f.viewer.PublicKey())}); err != nil {
+		t.Fatal(err)
+	}
 	f.l.terminalMu.Lock()
 	f.l.terminalAuthenticated = map[string]ed25519.PublicKey{"viewer": f.viewer.PublicKey()}
 	f.l.terminalMu.Unlock()
@@ -430,7 +435,9 @@ func TestCarrierReportsMissingPairingWithoutDisclosingContent(t *testing.T) {
 	}
 }
 
-// A roster-backed viewer has the same read authority on either transport.
+// A viewer only the roster names reads nothing over the carrier either: this
+// fork admits only browsers this machine paired. Pinned, it reads; revoked, it
+// is refused again, whatever the roster says.
 func TestCarrierReadsForLegacyViewerAndStillRejectsRevocation(t *testing.T) {
 	f := newDirectFixture(t)
 	b, _, _ := f.carrier(t)
@@ -445,15 +452,22 @@ func TestCarrierReadsForLegacyViewerAndStillRejectsRevocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.l.contentEpoch = epoch
+	if err := f.l.sendCarrierEnvelope("viewer", "t/machine/session", domaincloud.ClassStream, []byte(`{"private":"must not leave"}`)); err == nil {
+		t.Fatal("a viewer only the roster names was sent content")
+	}
+	// What the refusal sends is a read error, never the content.
+	if refusal := b.next(t); refusal.T == "env" {
+		t.Fatalf("an unpinned viewer received an envelope: %+v", refusal)
+	}
+	if err := f.l.pinned.Pin("account", adaptercloud.PinnedDevice{DeviceID: "viewer", PublicKey: base64.StdEncoding.EncodeToString(f.viewer.PublicKey())}); err != nil {
+		t.Fatal(err)
+	}
 	if err := f.l.sendCarrierEnvelope("viewer", "t/machine/session", domaincloud.ClassStream, []byte(`{"read":"transcript","body":{"text":"synthetic"}}`)); err != nil {
-		t.Fatalf("legacy viewer's answer was dropped: %v", err)
+		t.Fatalf("the pinned viewer's answer was dropped: %v", err)
 	}
 	_, body := f.openMaster(t, b.next(t))
 	if body["read"] != "transcript" {
 		t.Fatalf("unexpected answer: %v", body)
-	}
-	if err := f.l.pinned.Pin("account", adaptercloud.PinnedDevice{DeviceID: "viewer", PublicKey: base64.StdEncoding.EncodeToString(f.viewer.PublicKey())}); err != nil {
-		t.Fatal(err)
 	}
 	if _, err := f.l.pinned.Revoke("viewer", time.Now()); err != nil {
 		t.Fatal(err)

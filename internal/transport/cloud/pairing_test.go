@@ -424,16 +424,29 @@ func TestRevokingIsLocalAndImmediate(t *testing.T) {
 	if _, err := h.pairing.Complete(context.Background(), h.viewer.offer.Fragment()); err != nil {
 		t.Fatalf("pairing: %v", err)
 	}
-	changed, err := h.pairing.Revoke(h.viewer.deviceID)
-	if err != nil || !changed {
-		t.Fatalf("revoking: %v %v", changed, err)
+	// The content-key revocation as the runtime wires it, reduced to what this
+	// test watches: the pin refusal and the epoch it moves.
+	epoch := uint64(1)
+	h.pairing.ContentState = func() (domaincloud.ContentKeyState, error) {
+		return domaincloud.ContentKeyState{Epoch: epoch}, nil
+	}
+	h.pairing.RevokeContent = func(device string) (bool, error) {
+		changed, err := h.pinned.Revoke(device, time.Now())
+		if err == nil && changed {
+			epoch++
+		}
+		return changed, err
+	}
+	outcome, err := h.pairing.Revoke(h.viewer.deviceID)
+	if err != nil || !outcome.Revoked || !outcome.SecretReplaced || epoch != 2 {
+		t.Fatalf("revoking: %+v %v (epoch %d)", outcome, err, epoch)
 	}
 	refused, err := h.pinned.Refused(h.viewer.deviceID)
 	if err != nil || !refused {
 		t.Fatalf("the revoked browser is not refused: %v %v", refused, err)
 	}
-	if changed, err := h.pairing.Revoke("dev_nobody"); err != nil || changed {
-		t.Fatalf("revoking an unknown device reported a change: %v %v", changed, err)
+	if outcome, err := h.pairing.Revoke("dev_nobody"); err != nil || outcome.Revoked || outcome.SecretReplaced || epoch != 2 {
+		t.Fatalf("revoking an unknown device reported a change: %+v %v", outcome, err)
 	}
 }
 
@@ -770,5 +783,38 @@ func TestASuccessfulRepairingRestoresARevokedBrowserAcrossRestart(t *testing.T) 
 				t.Fatalf("restored scope: %q %v", got, err)
 			}
 		})
+	}
+}
+
+// A revocation goes through the content-key path or not at all, and what it
+// answers is read from the key epoch, not guessed from the error.
+func TestARevocationThatCannotReplaceTheKeyIsNotASuccess(t *testing.T) {
+	h := newPairingHarness(t)
+	if _, err := h.pairing.Complete(context.Background(), h.viewer.offer.Fragment()); err != nil {
+		t.Fatalf("pairing: %v", err)
+	}
+	if _, err := h.pairing.Revoke(h.viewer.deviceID); !errors.Is(err, ErrPairingUnavailable) {
+		t.Fatalf("a pairing with no content-key revocation revoked anyway: %v", err)
+	}
+	if refused, _ := h.pinned.Refused(h.viewer.deviceID); refused {
+		t.Fatal("a revocation that could not replace the key wrote the refusal anyway")
+	}
+	epoch := uint64(1)
+	h.pairing.ContentState = func() (domaincloud.ContentKeyState, error) {
+		return domaincloud.ContentKeyState{Epoch: epoch}, nil
+	}
+	h.pairing.RevokeContent = func(string) (bool, error) { return true, errors.New("disk full") }
+	outcome, err := h.pairing.Revoke(h.viewer.deviceID)
+	if !errors.Is(err, ErrSecretNotReplaced) || !outcome.Revoked || outcome.SecretReplaced {
+		t.Fatalf("a revocation whose key did not move answered %+v %v", outcome, err)
+	}
+	h.pairing.RevokeContent = func(string) (bool, error) { epoch++; return true, errors.New("terminal grant") }
+	outcome, err = h.pairing.Revoke(h.viewer.deviceID)
+	if err == nil || errors.Is(err, ErrSecretNotReplaced) || !outcome.SecretReplaced {
+		t.Fatalf("a failure after the key moved answered %+v %v", outcome, err)
+	}
+	h.pairing.RevokeContent = func(string) (bool, error) { return false, nil }
+	if outcome, err = h.pairing.Revoke(h.viewer.deviceID); err != nil || outcome.Revoked || outcome.SecretReplaced {
+		t.Fatalf("a device with no live pin answered %+v %v", outcome, err)
 	}
 }

@@ -19,12 +19,17 @@ type HumanIntervention struct {
 	Detail             string
 	Options            []HumanInterventionOption
 	DocumentURL        string
-	CreatedAt          time.Time
-	ReadAt             *time.Time
-	ResolvedAt         *time.Time
-	Withdrawn          bool
-	Resolution         string
-	Version            int64
+	// Command is the exact argv a Secret Handoff Note declares will receive
+	// the value: an absolute executable followed by its arguments. It is not
+	// secret; the person reads it before handing off, and the daemon refuses
+	// a claim that presents any other argv. Every other kind leaves it empty.
+	Command    []string
+	CreatedAt  time.Time
+	ReadAt     *time.Time
+	ResolvedAt *time.Time
+	Withdrawn  bool
+	Resolution string
+	Version    int64
 }
 
 type HumanInterventionOption struct {

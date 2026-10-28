@@ -493,6 +493,25 @@ func (p *Pairing) deliver(ctx context.Context, offer domaincloud.PairingOffer, s
 	return state, nil
 }
 
+// RevokeOutcome is what a revocation did, as the revoke route answers it.
+type RevokeOutcome struct {
+	Device string `json:"device"`
+	// Revoked is whether a pin changed. False means there was no active pin
+	// for that device, so nothing was refused and no key was replaced.
+	Revoked bool `json:"revoked"`
+	// SecretReplaced says this machine's content key moved to a new epoch,
+	// so the revoked browser cannot open anything sealed from now on. The
+	// other browsers paired here fetch the new key (rekey_runtime.go); one
+	// paired before key epochs existed has to be paired again.
+	SecretReplaced bool `json:"secret_replaced"`
+}
+
+// ErrSecretNotReplaced is a revocation whose pin was written but whose content
+// key could not be replaced. The browser is refused as a sender; it may still
+// be able to read until the key is replaced, which is why this is an error
+// and not a success with a footnote.
+var ErrSecretNotReplaced = errors.New("the browser was revoked here, but this machine's content key could not be replaced, so it may still read what this machine sends")
+
 // Revoke throws a pinned viewer out of this machine.
 //
 // It is local and it is immediate. The control plane's own revocation needs a
@@ -500,23 +519,40 @@ func (p *Pairing) deliver(ctx context.Context, offer domaincloud.PairingOffer, s
 // revokes a device, this machine learns it at the next roster refresh. A
 // refusal written here stops that sender at its next envelope and keeps
 // stopping it whatever the roster later says.
-func (p *Pairing) Revoke(deviceID string) (bool, error) {
-	if p == nil || p.Pinned == nil {
-		return false, ErrPairingUnavailable
+//
+// **It also replaces the content key**, through the journaled content-key
+// revocation (RevokeContent, rekey_runtime.go): a pin refusal stops a browser
+// sending but not reading, and every browser paired here was handed the same
+// key. Without that path nothing is revoked, because a revocation that cannot
+// replace the key would claim more than it did. Whether the key moved is read
+// from the epoch before and after, not inferred from the error, so a failure
+// after the rotation (removing a terminal grant, completing the journal) is
+// reported as what it is.
+func (p *Pairing) Revoke(deviceID string) (RevokeOutcome, error) {
+	outcome := RevokeOutcome{Device: deviceID}
+	if p == nil || p.Pinned == nil || p.RevokeContent == nil || p.ContentState == nil {
+		return outcome, ErrPairingUnavailable
 	}
-	if p.RevokeContent != nil {
-		return p.RevokeContent(deviceID)
+	before, err := p.ContentState()
+	if err != nil {
+		return outcome, err
 	}
-	changed, err := p.Pinned.Revoke(deviceID, p.now())
-	if err == nil && changed {
-		p.logf("cloud: viewer %s is no longer allowed on this machine", deviceID)
-		if p.OnRevoke != nil {
-			if dropErr := p.OnRevoke(deviceID); dropErr != nil {
-				return true, fmt.Errorf("the viewer pin was revoked but its terminal grant could not be removed: %w", dropErr)
-			}
+	revoked, err := p.RevokeContent(deviceID)
+	outcome.Revoked = revoked
+	if !revoked {
+		return outcome, err
+	}
+	if after, stateErr := p.ContentState(); stateErr == nil && after.Epoch > before.Epoch {
+		outcome.SecretReplaced = true
+	}
+	if !outcome.SecretReplaced {
+		if err == nil {
+			err = errors.New("the content key epoch did not move")
 		}
+		return outcome, fmt.Errorf("%w: %v", ErrSecretNotReplaced, err)
 	}
-	return changed, err
+	p.logf("cloud: viewer %s is no longer allowed on this machine, and the content key was replaced", deviceID)
+	return outcome, err
 }
 
 func (p *Pairing) setPhase(phase string) {

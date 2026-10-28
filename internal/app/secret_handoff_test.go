@@ -65,3 +65,66 @@ func TestSecretHandoffLimitsAndReplacement(t *testing.T) {
 		t.Fatalf("overflow: %v", err)
 	}
 }
+
+func TestSecretHandoffCommitFailureDoesNotPublishOrReplaceValue(t *testing.T) {
+	h := NewSecretHandoffs()
+	failed := errors.New("commit failed")
+	for _, existing := range []bool{false, true} {
+		if existing {
+			if err := h.Put("note", "session", []byte("accepted fixture")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := h.PutAndCommit("note", "session", []byte("rejected fixture"), func() error { return failed }); !errors.Is(err, failed) {
+			t.Fatalf("commit failure: %v", err)
+		}
+		if h.Pending("note", "session") != existing {
+			t.Fatal("failed commit changed availability")
+		}
+		if existing {
+			value, err := h.Take("note", "session")
+			if err != nil || string(value) != "accepted fixture" {
+				t.Fatalf("accepted value replaced: %q %v", value, err)
+			}
+		}
+	}
+}
+
+func TestADiscardedSecretHandoffIsWipedAndCannotBeClaimed(t *testing.T) {
+	h := NewSecretHandoffs()
+	if err := h.Put("note", "session-a", []byte("credential fixture")); err != nil {
+		t.Fatal(err)
+	}
+	held := h.values["note"].value
+	if h.Discard("note", "session-b") || !h.Pending("note", "session-a") {
+		t.Fatal("another Session discarded the value")
+	}
+	if !h.Discard("note", "session-a") || h.Pending("note", "session-a") {
+		t.Fatal("the value still waits after a discard")
+	}
+	if strings.Trim(string(held), "\x00") != "" {
+		t.Fatal("the discarded value was not wiped")
+	}
+	if _, err := h.Take("note", "session-a"); !errors.Is(err, ErrSecretUnavailable) {
+		t.Fatalf("a discarded value was claimed: %v", err)
+	}
+	if err := h.Put("note", "session-a", []byte("handed off again")); err != nil {
+		t.Fatalf("the person cannot hand off again after a discard: %v", err)
+	}
+}
+
+func TestASecretHandoffCommandMatchesOnlyItself(t *testing.T) {
+	declared := []string{"/usr/bin/gh", "auth", "login", "--with-token"}
+	for _, presented := range [][]string{nil, {"/usr/bin/gh"}, {"/usr/bin/gh", "auth", "login", "--with-token", "x"},
+		{"/usr/local/bin/gh", "auth", "login", "--with-token"}, {"/usr/bin/gh", "auth", "login", "--with-token "}} {
+		if SameSecretHandoffCommand(declared, presented) {
+			t.Errorf("%q matched %q", presented, declared)
+		}
+	}
+	if SameSecretHandoffCommand(nil, nil) || SameSecretHandoffCommand([]string{}, []string{}) {
+		t.Error("a Note that declared nothing matched")
+	}
+	if !SameSecretHandoffCommand(declared, append([]string(nil), declared...)) {
+		t.Error("the declared command did not match itself")
+	}
+}

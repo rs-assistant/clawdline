@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,10 +17,13 @@ import (
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
 )
 
-// A pre-pin browser has the machine's content key and a verified account
-// identity. Reading a machine envelope and writing one must agree about its
-// pairing; a mere account login without that content key still cannot act.
-func TestLegacyViewerReadingMachineCanSendOnlyWithItsContentKey(t *testing.T) {
+// A browser the account's roster names, holding this machine's content key,
+// but never paired with this machine, is not admitted: the roster is the
+// operator's list and may take a device away, never supply one. Until
+// 2026-10-22 such a "pre-pin" browser was admitted on the roster's key, so
+// whoever could add a roster row and held an old copy of the content key could
+// send commands here.
+func TestARosterKeyAloneNeverAdmitsASender(t *testing.T) {
 	viewer, err := domaincloud.NewDeviceKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -32,15 +36,23 @@ func TestLegacyViewerReadingMachineCanSendOnlyWithItsContentKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherSecret, err := domaincloud.NewContentKey(rand.Reader)
+	stranger, err := domaincloud.NewDeviceKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
+	var mu sync.Mutex
 	row := adaptercloud.RosterDevice{ID: "viewer", PublicKey: base64.StdEncoding.EncodeToString(viewer.PublicKey())}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
 		_ = json.NewEncoder(w).Encode(map[string]any{"devices": []adaptercloud.RosterDevice{row}})
 	}))
 	defer server.Close()
+	setRow := func(change func(*adaptercloud.RosterDevice)) {
+		mu.Lock()
+		change(&row)
+		mu.Unlock()
+	}
 	dir := t.TempDir()
 	file := nextconfig.Open(dir)
 	if _, err := file.Set(map[string]any{adaptercloud.KeyEnabled: true, adaptercloud.KeyCommands: true}); err != nil {
@@ -50,7 +62,7 @@ func TestLegacyViewerReadingMachineCanSendOnlyWithItsContentKey(t *testing.T) {
 		pinned:           adaptercloud.NewPinnedStore(t.TempDir()),
 		roster:           adaptercloud.NewRoster(server.URL, "credential", time.Now),
 		identity:         adaptercloud.Identity{MachineID: "machine"},
-		terminalRequests: make(chan Inbound, 2), terminalRefusals: make(chan Inbound, 2)}
+		terminalRequests: make(chan Inbound, 8), terminalRefusals: make(chan Inbound, 8)}
 	if err := l.roster.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -69,12 +81,12 @@ func TestLegacyViewerReadingMachineCanSendOnlyWithItsContentKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	seal := func(seq uint64, key domaincloud.ContentKey) []byte {
+	seal := func(seq uint64, signer domaincloud.DeviceKey) []byte {
 		t.Helper()
 		env, err := domaincloud.Seal([]byte(`{"type":"send","session":"%1","text":"hello"}`),
 			domaincloud.SealParams{Ch: "termi/machine/viewer", Seq: seq, Ts: uint64(time.Now().UnixMilli()),
 				Class: domaincloud.ClassCtl, KeyID: adaptercloud.MasterKeyID,
-				Sender: "viewer", Key: key, Signer: viewer})
+				Sender: "viewer", Key: secret, Signer: signer})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -84,35 +96,75 @@ func TestLegacyViewerReadingMachineCanSendOnlyWithItsContentKey(t *testing.T) {
 		}
 		return raw
 	}
-	if !transport.AcceptDirect("viewer", seal(1, secret)) {
-		t.Fatal("legacy viewer's authenticated machine envelope was refused")
+
+	// Roster row, content key, valid signature — and no pin.
+	if transport.AcceptDirect("viewer", seal(1, viewer)) || opened != 0 {
+		t.Fatal("a sender only the roster names was admitted on the roster's key")
 	}
-	a := l.authority(context.Background(), "viewer", viewer.PublicKey(), true)
-	if opened != 1 || !a.RosterAllowsSender || !a.WriteGateAllows {
-		t.Fatal("a readable legacy pairing did not grant command authority")
+	if a := l.authority(context.Background(), "viewer", viewer.PublicKey(), true); a.RosterAllowsSender || a.WriteGateAllows {
+		t.Fatal("a sender only the roster names was granted command authority")
 	}
-	if l.authority(context.Background(), "viewer", nil, true).RosterAllowsSender {
-		t.Fatal("account membership without an envelope's verified key granted a command")
+	if a := l.authority(context.Background(), "viewer", viewer.PublicKey(), false); a.RosterAllowsSender {
+		t.Fatal("a sender only the roster names was granted read authority")
 	}
-	if !l.TerminalViewerAllowed("viewer") {
-		t.Fatal("the decrypted legacy terminal envelope did not grant terminal authority")
+	if l.TerminalViewerAllowed("viewer") {
+		t.Fatal("a sender only the roster names was granted terminal authority")
 	}
-	if transport.AcceptDirect("viewer", seal(2, otherSecret)) || opened != 1 {
-		t.Fatal("account login without this machine's content key reached its commands")
-	}
-	if _, err := file.Set(map[string]any{adaptercloud.KeyCommands: false}); err != nil {
+
+	// Paired here: the pin admits, and the roster still agrees.
+	if err := l.pinned.Pin("account", adaptercloud.PinnedDevice{DeviceID: "viewer", PublicKey: row.PublicKey}); err != nil {
 		t.Fatal(err)
 	}
-	if l.authority(context.Background(), "viewer", viewer.PublicKey(), true).WriteGateAllows {
-		t.Fatal("the per-machine command switch was ignored")
+	if !transport.AcceptDirect("viewer", seal(2, viewer)) || opened != 1 {
+		t.Fatal("a pinned sender's envelope was refused")
 	}
-	if err := l.pinned.Pin("account", adaptercloud.PinnedDevice{DeviceID: "viewer", PublicKey: row.PublicKey}); err != nil {
+	if a := l.authority(context.Background(), "viewer", viewer.PublicKey(), true); !a.RosterAllowsSender || !a.WriteGateAllows {
+		t.Fatalf("a pinned sender was not granted command authority: %+v", a)
+	}
+	if !l.TerminalViewerAllowed("viewer") {
+		t.Fatal("a pinned sender was not granted terminal authority")
+	}
+	if l.authority(context.Background(), "viewer", stranger.PublicKey(), false).RosterAllowsSender {
+		t.Fatal("authority was granted for a key that is not the pin")
+	}
+
+	// The roster naming another key for the pinned device is a disagreement,
+	// and it denies; it does not become the key this machine verifies with.
+	setRow(func(r *adaptercloud.RosterDevice) {
+		r.PublicKey = base64.StdEncoding.EncodeToString(stranger.PublicKey())
+	})
+	if err := l.roster.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if transport.AcceptDirect("viewer", seal(3, stranger)) {
+		t.Fatal("a key the roster substituted verified an envelope")
+	}
+	if l.authority(context.Background(), "viewer", viewer.PublicKey(), true).RosterAllowsSender {
+		t.Fatal("a roster that names another key still granted command authority")
+	}
+
+	// The roster may take a pinned device away.
+	revokedAt := time.Now().UTC().Format(time.RFC3339)
+	setRow(func(r *adaptercloud.RosterDevice) {
+		r.PublicKey = base64.StdEncoding.EncodeToString(viewer.PublicKey())
+		r.RevokedAt = &revokedAt
+	})
+	if err := l.roster.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if l.authority(context.Background(), "viewer", viewer.PublicKey(), false).RosterAllowsSender {
+		t.Fatal("the account's revocation did not deny a pinned device")
+	}
+
+	// And a local revocation beats everything.
+	setRow(func(r *adaptercloud.RosterDevice) { r.RevokedAt = nil })
+	if err := l.roster.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if changed, err := l.pinned.Revoke("viewer", time.Now()); err != nil || !changed {
 		t.Fatalf("revoke: changed=%v error=%v", changed, err)
 	}
-	if transport.AcceptDirect("viewer", seal(3, secret)) || l.authority(context.Background(), "viewer", viewer.PublicKey(), true).RosterAllowsSender {
+	if transport.AcceptDirect("viewer", seal(4, viewer)) || l.authority(context.Background(), "viewer", viewer.PublicKey(), true).RosterAllowsSender {
 		t.Fatal("local revocation did not beat the account roster and machine key")
 	}
 }

@@ -87,7 +87,11 @@ manifest and can install them itself. The manifest, its signatures and the versi
 The daemon reads `<base>/manifest.json` and `<base>/manifest.sig.json` when it starts and again
 every 6 hours plus up to 30 minutes of random jitter, each read within 30 s. The manifest is
 accepted only when a release key compiled into the binary signed it (`release.Open`); anything
-else is reported in `error` and never followed. The base is:
+else is reported in `error` and never followed. A signed manifest never expires by itself, so the
+check also requires its signed `committed_at` to be at most 180 days old
+(`release.manifest_age_seconds`): an older one, or one without `committed_at`, is refused as
+`manifest_stale`, because it may be an old release served in place of the real newest one. The
+state is then `unknown`, and a held answer that has itself aged past the bound is dropped. The base is:
 
 - `CLAWDLINE_NEXT_RELEASE_URL` when set (a local release server; a named version is read from the
   sibling path whose last segment is the version);
@@ -134,7 +138,10 @@ The update runs in these steps; `apply.state` names the one it is in:
 1. **Refusals**, answered at once: the daemon must be a release install running as a service, no
    update may be pending or holding `update.lock`, and the release must be newer than the running
    one (or `--force` with `--version`), at least its `min_version`, and carry this OS and
-   architecture.
+   architecture. An older release is installed only when the person names it and asks for it
+   (`--version vX --force`); nothing else downgrades. Without `--version`, and for auto-apply,
+   the manifest must also pass the 180-day `committed_at` bound above; a release named with
+   `--version` is installed whatever its age.
 2. **`downloading`** into `<root>/staging`, at most 512 MiB and 15 minutes.
 3. **`verifying`**: size and sha256 against the signed manifest, then a safe unpack into
    `releases/<version>` (no absolute paths, no `..`, no link leaving the release, no hard links or
@@ -188,6 +195,7 @@ A failure before step 5 changes nothing the running daemon uses and is recorded 
 | `not_installed_as_service` | the daemon was not installed as a service, so `<state>/service.json` is missing |
 | `already_current` / `version_not_newer` | nothing newer to install (use `--version … --force`) |
 | `version_below_min` | the release needs a newer running version first |
+| `manifest_stale` | the newest manifest's signed `committed_at` is missing or more than 180 days old; name a version to install it anyway |
 | `version_failed_before` | auto-apply skips a version that rolled back |
 | `no_release_published` | the release host has no manifest |
 | `release_unreachable` | the release host could not be read |
@@ -319,7 +327,11 @@ On a release install with `update_available`, the session list also shows a per-
 Its **Update now** button rechecks the signed release source, starts the update directly, and shows
 progress and the final result in the same place. A withdrawn release or an unavailable source
 cannot be installed from an old banner. Dismissing the banner is remembered per version in that
-browser. Settings retains the full version check, release notes, and update controls.
+browser. A newer available release replaces the previous update's completion message and exposes
+its install action immediately, without first dismissing that message. Dismissing the newer
+offer does not bring the older completion back; a later release can still appear. Closing a
+result remembers only the result being shown, not a newer offer hidden behind it. Settings
+retains the full version check, release notes, update history, and update controls.
 
 A running dev build keeps a banner visible on both the machine's console and the Cloud
 **All machines** list, including Linux source deployments and source checkouts. It shows
@@ -388,8 +400,8 @@ which release this machine should run.
 
 - **Latest** is the `BUILD.json` the hosted console serves: `<DefaultAppOrigin>/BUILD.json`, where
   `DefaultAppOrigin` is `https://app.clawdline.com` (`internal/adapters/cloud/settings.go`). Set
-  `CLAWDLINE_NEXT_UPDATE_URL` to ask another `BUILD.json`; set `CLAWDLINE_NEXT_UPDATE_CHECK=off`
-  to turn the check off.
+  `CLAWDLINE_NEXT_UPDATE_URL` to ask another `BUILD.json`. On the `rs-assistant/clawdline` fork
+  the check is off unless `CLAWDLINE_NEXT_UPDATE_CHECK=on`; upstream turns it off with `=off`.
 - **Running** is the `BUILD.json` in the web dist this daemon serves (`CLAWDLINE_NEXT_WEB`). When
   there is none, it is the binary's own full `vcs.revision`, with no commit time.
 

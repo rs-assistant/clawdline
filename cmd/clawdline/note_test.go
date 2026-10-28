@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -131,5 +133,37 @@ func TestNoteCreateMarksOnlyExplicitlyRequestedNotes(t *testing.T) {
 	}
 	if code := createNote(&out, &errs, b, "target", "source", []byte(`{"requested_by_person":true}`), "note-three", false, func(string) string { return "" }); code != 2 {
 		t.Fatalf("body spoofed request marker: code=%d", code)
+	}
+}
+
+// A Secret Handoff Note names its receiving command by the path PATH finds in
+// the Agent's environment, so the person reads which file will run.
+func TestNoteCreateNamesTheSecretCommandByItsPath(t *testing.T) {
+	dir := t.TempDir()
+	tool := executableIn(t, dir, "credential-tool", filepath.Join(dir, "ran"))
+	t.Setenv("PATH", dir)
+	var sent []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Command []string `json:"command"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		sent = body.Command
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"ok":true,"note":{"id":"note-id"}}`))
+	}))
+	defer server.Close()
+	b := &broker{base: server.URL, token: "machine-secret", client: server.Client()}
+	var out, errs bytes.Buffer
+	code := createNote(&out, &errs, b, "target-terminal", "root-conversation",
+		[]byte(`{"kind":"secret","title":"Key","command":["credential-tool","--with-token"]}`), "k", false, func(string) string { return "" })
+	if code != 0 || !slices.Equal(sent, []string{tool, "--with-token"}) {
+		t.Fatalf("note create: code %d, sent %q, errors %q", code, sent, errs.String())
+	}
+	sent = nil
+	code = createNote(&out, &errs, b, "target-terminal", "root-conversation",
+		[]byte(`{"kind":"secret","title":"Key","command":["no-such-tool-anywhere"]}`), "k2", false, func(string) string { return "" })
+	if code != 2 || sent != nil || !strings.Contains(errs.String(), "no-such-tool-anywhere") {
+		t.Fatalf("an unknown command was sent: code %d, sent %q, errors %q", code, sent, errs.String())
 	}
 }

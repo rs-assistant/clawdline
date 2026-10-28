@@ -20,6 +20,17 @@ func releaseBounds() []Entry {
 			Sources: []string{"internal/adapters/release.maxSignatureBytes"},
 		},
 		{
+			// The age of the signed manifest that answers "is there something
+			// newer" (the release check, an update with no --version, auto-apply,
+			// install.sh with no --version), by its signed committed_at. Past it
+			// the manifest is refused as manifest_stale and the check says it does
+			// not know; a release named by version is installed whatever its age.
+			Name: ReleaseManifestAge, Class: Observation, Unit: Seconds,
+			Limit: 180 * 24 * 3600, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/release.maxManifestAgeSeconds"},
+		},
+		{
 			// The signed manifest of a release install's channel, as the release
 			// check last read it. At this age (plus up to the jitter) it is read
 			// again; the old answer is replaced only by a good new one, or dropped

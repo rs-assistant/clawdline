@@ -1893,6 +1893,27 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.lane_refusals",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudLaneRefusalsLimit",
+      "internal/transport/cloud.(*Link).runService:chan(refusalDepth)"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.peer_body_bytes",
     "Class": "buffer",
     "Unit": "bytes",
@@ -2088,6 +2109,28 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.read_queue",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudReadQueueLimit",
+      "internal/transport/cloud.(*Link).runService:chan(readDepth)"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.rekey_body",
     "Class": "buffer",
     "Unit": "bytes",
@@ -2209,6 +2252,65 @@
     "QuietRecovery": false,
     "Sources": [
       "cmd/clawdline.startCloudLine.maxCloudReloadStopSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.replay_journal_bytes",
+    "Class": "idempotency",
+    "Unit": "bytes",
+    "Limit": 8388608,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.ReplayJournalBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.replay_journal_rows",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.ReplayJournalRowsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.replay_journal_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 600,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.ReplayJournalSecondsLimit"
     ]
   },
   {
@@ -4374,6 +4476,46 @@
   },
   {
     "Register": "daemon",
+    "Name": "devices.open_code_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 300,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaxOpenCodeSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "devices.open_codes_pending",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaxOpenCodesPending"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "diagnostics.route_latency_samples",
     "Class": "observation",
     "Unit": "rows",
@@ -6034,6 +6176,25 @@
   },
   {
     "Register": "daemon",
+    "Name": "release.manifest_age_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 15552000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release.maxManifestAgeSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "release.manifest_bytes",
     "Class": "buffer",
     "Unit": "bytes",
@@ -6663,6 +6824,46 @@
     "QuietRecovery": false,
     "Sources": [
       "internal/app.MaxSecretHandoffBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.secret_handoff_command_args",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.MaxSecretHandoffCommandArgs"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.secret_handoff_command_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 2048,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.MaxSecretHandoffCommandBytes"
     ]
   },
   {

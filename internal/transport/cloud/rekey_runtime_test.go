@@ -30,7 +30,7 @@ func TestRuntimeWireIsOptInAndPairingUsesDurableState(t *testing.T) {
 				t.Fatal(err)
 			}
 			pins := adaptercloud.NewPinnedStore(keys.Dir())
-			l := &Link{keys: keys, pinned: pins, pairing: &Pairing{Pinned: pins}, identityPairing: &IdentityPairing{}, identity: adaptercloud.Identity{AccountID: "account", MachineID: "machine", MachineCredential: "synthetic"}, settings: adaptercloud.Settings{RelayURL: "ws://127.0.0.1:9/v1/connect"}, opts: LinkOptions{ContentKeyRuntime: enabled, Now: time.Now}}
+			l := &Link{keys: keys, pinned: pins, pairing: &Pairing{Pinned: pins}, replay: domaincloud.NewReplayWindow(0), identityPairing: &IdentityPairing{}, identity: adaptercloud.Identity{AccountID: "account", MachineID: "machine", MachineCredential: "synthetic"}, settings: adaptercloud.Settings{RelayURL: "ws://127.0.0.1:9/v1/connect"}, opts: LinkOptions{ContentKeyRuntime: enabled, Now: time.Now}}
 			if err := l.wire(); err != nil {
 				t.Fatal(err)
 			}

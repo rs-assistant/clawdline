@@ -276,6 +276,9 @@ func (b *Broker) admit(id string, d draft, scheduled, detached bool) (Record, er
 	if isolation != IsolationNone && isolation != IsolationWorktree {
 		return bad("isolation must be one of: none, worktree")
 	}
+	// No mode named is this machine's `orchestrator_permission`, and an unset
+	// one is `ask` (nextconfig DispatchPermission): `full` is bypassPermissions
+	// / --ask-for-approval never, which somebody has to choose by name.
 	permission := d.PermissionMode
 	if permission == "" {
 		values, err := nextconfig.Open(b.Dir).Read()

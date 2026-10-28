@@ -53,7 +53,9 @@ func TestRevocationDuringPinnedTranscriptReadDropsContent(t *testing.T) {
 	a := b.Handle(context.Background(), request(t, ClassCtl, map[string]any{
 		"type": "transcript", "session": pane, "limit": 100, "expected_generation": pinnedGeneration,
 	}))
-	if a.Status != 403 || a.Code != "unknown_sender" || checks != 1 || len(r.seen) != 1 {
+	// Two checks: before the read is answered at all, and again after the
+	// local read, before its content is sealed.
+	if a.Status != 403 || a.Code != "unknown_sender" || checks != 2 || len(r.seen) != 1 {
 		t.Fatalf("revocation after local read: %+v checks=%d routes=%+v", a, checks, r.seen)
 	}
 	if string(a.Payload) == `{"private":"text"}` {

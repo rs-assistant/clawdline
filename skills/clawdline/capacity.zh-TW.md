@@ -101,6 +101,7 @@
 | `cloud.identity_pairing_decision_bytes` | 1024 | `bytes` | `refuse` | `diagnostics` | — |
 | `cloud.identity_pairing_poll_attempts` | 600 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.identity_pairing_run_seconds` | 660 | `seconds` | `disconnect` | `diagnostics` | — |
+| `cloud.lane_refusals` | 16 | `rows` | `refuse` | `diagnostics, log` | — |
 | `cloud.peer_body_bytes` | 524288 | `bytes` | `refuse` | `diagnostics, notice, sender` | — |
 | `cloud.peer_discovery_reply` | 1 | `rows` | `refuse` | `sender, diagnostics` | — |
 | `cloud.peer_frame_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics, log, sender` | — |
@@ -110,12 +111,16 @@
 | `cloud.peer_ingress` | 16 | `rows` | `refuse` | `diagnostics, log, sender` | — |
 | `cloud.peer_outbox` | 512 | `rows` | `refuse` | `diagnostics, notice, health` | — |
 | `cloud.peer_pairs` | 128 | `rows` | `refuse` | `diagnostics, notice, health` | — |
+| `cloud.read_queue` | 64 | `rows` | `refuse` | `diagnostics, log, sender` | — |
 | `cloud.rekey_body` | 4096 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `cloud.rekey_interval` | 2 | `seconds` | `refuse` | `diagnostics, sender` | — |
 | `cloud.rekey_lifetime` | 120 | `seconds` | `expire` | `diagnostics, sender` | — |
 | `cloud.rekey_pending` | 8 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `cloud.relay_queue` | 64 | `rows` | `refuse` | `diagnostics, notice, cloud_status, log, sender` | — |
 | `cloud.reload_stop_seconds` | 15 | `seconds` | `refuse` | `diagnostics, sender, log` | — |
+| `cloud.replay_journal_bytes` | 8388608 | `bytes` | `refuse` | `diagnostics, log` | — |
+| `cloud.replay_journal_rows` | 65536 | `rows` | `refuse` | `diagnostics, log` | — |
+| `cloud.replay_journal_seconds` | 600 | `seconds` | `expire` | `diagnostics` | — |
 | `cloud.roster_short_read_attempts` | 2 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `cloud.session_row_asks` | 64 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `cloud.session_row_id_bytes` | 256 | `bytes` | `refuse` | `diagnostics, sender` | — |
@@ -234,6 +239,8 @@
 | `decisions.open` | 256 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `deploy.health_seconds` | 30 | `seconds` | `refuse` | `diagnostics` | — |
 | `devices.list` | 512 | `rows` | `refuse` | `diagnostics, notice, health` | — |
+| `devices.open_code_seconds` | 300 | `seconds` | `expire` | `diagnostics, sender` | — |
+| `devices.open_codes_pending` | 16 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `diagnostics.route_latency_samples` | 256 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `diagnostics.route_stat_keys` | 512 | `rows` | `coalesce` | `diagnostics` | — |
 | `dispatch.also_work_ids` | 7 | `rows` | `refuse` | `diagnostics, sender` | — |
@@ -318,6 +325,7 @@
 | `release.health_wait_seconds` | 60 | `seconds` | `refuse` | `diagnostics` | — |
 | `release.list_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics` | — |
 | `release.lock_stale_seconds` | 1800 | `seconds` | `expire` | `diagnostics` | — |
+| `release.manifest_age_seconds` | 15552000 | `seconds` | `evict_oldest` | `diagnostics` | — |
 | `release.manifest_bytes` | 65536 | `bytes` | `refuse` | `diagnostics` | — |
 | `release.pending_deadline_seconds` | 600 | `seconds` | `refuse` | `diagnostics` | — |
 | `release.previous_releases_kept` | 2 | `rows` | `evict_oldest` | `diagnostics` | — |
@@ -350,6 +358,8 @@
 | `session.report_open_todo_characters` | 120 | `characters` | `refuse` | `diagnostics, sender` | — |
 | `session.report_open_todo_rows` | 20 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `session.secret_handoff_bytes` | 16384 | `bytes` | `refuse` | `diagnostics, sender` | — |
+| `session.secret_handoff_command_args` | 32 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `session.secret_handoff_command_bytes` | 2048 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `session.secret_handoff_delivery_seconds` | 5 | `seconds` | `refuse` | `diagnostics, sender` | — |
 | `session.secret_handoff_pending` | 128 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `session.secret_handoff_seconds` | 900 | `seconds` | `expire` | `diagnostics, sender` | — |

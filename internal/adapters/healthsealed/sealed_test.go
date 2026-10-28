@@ -399,7 +399,7 @@ func newUploader(t *testing.T, srv *httptest.Server, keys KeySource, enabled *at
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Uploader{Endpoint: srv.URL, Client: srv.Client(), Enabled: enabled.Load, Keys: keys, Store: store,
+	return &Uploader{Endpoint: srv.URL, AllowLoopbackHTTP: true, Client: srv.Client(), Enabled: enabled.Load, Keys: keys, Store: store,
 		Now:   func() time.Time { return time.UnixMilli(1787745600000) },
 		Sleep: func(context.Context, time.Duration) error { return nil }}
 }

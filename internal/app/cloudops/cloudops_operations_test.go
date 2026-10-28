@@ -43,6 +43,25 @@ func TestSecretHandoffCloudActionCarriesValueOnlyToTheLocalRoute(t *testing.T) {
 	}
 }
 
+// The hosted console confirms the receiving command it showed in the same
+// item; Cloud carries it whole to the local route, which compares it with the
+// Note's (internal/transport/http/secret_handoff.go).
+func TestSecretHandoffCloudActionCarriesTheShownCommand(t *testing.T) {
+	r := &router{}
+	answer := open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "work.v2.human-intervention-action", "session": MachineReplySession, "request": "req-secret-handoff-command",
+		"terminal": "conversation:10000000-0000-4000-8000-000000000002",
+		"id":       "10000000-0000-4000-8000-000000000003", "action": "handoff",
+		"item": map[string]any{"value": "SAFE_FIXTURE", "command": []string{"/usr/bin/gh", "auth", "login", "--with-token"}},
+	}))
+	if answer.Status != 200 || len(r.seen) != 1 {
+		t.Fatalf("handoff answer: %+v; routes: %+v", answer, r.seen)
+	}
+	if got := string(r.last().Body); got != `{"command":["/usr/bin/gh","auth","login","--with-token"],"value":"SAFE_FIXTURE"}` {
+		t.Fatalf("handoff local body: %s", got)
+	}
+}
+
 // TestAMovedHookBindCarriesItsRevision: a moved hook is bound on the target
 // at the revision the move answered, so `hook_revision` reaches the local route
 // as the integer it was; a body without it is the plain bind, unchanged.

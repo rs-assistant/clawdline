@@ -33,7 +33,8 @@ func TestWorkflowSettingsDefaultsAndIndependentPersistentSwitches(t *testing.T) 
 		return got
 	}
 	got := call("GET", "")
-	if !got.DispatchFullPermission || !got.SessionAutoDiscovery {
+	// This fork's machine default is ask (nextconfig DispatchPermission).
+	if got.DispatchFullPermission || !got.SessionAutoDiscovery {
 		t.Fatalf("defaults: %+v", got)
 	}
 	if got.ItermIntegration == nil || *got.ItermIntegration {
@@ -41,7 +42,7 @@ func TestWorkflowSettingsDefaultsAndIndependentPersistentSwitches(t *testing.T) 
 	}
 	for _, on := range []bool{true, false} {
 		got = call("POST", fmt.Sprintf(`{"iterm_integration":%t}`, on))
-		if got.ItermIntegration == nil || *got.ItermIntegration != on || terminal.ITermIntegration() != on || !got.DispatchFullPermission || !got.SessionAutoDiscovery {
+		if got.ItermIntegration == nil || *got.ItermIntegration != on || terminal.ITermIntegration() != on || got.DispatchFullPermission || !got.SessionAutoDiscovery {
 			t.Fatalf("workflow consent did not take effect independently: %+v", got)
 		}
 		if got = call("GET", ""); got.ItermIntegration == nil || *got.ItermIntegration != on {

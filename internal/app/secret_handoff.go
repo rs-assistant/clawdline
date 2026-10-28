@@ -2,8 +2,12 @@ package app
 
 import (
 	"errors"
+	"path/filepath"
+	"slices"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Secret Handoff keeps a person's value outside the store, Note, transcript,
@@ -13,6 +17,11 @@ const (
 	MaxSecretHandoffPending         = 128
 	MaxSecretHandoffSeconds         = 15 * 60
 	MaxSecretHandoffDeliverySeconds = 5
+	// The receiving command a Secret Handoff Note declares: at most this many
+	// argv entries, and at most this many bytes across all of them. It is
+	// shown whole to the person, so it stays short enough to read.
+	MaxSecretHandoffCommandArgs  = 32
+	MaxSecretHandoffCommandBytes = 2 << 10
 )
 
 var (
@@ -21,6 +30,48 @@ var (
 	ErrSecretFull        = errors.New("secret_handoffs_full")
 	ErrSecretUnavailable = errors.New("secret_unavailable")
 )
+
+// ValidateSecretHandoffCommand checks the argv a Secret Handoff Note declares
+// will receive the value. The person reads it before handing off, so it must
+// say plainly which program runs: argv[0] is an absolute, already-clean path
+// (the CLI resolves a bare name with exec.LookPath in the Agent's own
+// environment before it creates the Note), and no entry may hold a control or
+// invisible formatting character that could make the shown command read as
+// something other than what runs.
+func ValidateSecretHandoffCommand(argv []string) error {
+	if len(argv) == 0 {
+		return humanInterventionError("secret_command_required", "A Secret Handoff Note must name the exact command that will receive the value.")
+	}
+	if len(argv) > MaxSecretHandoffCommandArgs {
+		return humanInterventionError("secret_command_too_large", "The receiving command has too many arguments.")
+	}
+	total := 0
+	for _, arg := range argv {
+		total += len(arg)
+		if !utf8.ValidString(arg) {
+			return humanInterventionError("secret_command_invalid", "The receiving command must be valid text without control or invisible characters.")
+		}
+		for _, r := range arg {
+			if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+				return humanInterventionError("secret_command_invalid", "The receiving command must be valid text without control or invisible characters.")
+			}
+		}
+	}
+	if total > MaxSecretHandoffCommandBytes {
+		return humanInterventionError("secret_command_too_large", "The receiving command is too long.")
+	}
+	if !filepath.IsAbs(argv[0]) || filepath.Clean(argv[0]) != argv[0] {
+		return humanInterventionError("secret_command_not_absolute", "The receiving command must start with the absolute path of its executable.")
+	}
+	return nil
+}
+
+// SameSecretHandoffCommand is the claim's comparison: the whole argv, entry
+// by entry, byte for byte. A Note that declared nothing (one written before
+// commands were declared) matches nothing.
+func SameSecretHandoffCommand(declared, presented []string) bool {
+	return len(declared) > 0 && slices.Equal(declared, presented)
+}
 
 type secretHandoffValue struct {
 	conversation string
@@ -57,6 +108,13 @@ func (h *SecretHandoffs) expire(now time.Time) {
 // Put replaces an unclaimed value. The caller has checked that the Note is an
 // open Secret Handoff addressed to conversation. No value is returned.
 func (h *SecretHandoffs) Put(id, conversation string, value []byte) error {
+	return h.PutAndCommit(id, conversation, value, nil)
+}
+
+// PutAndCommit publishes a value only after commit succeeds. The callback runs
+// under the handoff lock so a competing submission or claim cannot replace or
+// consume a value before its Note and receipt are committed. It must not call h.
+func (h *SecretHandoffs) PutAndCommit(id, conversation string, value []byte, commit func() error) error {
 	if len(value) == 0 {
 		return ErrSecretEmpty
 	}
@@ -71,6 +129,11 @@ func (h *SecretHandoffs) Put(id, conversation string, value []byte) error {
 	}
 	if _, exists := h.values[id]; !exists && len(h.values) >= MaxSecretHandoffPending {
 		return ErrSecretFull
+	}
+	if commit != nil {
+		if err := commit(); err != nil {
+			return err
+		}
 	}
 	if old, exists := h.values[id]; exists {
 		wipeSecret(old.value)
@@ -107,6 +170,22 @@ func (h *SecretHandoffs) Take(id, conversation string) ([]byte, error) {
 	delete(h.values, id)
 	h.claimed[id] = true
 	return entry.value, nil
+}
+
+// Discard wipes an unclaimed value without handing it to anyone. It is used
+// when the target Session asks for the value with a command other than the
+// one the person saw. It reports whether a value was waiting.
+func (h *SecretHandoffs) Discard(id, conversation string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.expire(h.Now())
+	entry, exists := h.values[id]
+	if !exists || entry.conversation != conversation {
+		return false
+	}
+	wipeSecret(entry.value)
+	delete(h.values, id)
+	return true
 }
 
 // ForgetClaim drops the concurrency guard only after the durable Note has

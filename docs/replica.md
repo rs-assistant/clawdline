@@ -91,10 +91,11 @@ hashchange，讀到的是空的，就回到清單。現在改成 `requestPage({p
 ### 文件的 project root（F11）
 
 `<session cwd>/artifacts` 是 symlink 時，舊版無條件跟隨（`ProjectArtifact.projectRoot`），這台機器也真的
-這樣用（`~/code/clawdline/artifacts -> ../<旁邊另一個 repo>/artifacts`，文件頁 101 列）。所以**預設仍然跟隨**，
-但加了一道地板：解析後的 root 不可以是家目錄、不可以包含 session 自己的工作目錄、不可以是檔案系統根
-（`ln -s ~ artifacts` 那一條就是被這道擋掉的）。要完全不跟隨的機器，在自己的 `config.json` 寫
-`documents_contain_project_root: true`。
+這樣用（`~/code/clawdline/artifacts -> ../<旁邊另一個 repo>/artifacts`，文件頁 101 列）。但被派出去的 agent
+也能在它工作的目錄裡建這個 symlink，所以**預設改為不跟隨出 session 目錄**（`documents_contain_project_root`
+沒寫或讀不到都算 `true`）。需要跟隨的機器在自己的 `config.json` 寫 `documents_contain_project_root: false`；
+跟隨時仍有一道地板：解析後的 root 不可以是家目錄、不可以包含 session 自己的工作目錄、不可以是檔案系統根
+（`ln -s ~ artifacts` 那一條就是被這道擋掉的）。
 
 ## 進度
 

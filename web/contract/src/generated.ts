@@ -46,11 +46,23 @@ export type ActivityUnknownReason =
 export const ActivityUnknownReasonValues: readonly ActivityUnknownReason[] = ["no_record", "unreadable", "unread", "unsupported"] as const
 
 /**
- * POST /v1/auth/adopt: a token the page was handed in a URL fragment, traded for
- * the cookie EventSource needs. Nothing is granted: an unknown token is 401.
+ * POST /v1/auth/adopt: what the page was handed in a URL fragment, traded for the
+ * cookie EventSource needs. Nothing is granted: an unknown token, or a code that
+ * was traded already or is more than five minutes old, is 401.
  */
 export interface AdoptRequest {
-  token: string
+  /**
+   * The one-time code `clawdline open` puts in its address (`#c=`) in place of the
+   * device's token, because that address is on a command line every user of the
+   * machine can read. Traded once, within five minutes; the answer's `token` is
+   * then empty, and the page keeps only the cookie.
+   */
+  code?: string
+
+  /**
+   * A token itself, as an address made before the one-time code carried it (`#t=`).
+   */
+  token?: string
 }
 
 /**
@@ -2019,9 +2031,11 @@ export interface BrokerWorktree {
 }
 
 /**
- * A device minted for a browser on this machine. `url` carries the token in its
- * fragment, which a browser never sends and never logs; the page trades it for the
- * cookie with /v1/auth/adopt.
+ * A device minted for a browser on this machine. `url` carries a one-time code in
+ * its fragment (`#c=`), which a browser never sends and never logs, and never the
+ * token: the address goes on a command line. The page trades the code for the
+ * cookie with /v1/auth/adopt. 429 rate_limited while sixteen such addresses wait to
+ * be opened.
  */
 export interface BrowserDevice {
   id: string
@@ -4239,6 +4253,27 @@ export interface PairingNotice {
   expires: number
   name: string
   pairing_id: string
+}
+
+/**
+ * POST /v1/auth/pairings/reset, this machine's own token only (`clawdline pair
+ * --reset`): the wrong codes and pairing requests that were keeping pairing closed
+ * are forgotten, and any open pairing ends. Anybody who can reach the pairing route
+ * can close it for a day with five wrong codes of their own; this is how the person
+ * at the machine opens it again.
+ */
+export interface PairingReset {
+  ok: boolean
+
+  /**
+   * Pairing requests of the last ten minutes that were forgotten.
+   */
+  requests: number
+
+  /**
+   * Wrong codes of the last day that were forgotten.
+   */
+  wrong_codes: number
 }
 
 /**
@@ -7519,6 +7554,15 @@ export interface SettingsRequest {
   product_language: string | null
 
   /**
+   * Whether the quota footer asks Gemini and Grok for quota: the daemon reads their
+   * CLI credential files (~/.gemini/oauth_creds.json, ~/.grok/auth.json) and sends
+   * those tokens to Google and xAI. Absent or false means off, and off reads and
+   * sends nothing; Claude and Codex quota still comes from local files. Only the
+   * local token may change it.
+   */
+  provider_quota_remote: boolean | null
+
+  /**
    * Notify after the app release is verified.
    */
   push_on_app_release_success: boolean | null
@@ -7593,6 +7637,31 @@ export interface SettingsRequest {
    */
   scope_app: string | null
   session_auto_discovery: boolean | null
+
+  /**
+   * The Cloud device id the macOS app's own tab paired as, recorded by the setup
+   * wizard from the invitation it handed the app. Empty or absent is not known.
+   */
+  setup_app_device: string | null
+
+  /**
+   * Unix seconds when the console first saw all three setup items paired; 0 or
+   * absent is not complete. The header setup button folds away one day later.
+   */
+  setup_completed_at: number | null
+
+  /**
+   * Empty, cloud or local. What the person chose in the setup wizard: local keeps
+   * the header from showing unfinished Cloud setup. Empty or absent is not chosen
+   * yet.
+   */
+  setup_mode: string | null
+
+  /**
+   * Setup items the person chose to skip, comma separated: app, browser, phone. A
+   * skipped item counts as settled.
+   */
+  setup_skipped: string | null
 
   /**
    * Have a model write the sentence a notification carries.
@@ -7854,6 +7923,15 @@ export interface SettingsSnapshot {
   product_language: string | null
 
   /**
+   * Whether the quota footer asks Gemini and Grok for quota: the daemon reads their
+   * CLI credential files (~/.gemini/oauth_creds.json, ~/.grok/auth.json) and sends
+   * those tokens to Google and xAI. Absent or false means off, and off reads and
+   * sends nothing; Claude and Codex quota still comes from local files. Only the
+   * local token may change it.
+   */
+  provider_quota_remote: boolean | null
+
+  /**
    * Notify after the app release is verified.
    */
   push_on_app_release_success: boolean | null
@@ -7929,6 +8007,31 @@ export interface SettingsSnapshot {
    */
   scope_app: string | null
   session_auto_discovery: boolean | null
+
+  /**
+   * The Cloud device id the macOS app's own tab paired as, recorded by the setup
+   * wizard from the invitation it handed the app. Empty or absent is not known.
+   */
+  setup_app_device: string | null
+
+  /**
+   * Unix seconds when the console first saw all three setup items paired; 0 or
+   * absent is not complete. The header setup button folds away one day later.
+   */
+  setup_completed_at: number | null
+
+  /**
+   * Empty, cloud or local. What the person chose in the setup wizard: local keeps
+   * the header from showing unfinished Cloud setup. Empty or absent is not chosen
+   * yet.
+   */
+  setup_mode: string | null
+
+  /**
+   * Setup items the person chose to skip, comma separated: app, browser, phone. A
+   * skipped item counts as settled.
+   */
+  setup_skipped: string | null
 
   /**
    * Have a model write the sentence a notification carries.
@@ -8046,7 +8149,8 @@ export interface ShellOutputReply {
 /**
  * A new or adopted token, twice: here for a script, and in `Set-Cookie:
  * clawdline-next=…; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict` (plus `;
- * Secure` behind an HTTPS proxy) for a page.
+ * Secure` behind an HTTPS proxy) for a page. Traded from a one-time `code`
+ * (AdoptRequest), `token` is empty: the page keeps the cookie only.
  */
 export interface SignedIn {
   ok: boolean

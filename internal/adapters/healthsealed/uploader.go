@@ -120,8 +120,11 @@ func (p ProviderSource) Keys(ctx context.Context) (Keys, error) {
 
 // Uploader seals snapshots into the store and sends stored revisions.
 type Uploader struct {
-	// Endpoint is Cloud's API origin, https only (http for loopback tests).
+	// Endpoint is Cloud's API origin, https only.
 	Endpoint string
+	// AllowLoopbackHTTP admits an http:// API base on a loopback host. It
+	// exists for isolated tests; the daemon never sets it.
+	AllowLoopbackHTTP bool
 	// Origin, when set, is read instead of Endpoint for every send, so the
 	// origin the settings name now is the one used.
 	Origin func() (string, error)
@@ -419,7 +422,7 @@ func (u *Uploader) target() (string, error) {
 		return "", fail(CodeBadInput)
 	}
 	host := parsed.Hostname()
-	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && (host == "127.0.0.1" || host == "localhost" || host == "::1")) {
+	if parsed.Scheme != "https" && !(u.AllowLoopbackHTTP && parsed.Scheme == "http" && (host == "127.0.0.1" || host == "localhost" || host == "::1")) {
 		return "", fail(CodeBadInput)
 	}
 	return strings.TrimRight(parsed.Scheme+"://"+parsed.Host, "/") + UploadPath, nil

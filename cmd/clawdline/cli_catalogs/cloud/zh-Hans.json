@@ -79,7 +79,6 @@
   "devices.roster_only": "仅在名册中",
   "devices.revoked_here": "已在此撤销",
   "devices.pinned_here": "已在此固定",
-  "devices.account_only_legend": "仅账号：你 Clawdline Cloud 账号上的浏览器，是与你另一台机器配对的，不是这台。它在这台也会被接受；`clawdline cloud revoke <device-id>` 可以让这台拒绝它。",
   "revoke.usage": "用法：clawdline cloud revoke <device-id>",
   "revoke.no_change": "没有更改：%s 并非这台机器已固定的浏览器\n",
   "revoke.revoked": "已撤销    %s\n",

@@ -5,6 +5,335 @@ Windows. The daemon owns port 7727 on this machine. `README.md` says what it is 
 how each part was decided. This page holds the rules; `docs/working-rules.md` holds the incidents
 and procedures behind them — read its section when you reach the thing it covers.
 
+## This fork: rs-assistant/clawdline
+
+This fork runs Clawdline **only from source we have reviewed**. It is not a release install and
+does not take upstream releases or self-updates. Open items for the next session are in
+`handoff.yaml`; everything durable is here.
+
+### Repository and branch
+
+- Fork `rs-assistant/clawdline`, upstream `sainteye/clawdline`. Remote names depend on the
+  checkout: a cloud-container clone has the fork as `origin` and no upstream remote. Read
+  `git remote -v` before fetching or pushing; to compare with upstream,
+  `git remote add upstream https://github.com/sainteye/clawdline`.
+- Work happens on `local-source-build`, cut from upstream `418bac7` (security-reviewed on
+  2026-10-19), with upstream `9e5a7ad1` merged on 2026-10-22 and `d8961793` on 2026-10-23, each
+  after its own review ("Upstream merge" below). The last reviewed upstream commit is
+  `d8961793`. Merging upstream brings unreviewed code: review the diff from that commit and rerun
+  govulncheck before merging, and merge the exact commit that was reviewed, not a moving `main`.
+- The person dropped the Codex cross-review on 2026-10-22; nothing on this branch since then has
+  had a second reviewer. Where Claude and Codex both review, present their disagreements instead of
+  resolving them silently.
+
+### Build and run (source build only)
+
+```sh
+(cd web && npm ci --ignore-scripts && npm run build)   # lockfile integrity, no install scripts
+go build -o bin/clawdline ./cmd/clawdline              # go.mod pins toolchain go1.27.3
+CLAWDLINE_NEXT_WEB="$PWD/web/console/dist" ./bin/clawdline serve
+```
+
+- Do not use `install.sh` or `clawdline update`. A source build never starts the GitHub release
+  updater (`internal/transport/http/update.go`, `kind != install.KindRelease`). Both install
+  upstream-built binaries and turn the release updater on, which the person rejected on
+  2026-10-22, even though this branch's `install.sh` now verifies the signature before it runs
+  anything.
+- The update check is off on this branch unless `CLAWDLINE_NEXT_UPDATE_CHECK=on` (since
+  2026-10-28; `internal/adapters/updatecheck` `Disabled`, read in `Run` and `Refresh`). On, the
+  daemon GETs `app.clawdline.com/BUILD.json` at start and every 30 min, with Go's default
+  User-Agent and no machine id, so the operator and Cloudflare see this machine's IP and timing.
+  Upstream checks unless the variable is `off`; a binary built from this branch before the change
+  still needs `CLAWDLINE_NEXT_UPDATE_CHECK=off`. The change came from the Mac test, where a
+  daemon started without the variable held a connection to `app.clawdline.com`.
+- After a dependency change, run
+  `GOTOOLCHAIN=go1.27.3 go run golang.org/x/vuln/cmd/govulncheck@latest ./...` (without the
+  variable, govulncheck builds itself with go1.26 and fails on this toolchain's sources) and
+  `(cd web && npm audit)`. Third-party Go and npm dependencies are hash-verified, not
+  code-reviewed. Pick fixed versions that have been published for at least two weeks.
+
+### Operating policy
+
+- Cloud stays off (`cloud_enabled` unset or false). Do not run `clawdline cloud login`.
+  `clawdline cloud off` stops a live relay line on a daemon built from this branch after the
+  2026-10-22 fix; an older build keeps the line up until the daemon restarts.
+- Keep `remote` off (Tailscale Serve admission; upstream removed the Cloudflare tunnel and
+  `remote_tunnel`). Another computer on the LAN reaches the console through an SSH port forward
+  (`docs/user/remote-access.md` A). On 2026-10-28 the person chose not to open access from
+  outside the LAN for now. If that changes, Tailscale Serve needs no code change (it does need
+  `remote` on, and the machine's `ts.net` name lands in public certificate logs); a self-run
+  Cloudflare tunnel is refused by `isAllowedHost`, and rewriting Host to loopback still fails
+  every change on `sameOrigin`, so it would need the tunnel's name allowed again in `gate.go`,
+  with Cloudflare reading every token and terminal byte in clear and the address public unless
+  Cloudflare Access is in front.
+- Dispatch with `--permission-mode ask`. A mode not named follows the machine setting
+  `orchestrator_permission`, which is `ask` when unset on this branch. `full` is
+  `bypassPermissions` / `--ask-for-approval never`. A paired device with Send can change
+  `orchestrator_permission` (upstream's choice, kept by the person on 2026-10-22), so check
+  `clawdline setting` if a dispatch ever runs without asking. Never add `clawdline` to an agent's
+  Bash allowlist.
+- Leave `provider_quota_remote` unset: on, the daemon reads the Gemini and Grok CLI credential files
+  and sends those tokens to Google and xAI for the quota footer.
+- Leave `documents_contain_project_root` unset or `true` (contained is the default on this
+  branch): `false` lets an `artifacts` symlink widen what a read-only device can read.
+- Do not open untrusted services on other `127.0.0.1` ports in the browser signed in to the
+  console. Browsers do not scope cookies by port, so they receive the session cookie; on Linux the
+  daemon refuses it from another user's process, not from a process of the person's own.
+- Before handing off a Secret Handoff value, read the command the Note shows: that program gets
+  the value. A shell, curl or an unfamiliar address is a reason to stop.
+
+### Dependency changes on this branch
+
+- 2026-10-22, Go: `golang.org/x/net` v0.50.0 → v0.60.0 and `toolchain go1.27.3`. govulncheck had
+  found 13 reachable vulnerabilities (x/net HTTP/2 and DNS, stdlib in go1.27.1); after the bump, 0.
+  It raised the `go` directive 1.25.0 → 1.26.0, `x/crypto` to v0.57.0 and `x/sys` to v0.48.0;
+  `go mod tidy` made goldmark and `x/crypto` direct; the README badge and `docs/user/install.md`
+  say Go 1.26.
+- 2026-10-22, npm: `npm audit` found 2 high, both build-time only: vite 6.4.3 (five advisories in
+  the dev server and launch-editor) and source-map-js 1.2.1 (DoS from a crafted source map,
+  through postcss). Bumped to vite 6.4.4 and source-map-js 1.2.2 (`e496fa9`); `npm audit` then
+  found 0.
+- 2026-10-22, upstream merge: Go adds `github.com/microcosm-cc/bluemonday` v1.0.27,
+  `github.com/aymerick/douceur` v0.2.0 and `github.com/gorilla/css` v1.0.1 (HTML document
+  sanitizing, `internal/adapters/documents/html.go`); `x/net` became a direct dependency. npm adds
+  `dompurify` 3.4.17 (the console's HTML preview). The fork's versions above were kept over
+  upstream's older ones. govulncheck on the merged tree: 0 reachable (upstream alone had 1, x/net
+  v0.50.0); `npm audit`: 0.
+
+### Security review
+
+Static review of `418bac7` on 2026-10-19: Claude (five subagents) and Codex (two runs), verdicts
+spot-checked against the source. Every finding below was fixed on this branch on 2026-10-22, each
+with a test that failed before its fix, except where "Still open" says otherwise. The fixes are
+not cross-reviewed; the person dropped the Codex cross-review.
+
+First round, `8d4bf41` and `5c8ca6c`:
+
+- Medium: dispatch defaulted to `full`. A brief or CLI call that names no mode now runs `ask`
+  (`internal/app/orchestrator/draft.go`, `cmd/clawdline/dispatch.go`).
+- Medium: `clawdline cloud off` wrote the file first, so the route found no change and left the
+  relay line up (`internal/transport/http/cloud_onboarding.go`). It now compares with the live line.
+- Medium (Codex only): `/v1/events` stayed open after device revocation. The stream now
+  re-verifies its credential on every tick and heartbeat (`gate.go` `stillAdmitted`, `stream.go`).
+- Medium (Codex only): an `artifacts` symlink widened document reads. Containment is now the
+  default (`internal/transport/http/documents.go` `containsProjectRoot`).
+- Low: console pages had no `frame-ancestors`. `page.go` now sends
+  `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff` and
+  `Referrer-Policy: no-referrer` (a link out no longer names `127.0.0.1:7727` to the site).
+- Low: an unvalidated pre-release segment in a version string could name a path.
+  `ParseVersion` now accepts only semver identifiers.
+
+Second round:
+
+- High, `181ab79`: unpinned senders fell back to the Cloud roster key. Only browsers in this
+  machine's own pin file are admitted (`link.go` `publicKeyFor`, `authority`,
+  `terminalAuthority`, `transcriptAuthority`); the roster can still deny but never supplies a key.
+- High, `181ab79`, reworked in the upstream merge: revoking a device did not replace the master
+  secret. Upstream then added a journaled content-key revocation that rotates the key in place and
+  lets the remaining browsers fetch the new one (rekey). `Pairing.Revoke` now goes only through it,
+  reads the key epoch before and after, and answers 500 `secret_not_replaced` when the key did not
+  move; a browser paired before key epochs existed has to pair again.
+- Medium, `181ab79`: no envelope timestamp check, replay window in memory. An envelope whose
+  signed `ts` is more than 5 min from this machine's clock is dropped (`clock_skew`); accepted
+  claims go to `cloud/replay-journal-v1` (0600) before the envelope is opened, so a reconnect or
+  restart does not reopen the window (register rows `cloud.replay_journal_*`).
+- Disputed (Codex High, Claude Low, assessed Medium), `181ab79`: `ctl/` reads skipped
+  re-authorization. `serveRead` now re-checks the same authority as writes.
+- Medium, `d8b1cf2`: Secret Handoff fed the value to any command the agent chose. The Note now
+  declares the exact argv (absolute executable); the console shows it beside the field and repeats
+  it in the submission; a claim with any other argv gets nothing, the waiting value is wiped and
+  the Note closes as refused.
+- Medium, `125bb2d`: the session cookie is not port-scoped. On Linux, a cookie, bearer,
+  orchestrator token or task secret arriving from a loopback socket another uid owns is refused
+  (`peer.go`, `internal/adapters/sockowner`); an unreadable `/proc` refuses local credentials.
+- Low, `125bb2d`: on multi-user Linux, every CLI call checks that its loopback peer is its own
+  uid before writing a credential (`listenerowner.go`, on `http.DefaultTransport`; the daemon is
+  the same binary, so its own loopback calls to another user's socket are refused too);
+  `clawdline open` passes a one-time five-minute code instead of the device token;
+  `clawdline pair --reset` (local token only) reopens pairing that wrong codes closed.
+- Medium (Codex High), `cbc74e4`: `install.sh` ran the downloaded binary before an independent
+  signature check. It now verifies `manifest.json` against the embedded release keys with OpenSSL
+  3 or `ssh-keygen -Y verify` (new `manifest.sshsig` asset) before anything runs, and refuses when
+  neither verifier exists. wget is no longer used (its `--https-only` did not stop http
+  redirects); curl is https-only.
+- Low, `cbc74e4`: forced downgrade and non-expiring manifests. `install.sh` refuses an older
+  release without `--allow-downgrade` (the updater already needed `--force`); a manifest whose
+  signed `committed_at` is missing or older than 180 days is not "the newest release"
+  (`release.manifest_age_seconds`). A version named on purpose still installs.
+
+What the hosted console (deployed by the operator from upstream) loses against this daemon:
+browsers only on the account roster cannot reach it until `clawdline cloud pair` pins them
+(upstream's carrier proof for unpinned viewers never admits here); envelopes stamped more than
+5 min off are dropped silently; `ctl/` reads fail while the roster is unreadable; a hosted console
+built before `d8b1cf2` cannot hand off a Secret Handoff value.
+
+### Upstream merge (`9e5a7ad1`, 2026-10-22)
+
+Upstream `418bac7..9e5a7ad1` (550 commits, about 20,000 lines of non-test Go and 24,000 of console
+code) was reviewed by five read-only Claude subagents (connection health; Cloud protocol; local
+HTTP and app; console and release tooling; every other Go change) and merged with the fork's fixes
+kept. Decisions the person made on 2026-10-22:
+
+- Provider quotas: upstream's footer made the daemon read `~/.gemini/oauth_creds.json` and
+  `~/.grok/auth.json` and send those tokens to Google and xAI whenever the console was open. Now
+  only with `provider_quota_remote: true`; off (the default) reads and sends nothing.
+- Onboarding survey: its submit posted to `api.clawdline.com`. It is not mounted in the local
+  console, and console pages send `connect-src 'self'`, so page code reaches only this daemon
+  (measured in Chromium: a fetch to `api.clawdline.com` is blocked as a `connect-src` violation;
+  `/v1/health` answers 200; a sandboxed `srcdoc` preview still renders).
+- Machine settings (`orchestrator_permission`, `remote`/Tailscale, iTerm integration) stay
+  writable by a paired device with Send, as upstream has them; unset `orchestrator_permission`
+  is `ask` here.
+- An agent's orchestrator token may write Squad roles, skills and bindings, as upstream has it.
+  A prompt-injected agent can use that to change later Squad launches.
+
+Found sound or harmless with Cloud off: the connection-health subsystem starts on every boot but
+only writes `<state>/connection-health/` (0700 dirs, 0600 files, 7 days / 100 MiB); its uploads
+need Cloud on, an identity and an explicit opt-in (`cloud_health_upload`,
+`cloud_health_owner_retention`), and `CLAWDLINE_CONNECTION_HEALTH=off` disables it. The Cloudflare
+tunnel is removed. HTML documents are sanitized by bluemonday on the daemon and DOMPurify in the
+console and shown in a `sandbox=""` frame. No new route answers without a credential. Upstream's
+own `install.sh` rewrite (Python verifier) was replaced by this branch's; its size caps, duplicate
+field refusal and `umask 077` were ported, its zh-Hant installer messages were not.
+
+Second merge, `9e5a7ad1..d8961793` (21 commits, 2026-10-23), reviewed by Claude in this session
+(about 430 lines of Go and 1,400 of console code): a bounded FIFO of 64 for Cloud reads behind the
+8 read workers and a separate queue of 16 for busy replies (both registered); four setup-wizard
+settings (`setup_mode`, `setup_completed_at`, `setup_app_device`, `setup_skipped`), validated
+and inert; the macOS app's Cloud tab labels itself `ClawdlineApp/1` and pairs on the console's
+request; the hosted console drops the fingerprint screen for a pairing from the machine's own QR
+or link (hosted only, no daemon change). The person chose on 2026-10-23 not to mount the new
+setup wizard in the local console: on a Mac it opened by itself and, once its app step was
+shown, started a Cloud sign-in (`/v1/cloud/login`, which registers the machine with
+`api.clawdline.com`) and then turned Cloud and Cloud commands on, which `connect-src` cannot stop
+because the daemon makes the call. Upstream's `clawdline.com/install.sh` short URL is not used:
+it serves upstream's installer, not this branch's.
+
+Upstream findings, Cloud-only, fixed on 2026-10-27, each with a test that failed first: the
+identity-pairing routes use `requireCloudLocal` (a Cloud request holds the local token; no Cloud
+operation names these routes, so this is defence in depth); `healthsealed` refuses an `http://`
+API base unless a test sets `AllowLoopbackHTTP`, as `healthupload` already did; a pending readonly
+reservation (`ReserveReadOnly`, written before the content key is released) is not a pin, so
+`PinnedStore.PublicKeyFor` admits nobody on it until the pairing completes. Not acted on: the
+rekey admission interval is spent before the offer's signature is checked.
+
+Smoke test on 2026-10-22 (`d946f01`, Linux container, empty `CLAWDLINE_NEXT_DIR`, port 7791,
+Cloud and the update check off): the console loads and signs in through `clawdline open --print`
+in Chromium; the one-time code works once; another uid's process is refused with the local token;
+a squatter on another port receives nothing from the CLI; a revoked device's `/v1/events` closes
+within one tick. `/v1/skill` answers 403 to a browser device and one hero image is missing from
+`dist`; both are the same at `b6976cf`.
+
+Still open:
+
+- High: the hosted console JS from `app.clawdline.com` holds the keys and cannot be verified
+  against the repository. No daemon-side change can fix it; it matters only with Cloud on.
+- A revocation made in the hosted console (on the account roster) denies the device but does not
+  replace the key; devices revoked before `181ab79` are not re-keyed by revoking again. The CLI
+  viewer and `clawdline cloud connect` keep an in-memory replay window. Since 2026-10-27 every
+  replay-journal append is fsynced before its envelope is acted on (upstream did not sync); in
+  the Linux container that took a claim from about 4 µs to about 165 µs
+  (`BenchmarkReplayJournalRecord`); on the person's Apple M2, where `Sync` is `F_FULLFSYNC`, about
+  4.4 ms (4.45, 4.42 and 4.37 ms over 2000 claims each, 2026-10-28). Claims are recorded under one
+  lock, so Cloud envelopes are capped near 225 a second: a keystroke waits about 4.4 ms more, a
+  paste or a burst of reads queues. Not measured with Cloud on; batching several claims into one
+  sync is the change to make if that ever matters.
+- GitHub Actions was off on the fork until the person enabled it on 2026-10-27 (GitHub-made
+  actions only). The workflows were not registered (the default branch had no push since the
+  fork), so a dispatch answered 404; `ci.yml` runs on the draft pull request
+  rs-assistant/clawdline#1 (`local-source-build` into the fork's `main`, not to be merged), on
+  every push to the branch. Its first run, at `38ea3a97`, was green in all four jobs, including
+  `macos-latest`: Darwin vet, build and Go tests (three tests excluded by name in
+  `tools/test-go-ci.sh` for needing the host process table or iTerm2), the native shell pairing
+  check and the release evidence with the macOS signature cases. The workflows use actions by tag,
+  not by commit. At `0180a2ff` (only documentation
+  changed since `38ea3a97`) the macOS job failed once in `TestDevicesRoutesRefuseABrowser`: a
+  second `POST /v1/auth/devices/browser` got no headers within 5 s. It passed on re-run and 30 of
+  30 times on Linux; the cause is not found. At `5e22aed6` (documentation only again) the console
+  job failed once in `src/cloud/session-carrier.test.mjs` "fault injection: a read takes the
+  carrier while this page's own socket is between connections" (the read was refused); it passed
+  on re-run and 40 of 40 times in the container; the cause is not found.
+- `tools/release/supply-chain.test.sh`: from `cbc74e4` until 2026-10-27, eight provenance cases
+  failed because their fixture had no `manifest.sshsig` (fixed, with a case for a missing one).
+  "pins that moved in the checkout do not fail an older release's SBOM" fails in the Linux cloud
+  container, on upstream `d8961793` too, with no file or package difference reported, and passes
+  on GitHub's runners (both CI jobs that run the script, 2026-10-27); the cause in the container
+  is not found (its clone is shallow).
+- The cookie still reaches a service of the person's own user; the socket-owner checks do not
+  exist on macOS or Windows.
+- A declared Secret Handoff command that is itself a shell or curl still receives the value: the
+  person's check of the shown command is the protection.
+- Whoever keeps guessing pairing codes can close pairing again after a reset (five guesses each).
+- Releases published before `cbc74e4` have no `manifest.sshsig`, so a Mac without OpenSSL 3
+  cannot use `install.sh` until a newer release exists. Stable releases must follow each other
+  within 180 days. The beta channel's tag list is unsigned. `clawdline setup` from an older
+  unpacked release, and `--force`, still downgrade on an explicit ask. Not run on macOS.
+- Console browser e2e tests (`web/console/src/**/*.e2e.ts`) default to a Mac Chrome path. In a
+  Linux cloud container they run with `CHROME` set to a wrapper that adds `--no-sandbox` to
+  `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (root needs it). On 2026-10-22 the Secret
+  Handoff test passed there, but many tests failed in the same way at `b6976cf` and `d946f01`
+  (address, list-gestures, unify, squad, write-path, background-strip, restore, resume-role, and
+  "Documents all nine catalogs"); the files whose results differed were flaky on both commits.
+  On 2026-10-28 at `b8aa325a` the container ran 224 tests: 122 passed, 77 failed, 25 skipped
+  ("Mac test" below for the Mac run).
+
+Mac test on 2026-10-28 (`b8aa325a`, Apple M2, `go test` reporting `goarch: arm64`, empty
+`CLAWDLINE_NEXT_DIR`, port 7791, Cloud off), run by the person:
+
+- The person reported every smoke check normal: the console loads and signs in with
+  `clawdline open --print`, the one-time link works once, a Session shows, and no setup wizard or
+  Cloud sign-in appears. `lsof` showed the daemon listening on `127.0.0.1:7791` only, plus one
+  connection to a Cloudflare address on port 443: `app.clawdline.com`, because the daemon had
+  been started without `CLAWDLINE_NEXT_UPDATE_CHECK=off`. The update check has been off by
+  default since.
+- `tools/test-go-ci.sh`: every package passed except `internal/adapters/planner`
+  `TestPlannerSaysWhenNeitherCLIExists`. It faked `LookPath` but not the fixed fallback paths
+  `/opt/homebrew/bin` and `/usr/local/bin`, and it did not replace `Run`, so it ran the `claude` or
+  `codex` the person has in `/usr/local/bin` with the prompt `anything`. Fixed on 2026-10-28:
+  `fallbackBins` is emptied by the test, and a run fails it (reproduced in the container with a
+  stub `/usr/local/bin/claude`).
+- Console e2e: 223 tests, 143 passed, 55 failed, 25 skipped. 40 of the 55 also failed in the
+  container at the same commit. Most of the 15 that failed only on the Mac showed Japanese where
+  the test expects Taiwan Traditional Chinese: the fixtures seed the zh-Hant catalog, and the
+  console then follows the browser's language list, which on macOS is the system's. No failure was
+  traced to macOS itself.
+- `BenchmarkReplayJournalRecord`: about 4.4 ms a claim ("Still open" above).
+
+Intel Mac test on 2026-10-28 (`5e22aed6`, Intel Core i5-7267U, macOS 15.7.5, `bin/clawdline` a
+`x86_64` Mach-O built there with Go 1.27.3 `darwin/amd64`, Node 26.9.0, empty
+`CLAWDLINE_NEXT_DIR`, port 7791, Cloud off, `CLAWDLINE_NEXT_UPDATE_CHECK` unset), run by the
+person: the console loads and signs in, the one-time link works once, a Session shows, no setup
+wizard or Cloud sign-in appears, and `lsof` shows the daemon on `127.0.0.1:7791` only (the
+listener and two loopback connections), so the default-off update check holds there.
+`tools/test-go-ci.sh` passed every package (most results cached from an earlier run on that
+machine; `internal/app/orchestrator` took 457 s). `BenchmarkReplayJournalRecord`: 3.71, 3.86 and
+3.86 ms a claim over 200 each. Console e2e was not run there.
+
+Found sound: no telemetry, analytics or crash SDKs; local HTTP has CSRF, Origin and Host checks;
+no exploitable XSS; no `sh -c` injection; the release updater verifies the ed25519 signature
+before parsing; token and key files are 0600.
+
+### What leaves the machine
+
+- With a source build and Cloud off (the update check is off unless turned on), nothing goes to
+  the Clawdline operator or to GitHub. What remains, none of it to the operator: AI auto-naming sends conversation
+  snippets and paths to Anthropic or OpenAI through the local `claude` or `codex` CLI; browser
+  push subscriptions go to Apple or Google push services, end-to-end encrypted; documentation and
+  plan links open `clawdline.com` or `app.clawdline.com`, which then see the IP but no referrer.
+  Console page code cannot connect anywhere but this daemon (`connect-src 'self'`). With
+  `provider_quota_remote` on, Gemini and Grok CLI tokens go to Google and xAI for quota.
+- With Cloud on, the operator sees the hostname as the machine name (renameable), the OS, the
+  version and the account. The relay sees the machine id, session ids, timing, sizes, and which
+  device reads which session. Titles, projects, transcripts and terminal content are end-to-end
+  encrypted, but `app.clawdline.com` serves the JS that decrypts them. Cloud direct uses Google
+  and Cloudflare STUN, which see the public IP.
+- Local collection: the daemon scans every `~/.claude/projects/*.jsonl` and `~/.codex/sessions`
+  file, including sessions Clawdline did not start, for token counts only (kept 57 days, no
+  opt-out). It does not read Claude or Codex credential files; only
+  `experiments/personas/round5/run.mjs` copies `~/.codex/auth.json`, and no daemon path runs it.
+  Voice transcripts persist in idempotency receipts for 24 h. Security audit segments are never
+  deleted automatically.
+
 ## The retired Swift app
 
 The Swift app stopped on 2026-09-19 and was archived on 2026-09-22; keep its archive read-only and

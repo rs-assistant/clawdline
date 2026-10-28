@@ -259,5 +259,10 @@
   "image.check": "Stored is not seen: GET /v1/transcript?session=%s lists them in that reply's artifacts once it is written.\n",
   "note.live_root_required": "Name a live Root conversation with --from.",
   "note.withdraw_usage": "usage: clawdline note withdraw --id <note id> --version <n> --reason <reason> [--from <conversation id>] [--key k] [--port n]",
-  "note.manage_usage": "  clawdline note list [--from <conversation id>] | clawdline note withdraw --id <note id> --version <n> --reason <reason>"
+  "note.manage_usage": "  clawdline note list [--from <conversation id>] | clawdline note withdraw --id <note id> --version <n> --reason <reason>",
+  "note.secret_command_not_found": "clawdline note create: the Secret Handoff command %q was not found on this machine. Nothing was changed.\n",
+  "listener.other_user": "%s is held by a process of another user (uid %d), not by your Clawdline daemon (uid %d), so no credential was sent there. Stop whatever holds that port, or run your daemon on another one (CLAWDLINE_NEXT_PORT)",
+  "listener.unknown": "could not tell which user is listening on %s (%v), so no credential was sent there",
+  "pair.reset_done": "Pairing is open again: %d wrong codes and %d requests were forgotten. If you did not type those codes, somebody else who can reach this machine did.\n",
+  "pair.reset_help": "open pairing again after wrong codes closed it, then exit"
 }

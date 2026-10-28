@@ -121,6 +121,13 @@ var settingKeys = map[string]struct {
 		},
 		takes: "on keeps this machine's owner diagnostics in Cloud as ciphertext only paired owner devices can open; off (the default) sends nothing",
 	},
+	// Whether the quota footer asks Gemini and Grok for quota with their CLI
+	// credentials. Absent means off, and off reads and sends nothing.
+	"provider_quota_remote": {
+		parse: parseSettingBool,
+		show:  showSettingBool,
+		takes: "on reads the Gemini and Grok CLI credentials and asks Google and xAI for quota; off (the default) reads and sends nothing",
+	},
 	"product_language": {
 		parse: func(s string) (any, bool) {
 			for _, language := range nextconfig.ProductLanguages {

@@ -107,6 +107,20 @@ func (p *page) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"this daemon was not told where the console is; start it with CLAWDLINE_NEXT_WEB set to the console's built files")
 		return
 	}
+	// The console is never framed, by itself or by anybody: a page elsewhere
+	// that framed it could lay its own buttons over this one's (clickjacking).
+	// And it talks to nothing but this daemon: connect-src 'self' keeps any
+	// fetch, EventSource or WebSocket on this origin, so no code in the bundle
+	// can send this machine's data to another host, whatever a later change
+	// adds (the onboarding survey that posted to api.clawdline.com is not
+	// mounted in this fork's console).
+	h := w.Header()
+	h.Set("Content-Security-Policy", "frame-ancestors 'none'; connect-src 'self'")
+	h.Set("X-Frame-Options", "DENY")
+	h.Set("X-Content-Type-Options", "nosniff")
+	// A link out of the console (clawdline.com, the plan page) does not tell
+	// the site it opens that it came from this machine's console and port.
+	h.Set("Referrer-Policy", "no-referrer")
 	// A URL path is a slash path whatever this machine spells its own paths
 	// with, so it is cleaned with path.Clean and only then turned into one.
 	// filepath.Clean cleaned "/" to a lone backslash on Windows, so the console's own

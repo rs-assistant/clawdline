@@ -173,6 +173,8 @@ const (
 	CacheSessionProjectKeys = "cache.session_project_keys"
 	BoardReceipts           = "board.receipts"
 	CloudRelayQueue         = "cloud.relay_queue"
+	CloudReadQueue          = "cloud.read_queue"
+	CloudLaneRefusals       = "cloud.lane_refusals"
 	StoreReceipts           = "store.receipts"
 	// How long the store keeps what nothing reads any more.
 	StoreDoneEffectRetention       = "store.done_effect_retention_seconds"
@@ -195,10 +197,14 @@ const (
 	CloudViewerEventsSeen  = "cloud.viewer_events_seen_batches"
 	CloudReloadStopSeconds = "cloud.reload_stop_seconds"
 	// C2: the things that had no limit at all (limits §3.3, §7.2 wave 2).
-	LogDaemon             = "log.daemon"
-	DevicesList           = "devices.list"
-	PushSubscriptions     = "push.subscriptions"
-	CacheTranscriptTitles = "cache.transcript_titles"
+	LogDaemon   = "log.daemon"
+	DevicesList = "devices.list"
+	// The one-time codes `clawdline open` puts in a browser's address in
+	// place of the device's token (internal/transport/http open_code.go).
+	DevicesOpenCodeSeconds  = "devices.open_code_seconds"
+	DevicesOpenCodesPending = "devices.open_codes_pending"
+	PushSubscriptions       = "push.subscriptions"
+	CacheTranscriptTitles   = "cache.transcript_titles"
 	// C3: the quiet failures made loud (limits §3.2, §7.2 wave 3).
 	SSEScreenPending   = "sse.screen_pending"
 	ArtifactsImages    = "artifacts.images"
@@ -243,6 +249,8 @@ const (
 	SecretHandoffPending         = "session.secret_handoff_pending"
 	SecretHandoffSeconds         = "session.secret_handoff_seconds"
 	SecretHandoffDeliverySeconds = "session.secret_handoff_delivery_seconds"
+	SecretHandoffCommandArgs     = "session.secret_handoff_command_args"
+	SecretHandoffCommandBytes    = "session.secret_handoff_command_bytes"
 	SettingsRequestBodyBytes     = "settings.request_body_bytes"
 	NotificationRulesRows        = "notification.rules_rows"
 	NotificationRuleLabel        = "notification.rule_label_characters"
@@ -291,6 +299,7 @@ const (
 	// A release's signed manifest and its signature list (docs/releasing.md).
 	ReleaseManifestBytes  = "release.manifest_bytes"
 	ReleaseSignatureBytes = "release.signature_bytes"
+	ReleaseManifestAge    = "release.manifest_age_seconds"
 	// A release install updating itself (docs/updates.md).
 	ReleaseCheckIntervalSeconds   = "release.check_interval_seconds"
 	ReleaseCheckJitterSeconds     = "release.check_jitter_seconds"
@@ -330,6 +339,11 @@ const (
 	// The typed refusals one wire channel may have owed at once: each answers
 	// one refused read by its own id, so there may be more than one.
 	CloudSpoolRefusals = "cloud.spool_refusals"
+	// The inbound replay window's claims, kept on disk so a reconnect, a key
+	// rotation or a restart does not forget an envelope it already answered.
+	CloudReplayJournalRows    = "cloud.replay_journal_rows"
+	CloudReplayJournalBytes   = "cloud.replay_journal_bytes"
+	CloudReplayJournalSeconds = "cloud.replay_journal_seconds"
 	// The reference-image thumbnails drawn for Board cards and to-do rows.
 	CacheImageThumbs = "cache.image_thumbs"
 	// The slash menu's skills, per working directory and assistant.

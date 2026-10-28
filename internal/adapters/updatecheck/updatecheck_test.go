@@ -121,6 +121,33 @@ func TestTheCheckCanBeTurnedOff(t *testing.T) {
 	}
 }
 
+// This fork builds from reviewed source and takes no upstream updates, so the
+// check asks app.clawdline.com nothing unless it is turned on by name: an
+// unset or unknown value is off.
+func TestTheCheckIsOffUnlessTurnedOn(t *testing.T) {
+	asked := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked++
+		w.Write([]byte(`{"stamp":"abc"}`))
+	}))
+	defer srv.Close()
+	t.Setenv(URLEnv, srv.URL)
+	for _, v := range []string{"", "yes", "true", "1"} {
+		t.Setenv(CheckEnv, v)
+		c := New("")
+		c.Refresh(context.Background())
+		if !c.Disabled || asked != 0 {
+			t.Fatalf("%s=%q: disabled=%v, asked %d times", CheckEnv, v, c.Disabled, asked)
+		}
+	}
+	t.Setenv(CheckEnv, "on")
+	c := New("")
+	c.Refresh(context.Background())
+	if c.Disabled || asked != 1 {
+		t.Fatalf("%s=on: disabled=%v, asked %d times", CheckEnv, c.Disabled, asked)
+	}
+}
+
 func TestSourceURLDefaultsToTheHostedConsole(t *testing.T) {
 	t.Setenv(URLEnv, "")
 	if got := SourceURL(); got != "https://app.clawdline.com/BUILD.json" {

@@ -79,7 +79,6 @@
   "devices.roster_only": "liste uniquement",
   "devices.revoked_here": "révoqué ici",
   "devices.pinned_here": "épinglé ici",
-  "devices.account_only_legend": "compte uniquement : un navigateur de votre compte Clawdline Cloud appairé avec une autre de vos machines, pas celle-ci. Il est aussi admis ici ; `clawdline cloud revoke <device-id>` le refuse sur cette machine.",
   "revoke.usage": "utilisation : clawdline cloud revoke <device-id>",
   "revoke.no_change": "aucun changement : %s n'était pas un navigateur épinglé sur cette machine\n",
   "revoke.revoked": "révoqué    %s\n",

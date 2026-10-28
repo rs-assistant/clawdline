@@ -88,6 +88,22 @@ func createNote(stdout, stderr io.Writer, b *broker, target, from string, raw []
 			return 2
 		}
 	}
+	// A Secret Handoff Note names the command that will receive the value.
+	// The daemon accepts only an absolute executable, so a bare name is
+	// resolved here, in the Agent's environment, the same way secret run
+	// resolves it before claiming.
+	if raw, exists := body["command"]; exists {
+		var argv []string
+		if err := json.Unmarshal(raw, &argv); err == nil && len(argv) > 0 && argv[0] != "" {
+			executable, err := resolveSecretCommand(argv[0])
+			if err != nil {
+				fmt.Fprintf(stderr, cliCopy("misc", "note.secret_command_not_found", "clawdline note create: the Secret Handoff command %q was not found on this machine. Nothing was changed.\n"), argv[0])
+				return 2
+			}
+			argv[0] = executable
+			body["command"], _ = json.Marshal(argv)
+		}
+	}
 	if target == "" {
 		who, err := b.request(http.MethodGet, "/v1/orchestrator/whoami",
 			url.Values{"conversation_id": {from}}, nil, "")

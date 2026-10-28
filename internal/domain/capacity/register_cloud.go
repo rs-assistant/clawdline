@@ -203,6 +203,27 @@ func cloudBounds() []Entry {
 				"internal/transport/cloud.(*Link).runOnce:chan(PeerProbeIngressLimit)"},
 		},
 		{
+			// Busy replies must not synchronously hold the request dispatcher.
+			// One worker sends them while this FIFO bounds what may wait; an
+			// unsent reply is counted and logged instead of spawning a goroutine.
+			Name: CloudLaneRefusals, Class: Buffer, Unit: Rows,
+			Limit: 16, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Log}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.CloudLaneRefusalsLimit",
+				"internal/transport/cloud.(*Link).runService:chan(refusalDepth)"},
+		},
+		{
+			// Eight workers execute reads while a separate FIFO absorbs finite
+			// viewer bursts. A full worker pool does not refuse an ordinary read;
+			// a full waiting queue answers the new request, by name, with 429
+			// cloud_ingress_busy and retry_after. Commands never wait on reads.
+			Name: CloudReadQueue, Class: Buffer, Unit: Rows,
+			Limit: 64, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Log, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.CloudReadQueueLimit",
+				"internal/transport/cloud.(*Link).runService:chan(readDepth)"},
+		},
+		{
 			// Decrypted Cloud requests waiting for the bridge (limits N20).
 			// At the limit the new request is refused and nothing already
 			// taken is let go: the sender is answered 429 cloud_ingress_busy
@@ -315,6 +336,43 @@ func cloudBounds() []Entry {
 			Limit: 64, AtLimit: Refuse,
 			Told:      []Channel{Diagnostics, Log},
 			EvictedBy: Daemon,
+		},
+		{
+			// The replay claims this machine keeps on disk
+			// (internal/adapters/cloud/replay_journal.go): one row per
+			// envelope it accepted from a viewer, so the same envelope handed
+			// over again after a reconnect, a key rotation or a restart is
+			// refused as a replay. At the bound every row past
+			// cloud.replay_journal_seconds is let go; if none is, the
+			// envelope is refused — the viewer's next attempt carries a new
+			// sequence — rather than a young row forgotten, because a
+			// forgotten row is the replay itself.
+			Name: CloudReplayJournalRows, Class: Idempotency, Unit: Rows,
+			Limit: 65_536, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Log},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/cloud.ReplayJournalRowsLimit"},
+		},
+		{
+			// The same journal's file size, with the same rule at the bound.
+			// A row is at most 171 bytes and usually under 80, so the row
+			// bound is normally the one reached first.
+			Name: CloudReplayJournalBytes, Class: Idempotency, Unit: Bytes,
+			Limit: 8 << 20, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Log},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/cloud.ReplayJournalBytesLimit"},
+		},
+		{
+			// How long a replay claim is kept, from the envelope's own ts.
+			// It is at least the five-minute clock window inbound admission
+			// enforces (internal/domain/cloud.MaxTimestampSkew): an envelope
+			// whose claim has expired is one the clock rule refuses anyway.
+			Name: CloudReplayJournalSeconds, Class: Idempotency, Unit: Seconds,
+			Limit: 600, AtLimit: Expire,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/cloud.ReplayJournalSecondsLimit"},
 		},
 		{
 			// A roster read this machine made stands behind an answer for

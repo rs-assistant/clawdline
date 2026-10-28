@@ -61,12 +61,12 @@
       }
     },
     "AdoptRequest": {
-      "description": "POST /v1/auth/adopt: a token the page was handed in a URL fragment, traded for the cookie EventSource needs. Nothing is granted: an unknown token is 401.",
+      "description": "POST /v1/auth/adopt: what the page was handed in a URL fragment, traded for the cookie EventSource needs. Nothing is granted: an unknown token, or a code that was traded already or is more than five minutes old, is 401.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["token"],
       "properties": {
-        "token": { "type": "string" }
+        "code": { "description": "The one-time code `clawdline open` puts in its address (`#c=`) in place of the device's token, because that address is on a command line every user of the machine can read. Traded once, within five minutes; the answer's `token` is then empty, and the page keeps only the cookie.", "type": "string" },
+        "token": { "description": "A token itself, as an address made before the one-time code carried it (`#t=`).", "type": "string" }
       }
     },
     "PasswordRequest": {
@@ -80,7 +80,7 @@
       }
     },
     "SignedIn": {
-      "description": "A new or adopted token, twice: here for a script, and in `Set-Cookie: clawdline-next=…; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict` (plus `; Secure` behind an HTTPS proxy) for a page.",
+      "description": "A new or adopted token, twice: here for a script, and in `Set-Cookie: clawdline-next=…; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict` (plus `; Secure` behind an HTTPS proxy) for a page. Traded from a one-time `code` (AdoptRequest), `token` is empty: the page keeps the cookie only.",
       "type": "object",
       "additionalProperties": false,
       "required": ["ok", "token"],
@@ -121,6 +121,17 @@
         "password": { "type": "boolean" }
       }
     },
+    "PairingReset": {
+      "description": "POST /v1/auth/pairings/reset, this machine's own token only (`clawdline pair --reset`): the wrong codes and pairing requests that were keeping pairing closed are forgotten, and any open pairing ends. Anybody who can reach the pairing route can close it for a day with five wrong codes of their own; this is how the person at the machine opens it again.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "requests", "wrong_codes"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "requests": { "description": "Pairing requests of the last ten minutes that were forgotten.", "type": "integer" },
+        "wrong_codes": { "description": "Wrong codes of the last day that were forgotten.", "type": "integer" }
+      }
+    },
     "RevokedAll": {
       "description": "POST /v1/auth/devices/revoke-all: every paired device, the password and the open pairing. This machine's own token stays.",
       "type": "object",
@@ -138,7 +149,7 @@
       "properties": { "permission": { "description": "Optional local selection; omission preserves read-and-operate.", "type": "string", "enum": ["read-only", "read-and-operate"] } }
     },
     "BrowserDevice": {
-      "description": "A device minted for a browser on this machine. `url` carries the token in its fragment, which a browser never sends and never logs; the page trades it for the cookie with /v1/auth/adopt.",
+      "description": "A device minted for a browser on this machine. `url` carries a one-time code in its fragment (`#c=`), which a browser never sends and never logs, and never the token: the address goes on a command line. The page trades the code for the cookie with /v1/auth/adopt. 429 rate_limited while sixteen such addresses wait to be opened.",
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "token", "url"],

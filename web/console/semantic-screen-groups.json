@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8853,
-  "riskKeys": 3928,
-  "nonRiskCount": 4925,
+  "englishContentKeys": 8997,
+  "riskKeys": 4010,
+  "nonRiskCount": 4987,
   "groups": [
     {
       "name": "admin / other",
@@ -261,6 +261,23 @@
       ]
     },
     {
+      "name": "browserPairing / other",
+      "count": 8,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "browserPairing.androidCheck",
+        "browserPairing.androidTitle",
+        "browserPairing.approve",
+        "browserPairing.connect",
+        "browserPairing.connectIntro",
+        "browserPairing.machineFingerprint",
+        "browserPairing.retry",
+        "browserPairing.viewerFingerprint"
+      ]
+    },
+    {
       "name": "capacityHelp / other",
       "count": 4,
       "sources": [
@@ -275,7 +292,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 258,
+      "count": 260,
       "sources": [
         null
       ],
@@ -489,6 +506,8 @@
         "capacityRow.session.human_intervention_title_bytes.what",
         "capacityRow.session.report_open_todo_characters.full",
         "capacityRow.session.report_open_todo_characters.what",
+        "capacityRow.session.secret_handoff_command_args.what",
+        "capacityRow.session.secret_handoff_command_bytes.what",
         "capacityRow.session.title_characters.what",
         "capacityRow.session.title_request_bytes.what",
         "capacityRow.session.title_rows.full",
@@ -2179,6 +2198,20 @@
       ]
     },
     {
+      "name": "itermConsent / other",
+      "count": 5,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "itermConsent.enable",
+        "itermConsent.saved",
+        "itermConsent.savedTitle",
+        "itermConsent.saving",
+        "itermConsent.title"
+      ]
+    },
+    {
       "name": "legacy / Cloud",
       "count": 13,
       "sources": [
@@ -3231,7 +3264,7 @@
     },
     {
       "name": "next / other",
-      "count": 388,
+      "count": 429,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3473,6 +3506,7 @@
         "next.schedulesListLabel",
         "next.schedulesLoading",
         "next.screenSessionGone",
+        "next.secretHandoffDestination",
         "next.secretHandoffLabel",
         "next.secretHandoffName",
         "next.secretHandoffPlaceholder",
@@ -3497,6 +3531,46 @@
         "next.sessionWriteDisabled",
         "next.sessionsListWaitTitle",
         "next.sessionsMachineOfflineTitle",
+        "next.setupAppBusy",
+        "next.setupAppContinue",
+        "next.setupAppDone",
+        "next.setupAppMachine",
+        "next.setupAppMachineHint",
+        "next.setupAppPairHint",
+        "next.setupAppSignInHint",
+        "next.setupAppStart",
+        "next.setupAppTitle",
+        "next.setupBack",
+        "next.setupBrowserIdle",
+        "next.setupBrowserTitle",
+        "next.setupChipLocal",
+        "next.setupChipLocalTip",
+        "next.setupChipProgress",
+        "next.setupClose",
+        "next.setupDialog",
+        "next.setupDoneBody",
+        "next.setupDoneSetUp",
+        "next.setupDoneSkippedBody",
+        "next.setupDoneTitle",
+        "next.setupItemApp",
+        "next.setupItemBrowser",
+        "next.setupItemPhone",
+        "next.setupLocalCloud",
+        "next.setupLocalOk",
+        "next.setupLocalTitle",
+        "next.setupNext",
+        "next.setupPhoneAndroid",
+        "next.setupPhoneApple",
+        "next.setupPhoneRenew",
+        "next.setupSkip",
+        "next.setupStart",
+        "next.setupStayLocal",
+        "next.setupWelcomeEyebrow",
+        "next.setupWelcomePhone",
+        "next.setupWelcomeReply",
+        "next.setupWelcomeReplyHint",
+        "next.setupWelcomeSessions",
+        "next.setupWelcomeTitle",
         "next.sidebarAdministrator",
         "next.sidebarAppStaged",
         "next.sidebarChooseMachineVersion",
@@ -4683,6 +4757,21 @@
         "settings.webCloudStatusKey",
         "settings.webCloudStatusMac",
         "settings.workTab"
+      ]
+    },
+    {
+      "name": "shell / other",
+      "count": 6,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "shell.menuCopy",
+        "shell.menuCut",
+        "shell.menuEdit",
+        "shell.menuPaste",
+        "shell.menuSelectAll",
+        "shell.pairLinkReturn"
       ]
     },
     {

@@ -26,9 +26,10 @@ const maxIdentityDecisionBody = 1 << 10
 //	DELETE /v1/cloud/pairing/identity   stop it
 //
 // This machine's own token only, for the reason cloudPairingRoute gives: the
-// link begins a handover of the account master secret.
+// link begins a handover of the account master secret. requireCloudLocal and
+// not requireLocal: a Cloud viewer's request holds this machine's own token.
 func (s *Server) cloudIdentityPairingRoute(w http.ResponseWriter, r *http.Request) {
-	if !requireLocal(w, r) {
+	if !requireCloudLocal(w, r) {
 		return
 	}
 	pairing, ok := s.cloudIdentityPairing(w)
@@ -58,7 +59,7 @@ func (s *Server) cloudIdentityPairingRoute(w http.ResponseWriter, r *http.Reques
 // `{"pairing_id":"…","approve":true|false}`. `approve` is required; a body
 // without it is refused rather than read as either answer.
 func (s *Server) cloudIdentityPairingDecisionRoute(w http.ResponseWriter, r *http.Request) {
-	if !requireLocal(w, r) {
+	if !requireCloudLocal(w, r) {
 		return
 	}
 	if r.Method != http.MethodPost {

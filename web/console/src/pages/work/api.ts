@@ -307,6 +307,8 @@ export interface HumanInterventionV2 {
   detail?: string
   options: { label: string; draft: string }[]
   document_url?: string
+  /** A Secret Handoff Note's receiving argv; the value goes to nothing else. */
+  command?: string[]
   created_at: number
   read_at: number | null
   resolved_at: number | null
@@ -496,10 +498,12 @@ export const humanInterventionActionV2 = (
   `/v1/work/v2/human-interventions/${encodeURIComponent(`conversation:${conversationID}`)}/${note.id}/${action}`,
   { expected_version: note.version },
 )
-export const submitSecretHandoffV2 = (conversationID: string, noteID: string, value: string) =>
+/** `command` is the receiving argv the card showed; the daemon refuses a
+ *  submission that does not repeat the Note's own. */
+export const submitSecretHandoffV2 = (conversationID: string, noteID: string, value: string, command: string[]) =>
   mutate<{ ok: boolean; received: boolean }>(
     `/v1/work/v2/human-interventions/${encodeURIComponent(`conversation:${conversationID}`)}/${noteID}/handoff`,
-    { value },
+    { value, command },
   )
 export const readSessionsForWorkV2 = () => readSessionListWith<SessionsSnapshot>(call)
 /** The token ledger's bill of a Board item, and of one session (docs/token-ledger.md). */

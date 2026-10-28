@@ -94,6 +94,31 @@ func (s *Server) cloudCapacityMeasures() map[string]func() capacity.Reading {
 			}
 			return r
 		},
+		capacity.CloudReadQueue: func() capacity.Reading {
+			line, ok := cloudLines.Load(s.cfg.Dir)
+			if !ok {
+				return capacity.Reading{Known: true, Note: "the Cloud line is off: there is no read queue"}
+			}
+			reader, ok := line.(interface {
+				ReadLaneReadings() (active, waiting capacity.Reading)
+			})
+			if !ok {
+				return capacity.Unmeasured("this Cloud line does not report its read queue")
+			}
+			_, waiting := reader.ReadLaneReadings()
+			return waiting
+		},
+		capacity.CloudLaneRefusals: func() capacity.Reading {
+			line, ok := cloudLines.Load(s.cfg.Dir)
+			if !ok {
+				return capacity.Reading{Known: true, Note: "the Cloud line is off: there is no busy reply queue"}
+			}
+			reader, ok := line.(interface{ LaneRefusalReading() capacity.Reading })
+			if !ok {
+				return capacity.Unmeasured("this Cloud line does not report its busy reply queue")
+			}
+			return reader.LaneRefusalReading()
+		},
 		capacity.CloudPeerPairs:  func() capacity.Reading { return s.peerStoreCapacity(capacity.CloudPeerPairs) },
 		capacity.CloudPeerGrants: func() capacity.Reading { return s.peerStoreCapacity(capacity.CloudPeerGrants) },
 		capacity.CloudPeerInbox:  func() capacity.Reading { return s.peerStoreCapacity(capacity.CloudPeerInbox) },
@@ -216,9 +241,46 @@ func (s *Server) cloudCapacityMeasures() map[string]func() capacity.Reading {
 			return receipts
 		},
 		capacity.CloudSpoolRefusals: func() capacity.Reading { return s.spoolRefusalReading() },
+		// The inbound replay window's copy on disk, both of its bounds and
+		// the age that lets a claim go.
+		capacity.CloudReplayJournalRows: func() capacity.Reading {
+			rows, _ := s.replayJournalReadings()
+			return rows
+		},
+		capacity.CloudReplayJournalBytes: func() capacity.Reading {
+			_, bytes := s.replayJournalReadings()
+			return bytes
+		},
+		capacity.CloudReplayJournalSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true,
+				Note: "a replay claim is kept this long from its envelope's ts; an older envelope is refused by the clock rule"}
+		},
 	}
 	for name, m := range s.connectionHealthCapacityMeasures() {
 		out[name] = m
 	}
 	return out
+}
+
+// replayJournalReadings reads the Cloud line's replay journal, or says why
+// there is none.
+func (s *Server) replayJournalReadings() (rows, bytes capacity.Reading) {
+	line, ok := cloudLines.Load(s.cfg.Dir)
+	if !ok {
+		off := capacity.Reading{Known: true, Note: "the Cloud line is off: nothing is admitted, so nothing is claimed"}
+		return off, off
+	}
+	reader, ok := line.(interface {
+		ReplayJournalReadings() (rows, bytes capacity.Reading, ok bool)
+	})
+	if !ok {
+		unmeasured := capacity.Unmeasured("this Cloud line does not report its replay journal")
+		return unmeasured, unmeasured
+	}
+	rows, bytes, built := reader.ReplayJournalReadings()
+	if !built {
+		none := capacity.Reading{Known: true, Note: "the Cloud line was never built: nothing has been claimed"}
+		return none, none
+	}
+	return rows, bytes
 }

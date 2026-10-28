@@ -243,9 +243,16 @@ func (s *Server) cloudEnabledRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if on && !reloadNeeded {
+	// The file can already say what was asked: `clawdline cloud off` writes it
+	// before calling this route. The live line is what decides, or an off
+	// switch would leave a running relay line up until the next restart.
+	if !reloadNeeded {
 		line, present := cloudLines.Load(s.cfg.Dir)
-		reloadNeeded = !present || !line.(CloudLine).Status().Enabled || line.(CloudLine).Status().State == "stopped"
+		if on {
+			reloadNeeded = !present || !line.(CloudLine).Status().Enabled || line.(CloudLine).Status().State == "stopped"
+		} else {
+			reloadNeeded = present && line.(CloudLine).Status().Enabled
+		}
 	}
 	if reloadNeeded && s.cloudReload != nil {
 		if err := s.cloudReload(); err != nil {

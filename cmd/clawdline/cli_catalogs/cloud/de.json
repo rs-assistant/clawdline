@@ -79,7 +79,6 @@
   "devices.roster_only": "nur in der Geräteliste",
   "devices.revoked_here": "hier widerrufen",
   "devices.pinned_here": "hier festgelegt",
-  "devices.account_only_legend": "nur Konto: ein Browser in deinem Konto bei Clawdline Cloud, der mit einer anderen deiner Maschinen gekoppelt wurde, nicht mit dieser. Er wird auch hier zugelassen; `clawdline cloud revoke <device-id>` lehnt ihn auf dieser Maschine ab.",
   "revoke.usage": "Verwendung: clawdline cloud revoke <device-id>",
   "revoke.no_change": "keine Änderung: %s war kein auf diesem Rechner festgelegter Browser\n",
   "revoke.revoked": "widerrufen %s\n",

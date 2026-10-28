@@ -13,6 +13,7 @@
 .quota-provider { display: flex; align-items: center; gap: 7px; white-space: nowrap; min-width: 0; padding: 3px 0; }
 .quota-provider:hover { color: var(--ink); }
 .quota-logo, .quota-logo svg { display: block; width: 16px; height: 16px; flex: 0 0 16px; }
+.provider-quota-bar .quota-logo, .provider-quota-bar .quota-logo svg { width: 12px; height: 12px; flex-basis: 12px; }
 .quota-full-windows { display: flex; align-items: center; gap: 8px; }
 .quota-window-separator { color: var(--faint); }
 .quota-compact-window { display: none; }
@@ -30,7 +31,7 @@
 .quota-stale { font-size: 10px; color: var(--faint); }
 .quota-provider[data-stale] progress { opacity: .5; }
 .quota-refresh, .quota-more { flex: 0 0 auto; padding: 4px; }
-.quota-refresh { font-size: 19px; line-height: 1; }
+.quota-refresh { display: grid; place-items: center; min-width: 28px; min-height: 28px; font-size: 14px; line-height: 1; }
 .quota-refresh:disabled { opacity: .4; cursor: default; }
 .quota-dialog { width: min(620px, calc(100vw - 28px)); max-height: min(80dvh, 780px); overflow: auto; padding: 20px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: var(--bg); }
 .quota-dialog::backdrop { background: rgb(0 0 0 / .55); }

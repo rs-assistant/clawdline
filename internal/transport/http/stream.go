@@ -148,6 +148,10 @@ func (s *Server) ownEvents(w http.ResponseWriter, r *http.Request) {
 		case note := <-feed.notes:
 			feed.write(w, flusher, note)
 		case <-ticks:
+			// A device revoked since the stream opened reads nothing more.
+			if !stillAdmitted(r) {
+				return
+			}
 			// The newest product, whichever tick it came from: a stream that
 			// fell behind sends the machine as it is now, once.
 			if snapshot, ok := lists.sessions.peek(); ok {
@@ -157,6 +161,9 @@ func (s *Server) ownEvents(w http.ResponseWriter, r *http.Request) {
 				sendTasks(list)
 			}
 		case <-beat.C:
+			if !stillAdmitted(r) {
+				return
+			}
 			fmt.Fprint(w, ": still here\n\n")
 			flusher.Flush()
 		}

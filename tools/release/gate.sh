@@ -98,7 +98,7 @@ const fs = require("fs"), path = require("path");
 const [dir, version] = process.argv.slice(2);
 const m = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json")));
 if (m.version !== version) { console.error(`gate: manifest.json is ${m.version}, not ${version}`); process.exit(1); }
-const known = new Set(["manifest.json", "manifest.sig.json", "SHA256SUMS"]);
+const known = new Set(["manifest.json", "manifest.sig.json", "manifest.sshsig", "SHA256SUMS"]);
 for (const a of m.artifacts) { known.add(a.name); known.add(a.name + ".spdx.json"); }
 const dmg = `Clawdline-${version}-macos-arm64.dmg`;
 // Only this delivery set is recognized; all three are verified below.
@@ -119,7 +119,7 @@ for archive in "$dir"/*.tar.gz; do
   mkdir -p "$d"
   tar -xzf "$archive" -C "$d"
 done
-cp "$dir/manifest.json" "$dir/manifest.sig.json" "$dir/SHA256SUMS" "$dir"/*.spdx.json "$work/unpacked/"
+cp "$dir/manifest.json" "$dir/manifest.sig.json" "$dir/manifest.sshsig" "$dir/SHA256SUMS" "$dir"/*.spdx.json "$work/unpacked/"
 
 if [ "$test_release" = 1 ]; then
   echo "macOS signature and notarization: skipped for a -test release"

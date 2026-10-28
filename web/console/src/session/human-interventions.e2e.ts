@@ -34,6 +34,9 @@ let noteCount = 1
 let showOptions = true
 let singleOption = false
 let secretMode = false
+// The receiving command the secret-mode Note declares; the card shows it and
+// the submission repeats it.
+const SECRET_COMMAND = ["/usr/bin/gh", "auth", "login", "--with-token"]
 let handoffValues: string[] = []
 let handoffDelay = 0
 let failHandoff = false
@@ -440,6 +443,7 @@ function fixture(): Server {
         document_url: secretMode ? "" : origin + `/#document=1&machine=this-mac&session=${SESSION}&scope=project&path=demo.md`,
         detail: secretMode ? "" : ("The report is ready. Please review the proposed date and the linked evidence.\n").repeat(36), options: secretMode ? [] : showOptions ? [
           { label: "Tuesday", draft: "Tuesday works for me." }, ...singleOption ? [] : [{ label: "Wednesday", draft: "Wednesday works for me." }] ] : [],
+        ...secretMode ? { command: SECRET_COMMAND } : {},
         created_at: now, withdrawn, resolution: withdrawn ? "The prerequisite is satisfied." : "", read_at: readAt, resolved_at: resolvedAt, secret_received: secretMode && handoffValues.length > 0 && !resolvedAt, version }
       if (req.method === "GET") {
         noteReads++
@@ -456,6 +460,7 @@ function fixture(): Server {
           if (secretMode && path.endsWith("/handoff")) {
             return setTimeout(() => {
               if (failHandoff) return json(res, 503, { error: "machine_offline" })
+              if (JSON.stringify(body.command) !== JSON.stringify(SECRET_COMMAND)) return json(res, 409, { error: "secret_handoff_command_unconfirmed" })
               handoffValues.push(body.value)
               json(res, 200, { ok: true, received: true })
             }, handoffDelay)
@@ -980,6 +985,8 @@ test("Secret Handoff pastes one-line and multi-line values without sending them 
     assert.equal(await run(`document.querySelector(".human-intervention-title")?.textContent?.includes("Production API key")`), false)
     assert.equal(await run(`!!document.querySelector(".secret-handoff-form input")`), false)
     assert.equal(await run(`!!document.querySelector(".human-intervention-option")`), false)
+    assert.equal(await run(`document.querySelector(".secret-handoff-destination code")?.textContent`), "/usr/bin/gh auth login --with-token",
+      "the receiving command is shown before the value is handed off")
     await run(`document.querySelector(".secret-handoff-form textarea").value = "SAFE_ONE_LINE_FIXTURE"; document.querySelector(".secret-handoff-form button[type=submit]").click()`)
     await until(`document.querySelector(".secret-handoff-form button")?.textContent?.includes("安全交付中")`)
     assert.equal(await run(`document.querySelector(".secret-handoff-form textarea")?.disabled`), true)

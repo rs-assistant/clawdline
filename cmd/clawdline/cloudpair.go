@@ -270,8 +270,8 @@ func cloudDevicesCommand() {
 	// the ones it never paired read like strangers that got in.
 	if accountOnly {
 		fmt.Println()
-		fmt.Println(cliCopy("cloud", "devices.account_only_legend",
-			"account only: a browser on your Clawdline Cloud account that was paired with another of your machines, not this one. It is admitted here too; `clawdline cloud revoke <device-id>` refuses it on this machine."))
+		fmt.Println(cliCopy("cloud", "devices.account_only_unpaired",
+			"account only: a browser on your Clawdline Cloud account that was paired with another of your machines, not this one. It is not admitted here: this machine trusts only browsers it paired itself. Run `clawdline cloud pair` to pair it here."))
 	}
 }
 
@@ -281,20 +281,34 @@ func cloudRevokeCommand(args []string) {
 		fmt.Fprintln(os.Stderr, cliCopy("cloud", "revoke.usage", "usage: clawdline cloud revoke <device-id>"))
 		os.Exit(2)
 	}
-	var answer struct {
-		Device  string `json:"device"`
-		Revoked bool   `json:"revoked"`
-	}
+	var answer cloudtransport.RevokeOutcome
 	if err := cloudDaemonJSON(http.MethodPost, "/v1/cloud/devices/revoke",
 		map[string]any{"device": strings.TrimSpace(args[0])}, &answer); err != nil {
 		fail(err)
 	}
+	printRevokeOutcome(os.Stdout, answer)
+}
+
+// printRevokeOutcome says what a revocation did. The content key line is the
+// one a person must not miss: every other browser paired here stops working
+// until it is paired again, and they are named so the person knows which.
+func printRevokeOutcome(out io.Writer, answer cloudtransport.RevokeOutcome) {
 	if !answer.Revoked {
-		fmt.Printf(cliCopy("cloud", "revoke.no_change", "nothing changed: %s was not a browser this machine had pinned\n"), answer.Device)
+		fmt.Fprintf(out, cliCopy("cloud", "revoke.no_change", "nothing changed: %s was not a browser this machine had pinned\n"), answer.Device)
 		return
 	}
-	fmt.Printf(cliCopy("cloud", "revoke.revoked", "revoked    %s\n"), answer.Device)
-	fmt.Println(cliCopy("cloud", "revoke.refusal", "           its next envelope is refused here, whatever the account's list says"))
+	fmt.Fprintf(out, cliCopy("cloud", "revoke.revoked", "revoked    %s\n"), answer.Device)
+	fmt.Fprintln(out, cliCopy("cloud", "revoke.refusal", "           its next envelope is refused here, whatever the account's list says"))
+	if !answer.SecretReplaced {
+		// A daemon from before the key replacement answers without the field.
+		fmt.Fprintln(out, cliCopy("cloud", "revoke.secret_kept",
+			"           this machine's content key was NOT replaced, so the revoked browser may still read what this machine sends"))
+		return
+	}
+	fmt.Fprintln(out, cliCopy("cloud", "revoke.secret_replaced",
+		"           this machine's content key was replaced, so the revoked browser cannot read what this machine sends from now on"))
+	fmt.Fprintln(out, cliCopy("cloud", "revoke.rekey",
+		"Other browsers paired here fetch the new key on their own. A browser paired before this machine could rotate its key has to be paired again (`clawdline cloud pair`)."))
 }
 
 // cloudRotateCommand replaces this machine's signing key.

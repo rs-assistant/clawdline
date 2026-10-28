@@ -7,8 +7,8 @@
 # --dmg verifies only the three delivery assets at their packaging commit;
 # gate.sh independently pins that commit and verifies original release evidence.
 #
-# Each asset (every archive, its SBOM, manifest.json, manifest.sig.json and
-# SHA256SUMS) must carry a GitHub artifact attestation (SLSA provenance, signed
+# Each asset (every archive, its SBOM, manifest.json, manifest.sig.json,
+# manifest.sshsig and SHA256SUMS) must carry a GitHub artifact attestation (SLSA provenance, signed
 # through Sigstore) that `gh attestation verify` accepts for
 #   repository     sainteye/clawdline
 #   signer         .github/workflows/release.yml on refs/heads/main
@@ -72,7 +72,7 @@ assets=()
 if [ "$dmg" = 1 ]; then
   candidates=("$dir"/*.dmg "$dir"/*.dmg.spdx.json "$dir"/*.dmg.delivery.json)
 else
-  candidates=("$dir"/*.tar.gz "$dir"/*.spdx.json "$dir/manifest.json" "$dir/manifest.sig.json" "$dir/SHA256SUMS")
+  candidates=("$dir"/*.tar.gz "$dir"/*.spdx.json "$dir/manifest.json" "$dir/manifest.sig.json" "$dir/manifest.sshsig" "$dir/SHA256SUMS")
 fi
 for f in ${candidates[@]+"${candidates[@]}"}; do
   [ "$dmg" != 0 ] || [[ "$f" != *.dmg.spdx.json ]] || continue

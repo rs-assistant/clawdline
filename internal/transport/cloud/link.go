@@ -27,6 +27,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -149,9 +150,10 @@ type Viewer struct {
 	Caps        []string `json:"caps,omitempty"`
 	Fingerprint string   `json:"fingerprint,omitempty"`
 	// Pinned is whether this machine itself handed that device the account
-	// key. A row that is only in the account's roster is listed too, because
-	// it is still admitted — but the two are different amounts of evidence and
-	// the settings page says which is which.
+	// key. Only a pinned row is admitted. A row that is only in the account's
+	// roster is listed too, so that a browser paired with another machine is
+	// visible here, but it can neither send nor read until it pairs with this
+	// one; the settings page says which is which.
 	Pinned bool `json:"pinned"`
 	// PairedAt is when this machine pinned it, Unix seconds.
 	PairedAt int64 `json:"paired_at,omitempty"`
@@ -225,6 +227,12 @@ type LinkOptions struct {
 	// QueueDepth is how many decrypted requests may wait for the bridge: the
 	// capacity register's `cloud.relay_queue` limit. Zero is its default.
 	QueueDepth int
+	// ReadQueueDepth may lower the read waiting queue independently of ingress.
+	// Zero uses CloudReadQueueLimit; it cannot raise that bound.
+	ReadQueueDepth int
+	// RefusalQueueDepth may lower the queue for busy replies. A stalled reply
+	// never holds the dispatcher, and cannot grow an unbounded set of senders.
+	RefusalQueueDepth int
 	// SpoolRows and SpoolBytes are the outbound spool's two global caps: the
 	// register's `cloud.spool` and `cloud.spool_bytes` limits. Zero, or a
 	// number above the default, is the default.
@@ -264,6 +272,13 @@ type Link struct {
 	status    *adaptercloud.StatusRecorder
 	service   Service
 
+	// replay is the inbound replay window and replayJournal its copy on disk.
+	// Both belong to the link, not to one wire(): a rotation rebuilds the
+	// transport, and a transport that brought its own empty window would
+	// accept again whatever the one before it had accepted.
+	replay        *domaincloud.ReplayWindow
+	replayJournal *adaptercloud.ReplayJournal
+
 	mu        sync.Mutex
 	state     string
 	lastErr   string
@@ -273,8 +288,14 @@ type Link struct {
 	refused   int
 	// reading is how many reads are being answered beside the command lane,
 	// at most CloudReadConcurrencyLimit.
-	reading     int
-	fingerprint string
+	reading            int
+	readQueue          chan pending
+	readFlights        map[*readFlight]struct{}
+	readQueueRefused   int64
+	readPressureAt     time.Time
+	laneRefusals       chan laneRefusal
+	laneRefusalDropped int64
+	fingerprint        string
 	// taskListMoved is set when this machine has written a task row and
 	// cleared by the publisher pass that reads the list because of it
 	// (TaskListChanged, tasklist.go). It is on the Link rather than on the
@@ -286,6 +307,8 @@ type Link struct {
 	// stopRun cancels the socket currently up, and rotated says the next
 	// `Run` iteration should rebuild rather than return. They are one pair:
 	// a cancel with no flag is a shutdown, a cancel with it is a rotation.
+	// rotated is also read before a socket starts, so a key replaced in the
+	// moment between two sockets is not carried into the next one.
 	stopRun context.CancelFunc
 	rotated bool
 
@@ -363,13 +386,13 @@ const (
 	// the answer could not be read. Terminal rights fail closed, but the
 	// answer is retryable (terminal_busy), never a revocation.
 	TerminalUnverified TerminalVerdict = iota
-	// TerminalAllowed means a roster read fresh within
-	// CloudTerminalRosterRefreshLimit names the viewer, unrevoked, with
-	// the same key this machine verifies its envelopes with.
+	// TerminalAllowed means this machine pinned the viewer and a roster read
+	// fresh within CloudTerminalRosterRefreshLimit still names it,
+	// unrevoked, with the pinned key.
 	TerminalAllowed
 	// TerminalDenied means a fact this machine holds says no: Cloud or Cloud
-	// commands are off here, this machine revoked the device, or a fresh
-	// roster lacks the device, marks it revoked or names a
+	// commands are off here, this machine revoked or never paired the
+	// device, or a fresh roster lacks the device, marks it revoked or names a
 	// different key than the pin.
 	TerminalDenied
 )
@@ -425,9 +448,9 @@ func (l *Link) TerminalViewerAllowed(device string) bool {
 // is only the Cloud-side prerequisite for a relay connection registration:
 // the grant is checked again after that registration, so a locally refused
 // viewer can receive a keyed refusal. With withKey it uses the same locally
-// revoked, pin-first sender key as Cloud commands, plus a fresh roster. A
-// viewer without a local pin must have reached this point through an
-// authenticated, decrypted terminal envelope carrying this machine's content key.
+// revoked, pin-only sender key as Cloud commands, plus a fresh roster that may
+// deny but never admit: a viewer without a local pin is denied, whatever the
+// roster or an earlier terminal envelope says.
 func (l *Link) terminalAuthority(device string, withKey bool) (TerminalVerdict, string) {
 	if !l.settings.Enabled {
 		return TerminalDenied, "Cloud is off on this machine"
@@ -460,12 +483,18 @@ func (l *Link) terminalAuthority(device string, withKey bool) (TerminalVerdict, 
 			pinnedKey = key
 		}
 	}
-	if withKey && pinnedKey == nil {
+	if withKey {
+		// Only a pin admits. A key an authenticated terminal envelope carried
+		// is kept as a second fact, not as a substitute: a connection opened
+		// under a key that is no longer the pinned one does not continue.
+		if pinnedKey == nil {
+			return TerminalDenied, "this machine has not paired the device"
+		}
 		l.terminalMu.Lock()
 		authenticatedKey = l.terminalAuthenticated[device]
 		l.terminalMu.Unlock()
-		if authenticatedKey == nil {
-			return TerminalDenied, "this device has not authenticated a terminal envelope for this machine"
+		if authenticatedKey != nil && !bytes.Equal(authenticatedKey, pinnedKey) {
+			return TerminalDenied, "the device's terminal envelopes were verified with a key that is not its pin"
 		}
 	}
 	if l.roster == nil {
@@ -656,6 +685,14 @@ func Open(opts LinkOptions) (*Link, error) {
 	}
 	link.identity = identity
 	link.pinned = adaptercloud.NewPinnedStore(keys.Dir())
+	// The replay window is seeded from disk before the first socket can
+	// deliver anything. A journal that cannot be read stops the line, for the
+	// reason an unreadable pin file does: reading it as empty is the replay.
+	link.replay = domaincloud.NewReplayWindow(0)
+	if link.replayJournal, err = adaptercloud.OpenReplayJournal(keys.Dir(), opts.Now, link.replay); err != nil {
+		link.fail(err)
+		return link, nil
+	}
 	link.pairing = &Pairing{
 		AccountID:  identity.AccountID,
 		MachineID:  identity.MachineID,
@@ -800,7 +837,8 @@ func (l *Link) wire() error {
 		Signer:               key,
 		Spool:                spool,
 		Status:               status,
-		Replay:               domaincloud.NewReplayWindow(0),
+		Replay:               l.replay,
+		ReplayJournal:        l.replayJournal,
 		Inbound:              l.relay.Deliver,
 		DirectInbound:        l.relay.DeliverDirect,
 		InboundTraced:        l.relay.DeliverTraced,
@@ -997,6 +1035,21 @@ func (l *Link) Run(ctx context.Context) error {
 		}
 		inner, stop := context.WithCancel(ctx)
 		l.mu.Lock()
+		if l.rotated {
+			// A key was replaced while no socket was up to take down. Building
+			// the socket from what wire() captured before would seal with the
+			// replaced key, so rebuild first. The flag is read and stopRun set
+			// under one lock, so a rotation is either seen here or sees a
+			// socket it can stop.
+			l.rotated = false
+			l.mu.Unlock()
+			stop()
+			if err := l.wire(); err != nil {
+				l.fail(err)
+				return err
+			}
+			continue
+		}
 		l.stopRun = stop
 		l.mu.Unlock()
 		err := l.runOnce(inner)
@@ -1116,11 +1169,18 @@ func (l *Link) refreshRoster(ctx context.Context) {
 	}
 }
 
-// CloudReadConcurrencyLimit is how many Cloud reads may be answered at once
-// beside the command lane. Past it a read is told `cloud_ingress_busy` at once
-// rather than waited for: waiting would put the command lane behind reads,
-// which is the same stall the other way round.
+// CloudReadConcurrencyLimit bounds execution, independently of waiting reads.
+// A finite burst may wait without making the dispatcher or command lane wait.
 const CloudReadConcurrencyLimit = 8
+
+// CloudReadQueueLimit bounds reads waiting for those workers. Only a full
+// waiting queue is refused as cloud_ingress_busy; eight occupied workers alone
+// are ordinary load, not evidence that the next read cannot be answered.
+const CloudReadQueueLimit = 64
+
+// CloudLaneRefusalsLimit bounds pending busy replies independently of reads
+// and commands. A blocked carrier or spool must not hold their dispatcher.
+const CloudLaneRefusalsLimit = 16
 
 // runService answers requests, counting what it answered.
 //
@@ -1133,15 +1193,15 @@ const CloudReadConcurrencyLimit = 8
 // answer it — the Board's Project picker and the new-session dialog both wait
 // on `places`, and both stayed there while one request upstream never
 // returned and the pushed Session list kept moving. So a read is answered
-// beside the command lane, up to CloudReadConcurrencyLimit at once.
+// beside the command lane, up to CloudReadConcurrencyLimit at once, with a
+// separate bounded FIFO for bursts while those workers are occupied.
 //
 // Neither lane may make this goroutine wait, because whatever it waits on is
 // what every later request of the other kind waits behind. A read past its
-// bound and a command past the lane's depth are both answered
-// `cloud_ingress_busy` at once — the sentence Relay already sends for a full
-// queue, which the hosted console draws as "busy, try again", rather than a
-// request that silently never returns. The refusal asks no route, so it
-// cannot be what is stuck.
+// waiting queue and a command past the lane's depth both queue a typed
+// `cloud_ingress_busy` reply. That reply has its own bounded worker: even a
+// small answer can be stuck in a carrier or spool, and that must not hold the
+// next command. A reply that cannot even be queued is counted as unanswered.
 //
 // Every answer this starts is waited for before it returns, so nothing is
 // written after the link has stopped.
@@ -1153,6 +1213,31 @@ func (l *Link) runService(ctx context.Context) error {
 	// now, and no more.
 	depth := l.relay.QueueDepth()
 	commands := make(chan pending, depth)
+	readDepth := min(depth, CloudReadQueueLimit)
+	if l.opts.ReadQueueDepth > 0 {
+		readDepth = min(readDepth, l.opts.ReadQueueDepth)
+	}
+	reads := make(chan pending, readDepth)
+	refusalDepth := CloudLaneRefusalsLimit
+	if l.opts.RefusalQueueDepth > 0 {
+		refusalDepth = min(refusalDepth, l.opts.RefusalQueueDepth)
+	}
+	refusals := make(chan laneRefusal, refusalDepth)
+	l.mu.Lock()
+	l.readQueue = reads
+	l.laneRefusals = refusals
+	l.mu.Unlock()
+	answers.Add(1)
+	go func() { defer answers.Done(); l.runLaneRefusals(ctx, refusals) }()
+	defer close(refusals)
+	for i := 0; i < CloudReadConcurrencyLimit; i++ {
+		answers.Add(1)
+		go func() {
+			defer answers.Done()
+			l.runReads(ctx, reads)
+		}()
+	}
+	defer close(reads)
 	answers.Add(1)
 	go func() {
 		defer answers.Done()
@@ -1160,13 +1245,27 @@ func (l *Link) runService(ctx context.Context) error {
 	}()
 	defer close(commands)
 	requests := l.relay.Requests()
+	ingressRefusals := l.relay.Refused()
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case request, open := <-ingressRefusals:
+			if !open {
+				ingressRefusals = nil
+				if requests == nil {
+					return nil
+				}
+				continue
+			}
+			l.queueBusy(refusals, laneRefusal{service: l.service, request: request, lane: "ingress", limit: depth, ingress: true})
 		case request, open := <-requests:
 			if !open {
-				return nil
+				requests = nil
+				if ingressRefusals == nil {
+					return nil
+				}
+				continue
 			}
 			// The service is taken here, on this goroutine, for every answer
 			// started off it: a rotation rewires l.service and must not race
@@ -1184,17 +1283,18 @@ func (l *Link) runService(ctx context.Context) error {
 					l.answerTraced(ctx, service, request, h, connectionhealth.LocSessionsHandler)
 				}()
 			case cloudops.IsRead(request.Plaintext):
-				if !l.takeReadSlot() {
-					l.refuseBusy(ctx, service, request, "read lane", CloudReadConcurrencyLimit)
-					continue
-				}
 				h := l.lanePhase(request, connectionhealth.ClassRead, connectionhealth.LocReadLane)
-				answers.Add(1)
-				go func() {
-					defer answers.Done()
-					defer l.releaseReadSlot()
-					l.answerTraced(ctx, service, request, h, connectionhealth.LocReadHandler)
-				}()
+				select {
+				case reads <- pending{service: service, request: request, health: h, queuedAt: time.Now()}:
+					l.observeReadPressure(request)
+				default:
+					h.End(false)
+					l.mu.Lock()
+					l.readQueueRefused++
+					l.mu.Unlock()
+					l.observeReadPressure(request)
+					l.queueBusy(refusals, laneRefusal{service: service, request: request, lane: "read queue", limit: readDepth})
+				}
 			default:
 				// The phase begins before the send, so a command waiting
 				// behind a stuck one shows lane_queued with its own age.
@@ -1203,19 +1303,83 @@ func (l *Link) runService(ctx context.Context) error {
 				case commands <- pending{service: service, request: request, health: h}:
 				default:
 					h.End(false)
-					l.refuseBusy(ctx, service, request, "command lane", depth)
+					l.queueBusy(refusals, laneRefusal{service: service, request: request, lane: "command lane", limit: depth})
 				}
 			}
 		}
 	}
 }
 
-// pending is one command waiting for its turn, with the service that was
-// current when it arrived.
-type pending struct {
+type laneRefusal struct {
 	service Service
 	request Inbound
-	health  connectionhealth.Handle
+	lane    string
+	limit   int
+	ingress bool
+}
+
+func (l *Link) queueBusy(queue chan<- laneRefusal, next laneRefusal) {
+	select {
+	case queue <- next:
+	default:
+		l.unansweredBusy(next, "the busy reply queue is full")
+	}
+}
+
+func (l *Link) unansweredBusy(next laneRefusal, why string) {
+	l.mu.Lock()
+	l.laneRefusalDropped++
+	l.mu.Unlock()
+	if next.ingress {
+		l.relay.Unanswered(next.request, why)
+	} else {
+		l.logf("cloud: a full %s refused a request and its sender could not be told: %s", next.lane, why)
+	}
+}
+
+func (l *Link) runLaneRefusals(ctx context.Context, queue <-chan laneRefusal) {
+	for next := range queue {
+		if ctx.Err() != nil {
+			l.unansweredBusy(next, "the Cloud line stopped before its busy reply")
+			continue
+		}
+		if !l.refuseBusy(ctx, next.service, next.request, next.lane, next.limit) {
+			l.unansweredBusy(next, "the busy reply could not be published")
+		}
+	}
+}
+
+// pending is one read or command waiting for its turn, with the service that was
+// current when it arrived.
+type pending struct {
+	service  Service
+	request  Inbound
+	health   connectionhealth.Handle
+	queuedAt time.Time
+}
+
+// runReads uses a fixed pool: neither a burst nor an unresponsive route can
+// grow the number of executing goroutines. Cancellation discards queued reads
+// before routing them; a normal queue close drains the reads already accepted.
+func (l *Link) runReads(ctx context.Context, reads <-chan pending) {
+	for next := range reads {
+		if ctx.Err() != nil {
+			next.health.End(false)
+			continue
+		}
+		flight := l.takeReadSlot(next)
+		l.observeReadPressure(next.request)
+		func() {
+			defer l.releaseReadSlot(flight)
+			service := next.service
+			service.ReadHandled = func() {
+				l.mu.Lock()
+				flight.handledAt = time.Now()
+				l.mu.Unlock()
+			}
+			l.answerTraced(ctx, service, next.request, next.health, connectionhealth.LocReadHandler)
+		}()
+	}
 }
 
 // runCommands answers commands one at a time until the lane is closed. A
@@ -1231,27 +1395,116 @@ func (l *Link) runCommands(ctx context.Context, commands <-chan pending) {
 	}
 }
 
-// takeReadSlot claims one of the read lane's slots, or reports that none is
-// free. It never waits: the goroutine asking is the command lane's.
-func (l *Link) takeReadSlot() bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.reading >= CloudReadConcurrencyLimit {
-		return false
-	}
-	l.reading++
-	return true
+type readFlight struct {
+	word, rail                     string
+	queuedAt, startedAt, handledAt time.Time
+	observed                       bool
 }
 
-func (l *Link) releaseReadSlot() {
+// readKind logs catalog words and channel families only, never a body, Session
+// identifier, request key, or arbitrary text supplied by a viewer.
+func readKind(request Inbound) (word, rail string) {
+	var body struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(request.Plaintext, &body) == nil && cloudops.Knows(body.Type) {
+		word = body.Type
+	} else {
+		word = "unknown"
+	}
+	rail = "unknown"
+	if strings.HasPrefix(request.Channel, "ctl/") {
+		rail = "ctl"
+	}
+	if strings.HasPrefix(request.Channel, "r/") {
+		rail = "r"
+	}
+	return
+}
+
+// Only the fixed read workers take slots. Tracking lives for exactly the same
+// scope as execution, including authorization and publication failures.
+func (l *Link) takeReadSlot(next pending) *readFlight {
+	word, rail := readKind(next.request)
+	f := &readFlight{word: word, rail: rail, queuedAt: next.queuedAt, startedAt: time.Now()}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.readFlights == nil {
+		l.readFlights = make(map[*readFlight]struct{})
+	}
+	l.reading++
+	// A read queued at the last pressure snapshot still needs its own queue
+	// timing when it starts, including the last item leaving the FIFO.
+	f.observed = len(l.readQueue) > 0 || (!l.readPressureAt.IsZero() && !f.queuedAt.After(l.readPressureAt))
+	l.readFlights[f] = struct{}{}
+	return f
+}
+
+func (l *Link) releaseReadSlot(f *readFlight) {
+	now := time.Now()
 	l.mu.Lock()
 	l.reading--
+	delete(l.readFlights, f)
+	observed, handledAt := f.observed, f.handledAt
 	l.mu.Unlock()
+	if observed || now.Sub(f.startedAt) > slowReadAnswer {
+		if handledAt.IsZero() {
+			handledAt = now
+		}
+		l.logf("cloud: read slot released: operation=%s rail=%s queue_ms=%d handler_ms=%d publish_ms=%d slot_ms=%d",
+			f.word, f.rail, f.startedAt.Sub(f.queuedAt).Milliseconds(), handledAt.Sub(f.startedAt).Milliseconds(),
+			now.Sub(handledAt).Milliseconds(), now.Sub(f.startedAt).Milliseconds())
+	}
+}
+
+// Pressure snapshots explain all active slots, including time spent waiting
+// for shared authority or publication. Fast quiet reads still produce no log.
+func (l *Link) observeReadPressure(request Inbound) {
+	now := time.Now()
+	l.mu.Lock()
+	if l.reading != CloudReadConcurrencyLimit || len(l.readQueue) == 0 {
+		l.mu.Unlock()
+		return
+	}
+	var slots []string
+	l.readPressureAt = now
+	for f := range l.readFlights {
+		f.observed = true
+		phase := "handler"
+		if !f.handledAt.IsZero() {
+			phase = "publish"
+		}
+		slots = append(slots, fmt.Sprintf("%s/%s:%s:%dms", f.rail, f.word, phase, now.Sub(f.startedAt).Milliseconds()))
+	}
+	waiting := len(l.readQueue)
+	l.mu.Unlock()
+	word, rail := readKind(request)
+	l.logf("cloud: read workers occupied: operation=%s rail=%s waiting=%d active=%d slots=[%s]",
+		word, rail, waiting, CloudReadConcurrencyLimit, strings.Join(slots, ","))
+}
+
+// ReadLaneReadings exposes execution and waiting separately; a busy worker
+// pool must not be reported as a full ingress queue.
+func (l *Link) ReadLaneReadings() (active, waiting capacity.Reading) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	active = capacity.Reading{Known: true, Used: int64(l.reading)}
+	waiting = capacity.Reading{Known: true, Used: int64(len(l.readQueue)), Counters: capacity.Counters{Refused: l.readQueueRefused}}
+	if l.readQueue != nil && cap(l.readQueue) != CloudReadQueueLimit {
+		waiting.Note = fmt.Sprintf("the read queue holds %d, not the register's %d", cap(l.readQueue), CloudReadQueueLimit)
+	}
+	return
+}
+
+func (l *Link) LaneRefusalReading() capacity.Reading {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return capacity.Reading{Known: true, Used: int64(len(l.laneRefusals)), Counters: capacity.Counters{Dropped: l.laneRefusalDropped}}
 }
 
 // refuseBusy tells a request a lane had no room for that it was not taken,
 // and counts it as an answered refusal.
-func (l *Link) refuseBusy(ctx context.Context, service Service, request Inbound, lane string, limit int) {
+func (l *Link) refuseBusy(ctx context.Context, service Service, request Inbound, lane string, limit int) bool {
 	why := service.Busy(ctx, request, limit)
 	l.mu.Lock()
 	l.answered++
@@ -1260,10 +1513,11 @@ func (l *Link) refuseBusy(ctx context.Context, service Service, request Inbound,
 	if why != "" {
 		l.logf("cloud: a request from %s seq=%d was refused at a full %s (%d) and its sender could not be told: %s",
 			request.Sender, request.Sequence, lane, limit, why)
-		return
+		return false
 	}
 	l.logf("cloud: the %s is full (%d); refused a request from %s seq=%d, and its sender is told to retry",
 		lane, limit, request.Sender, request.Sequence)
+	return true
 }
 
 // lanePhase begins the finite phase of one request as it is put on a lane.
@@ -1346,38 +1600,38 @@ func (l *Link) operationAccess() (bool, bool) {
 //  1. **A device this machine threw out is refused**, whatever anything else
 //     says. A local revocation that the account's roster could undo would not
 //     be a revocation.
-//  2. **A pin wins.** The key came out of a sealed offer this machine opened
-//     itself; the control plane never saw it in the clear and so cannot
-//     substitute one.
-//  3. **The roster is the fallback**, for a viewer paired before the pin file
-//     existed. It is the fourth wave's behaviour, kept rather than removed so
-//     that a browser that already works does not stop working — and it is the
-//     weaker answer, which is why the settings page marks which rows are pins.
+//  2. **Only a pin supplies a key.** The key came out of a sealed offer this
+//     machine opened itself; the control plane never saw it in the clear and
+//     so cannot substitute one.
+//  3. **The roster never supplies a key.** It used to be the fallback, for a
+//     viewer paired before the pin file existed, which meant a key the
+//     operator's roster named was trusted here: whoever could add a roster row
+//     and held an old copy of this machine's content key could send. The
+//     roster can still take a pinned device away (`authority`,
+//     `terminalAuthority`), but it cannot add one. A browser that was only
+//     ever on the roster is paired with `clawdline cloud pair`.
 //
 // An unreadable pin file refuses everybody rather than falling through, for
 // the reason `pinned.go` gives: falling through is exactly the substitution
 // the pins exist against.
 func (l *Link) publicKeyFor(sender string) (ed25519.PublicKey, bool) {
-	if l.pinned != nil {
-		refused, err := l.pinned.Refused(sender)
-		if err != nil {
-			l.logf("cloud: the paired-device file cannot be read, so no sender is admitted: %v", err)
-			return nil, false
-		}
-		if refused {
-			return nil, false
-		}
-		if key, ok, err := l.pinned.PublicKeyFor(sender); err != nil {
-			l.logf("cloud: the paired-device file cannot be read, so no sender is admitted: %v", err)
-			return nil, false
-		} else if ok {
-			return key, true
-		}
-	}
-	if l.roster == nil {
+	if l.pinned == nil {
 		return nil, false
 	}
-	return l.roster.PublicKeyFor(sender)
+	refused, err := l.pinned.Refused(sender)
+	if err != nil {
+		l.logf("cloud: the paired-device file cannot be read, so no sender is admitted: %v", err)
+		return nil, false
+	}
+	if refused {
+		return nil, false
+	}
+	key, ok, err := l.pinned.PublicKeyFor(sender)
+	if err != nil {
+		l.logf("cloud: the paired-device file cannot be read, so no sender is admitted: %v", err)
+		return nil, false
+	}
+	return key, ok
 }
 
 // Pairing is the handover this link drives, for the routes that start one.
@@ -1406,33 +1660,44 @@ func (l *Link) pairingKeys() (domaincloud.DeviceKey, domaincloud.ContentKey, err
 	return key, secret, nil
 }
 
-// authority is cloudops' re-read at the point of no return.
+// authority is cloudops' re-read at the point of no return, for commands and,
+// since reads are re-checked too, for ctl/ reads.
 //
-// The roster is the account's, not this machine's: a device the person removed
-// in the hosted console stops being able to act here at the next refresh.
-// Every active viewer that can authenticate and decrypt this machine's
-// envelope may send while Cloud commands are enabled. The transport already
-// verified both before calling the bridge. A local pin, when present, still
-// overrides the roster key; a local revocation always denies the viewer.
+// Two sources, with different powers. **The pin admits**: only a device this
+// machine paired itself, still unrevoked, and whose pinned key is the key the
+// envelope was verified with, may act or read here. **The roster can only
+// deny**: it is the account's, not this machine's, so a device the person
+// removed in the hosted console stops being able to act here at the next
+// refresh — but a roster row for a device this machine never pinned admits
+// nothing, and a roster key never stands in for a pin. A local revocation
+// always denies the viewer, before the roster is consulted.
 func (l *Link) authority(ctx context.Context, sender string, verifiedKey ed25519.PublicKey, requiresWriteGate bool) cloudops.Authority {
-	readable, _ := l.roster.Readable()
-	var pairedKey ed25519.PublicKey
-	if l.pinned != nil {
-		if refused, err := l.pinned.Refused(sender); err != nil || refused {
-			// A device this machine threw out, or a pin file it cannot read.
-			// Either way the answer is no, and it is no before the roster is
-			// consulted: the roster is the thing a revocation has to beat.
-			return cloudops.Authority{ClockReady: true, RosterReadable: readable}
-		}
-		if key, ok, err := l.pinned.PublicKeyFor(sender); err == nil && ok {
-			pairedKey = key
-		}
+	var readable bool
+	if l.roster != nil {
+		readable, _ = l.roster.Readable()
+	}
+	if l.pinned == nil {
+		return cloudops.Authority{ClockReady: true, RosterReadable: readable}
+	}
+	if refused, err := l.pinned.Refused(sender); err != nil || refused {
+		// A device this machine threw out, or a pin file it cannot read.
+		// Either way the answer is no, and it is no before the roster is
+		// consulted: the roster is the thing a revocation has to beat.
+		return cloudops.Authority{ClockReady: true, RosterReadable: readable}
+	}
+	pairedKey, pinned, err := l.pinned.PublicKeyFor(sender)
+	if err != nil || !pinned || !bytes.Equal(pairedKey, verifiedKey) {
+		// Not paired with this machine, or paired under a different key than
+		// the one this envelope was verified with: the roster cannot make up
+		// for either.
+		return cloudops.Authority{ClockReady: true, RosterReadable: readable}
 	}
 	a := cloudops.Authority{
-		// The clock guard is not wired yet; the transport admits on the relay's
-		// own timestamp window today. Saying `true` here is reporting what is
-		// actually checked rather than claiming a check that does not run —
-		// see docs/records/cloud-wire-implementation-2026-09.md §16.4.
+		// The clock guard is not wired yet; the transport admits on its own
+		// copy of the relay's timestamp window (MaxTimestampSkew around this
+		// machine's clock). Saying `true` here is reporting what is actually
+		// checked rather than claiming a check that does not run — see
+		// docs/records/cloud-wire-implementation-2026-09.md §16.4.
 		ClockReady:     true,
 		RosterReadable: readable,
 	}
@@ -1448,9 +1713,10 @@ func (l *Link) authority(ctx context.Context, sender string, verifiedKey ed25519
 		}
 		if requiresWriteGate {
 			rosterKey, err := base64.StdEncoding.DecodeString(device.PublicKey)
+			// The pin already equals verifiedKey; a roster naming another key
+			// for the same device is a disagreement, and a disagreement denies.
 			if err != nil || len(rosterKey) != ed25519.PublicKeySize ||
-				!bytes.Equal(rosterKey, verifiedKey) ||
-				(pairedKey != nil && !bytes.Equal(rosterKey, pairedKey)) {
+				!bytes.Equal(rosterKey, pairedKey) {
 				return a
 			}
 		}
@@ -1506,7 +1772,9 @@ func (l *Link) transcriptAuthority(ctx context.Context, sender string, verifiedK
 		}
 		if l.pinned != nil {
 			pinned, ok, err := l.pinned.PublicKeyFor(sender)
-			if err != nil || ok && !bytes.Equal(pinned, key) {
+			// authority already required the pin; asked again here because
+			// the file may have changed while the roster was being read.
+			if err != nil || !ok || !bytes.Equal(pinned, key) {
 				a.RosterAllowsSender = false
 				return a
 			}
@@ -1554,6 +1822,18 @@ func (l *Link) SpoolChannelReadings() (channelBytes, receipts capacity.Reading, 
 	return channelBytes, receipts, true
 }
 
+// ReplayJournalReadings are the replay journal's `cloud.replay_journal_rows`
+// and `cloud.replay_journal_bytes`. ok is false when this link has no
+// journal: the switch is off, the machine is not enrolled, or the journal
+// could not be read (which stops the line, and LastError says why).
+func (l *Link) ReplayJournalReadings() (rows, bytes capacity.Reading, ok bool) {
+	if l.replayJournal == nil {
+		return capacity.Reading{}, capacity.Reading{}, false
+	}
+	return capacity.Reading{Known: true, Used: int64(l.replayJournal.Rows())},
+		capacity.Reading{Known: true, Used: l.replayJournal.Size()}, true
+}
+
 // SpoolRefusalReading is the same spool's `cloud.spool_refusals`.
 func (l *Link) SpoolRefusalReading() (capacity.Reading, bool) {
 	if l.relay == nil || l.relay.Spool == nil {
@@ -1592,10 +1872,10 @@ func (l *Link) Status() Status {
 	if l.relay != nil {
 		out.QueueRefused, out.QueueUnanswered = l.relay.Refusals()
 	}
-	// The viewer list is the two sources joined, in the order that decides
-	// admission: this machine's own pins, then the account's roster for
-	// anything it has never pinned. A row that is only in the roster is shown
-	// as such rather than silently equated with a pin.
+	// The viewer list is the two sources joined: this machine's own pins,
+	// which are what admits, then the account's roster for anything it has
+	// never pinned. A row that is only in the roster is shown as such rather
+	// than silently equated with a pin — it is not admitted here.
 	seen := map[string]int{}
 	if l.pinned != nil {
 		devices, err := l.pinned.Devices()
@@ -1892,17 +2172,25 @@ func (l *Link) RotateSigningKey(ctx context.Context, confirm bool) (RotationOutc
 		IdentityEpoch: rotated.IdentityEpoch,
 		Repair:        cost,
 	}
+	outcome.Reconnected = l.rewire()
+	return outcome, nil
+}
+
+// rewire asks Run to rebuild the line on whatever the key store now holds,
+// and takes down the socket that is up, if one is. It answers whether one was.
+//
+// The flag is set whether or not a socket is up: a Run that is between two
+// sockets reads it before it starts the next (see Run), so no socket is ever
+// built from keys captured before the change.
+func (l *Link) rewire() bool {
 	l.mu.Lock()
+	l.rotated = true
 	stop := l.stopRun
-	if stop != nil {
-		l.rotated = true
-	}
 	l.mu.Unlock()
 	if stop != nil {
-		outcome.Reconnected = true
 		stop()
 	}
-	return outcome, nil
+	return stop != nil
 }
 
 // setState records the line's own word for what it is doing.

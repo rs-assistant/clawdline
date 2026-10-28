@@ -122,6 +122,7 @@ internal/adapters/cloud.maxFailureCodeBytes # admission: one word the relay or t
 internal/adapters/cloud.maxFrameBytes # admission: one WebSocket frame from the relay
 internal/adapters/cloud.MaximumBackoff # parameter: the reconnect wait's ceiling
 internal/adapters/cloud.maxRelayURLBytes # admission: the relay URL setting
+internal/adapters/cloud.replayLineBytesLimit # derived: the longest valid replay journal row (= domain/cloud.MaxSegmentBytes + 43), the read slack past cloud.replay_journal_bytes
 internal/adapters/cloud.maxResponseBytes # read: one control-plane answer
 internal/adapters/cloudkeys.secretLimit # read: one key file
 internal/adapters/devices.auditFieldLimit # admission: one audit value, cut to 256 bytes (limits N12's silent cut, C3; C2 split the audit from the journal)
@@ -215,7 +216,7 @@ internal/domain/cloud.maxPairingIDBytes # admission: an id in a pairing document
 internal/domain/cloud.MaxSafeInteger # parameter: the largest integer JSON carries exactly
 internal/domain/cloud.MaxSegmentBytes # admission: one channel segment
 internal/domain/cloud.MaxServerWallDifference # parameter: how far a server clock sample may be
-internal/domain/cloud.MaxTimestampSkew # parameter: the relay's clock skew window
+internal/domain/cloud.MaxTimestampSkew # parameter: the relay's clock skew window, which inbound admission also enforces against this machine's clock
 internal/domain/cloud.MaxTrackedSenders # store: the replay window's senders, refuses new ones until restart (limits N21, a): C3
 internal/domain/icon.SplashLimit # admission: a launch image's size
 internal/domain/schedule.MaxCatchUpHours # parameter: how far back a schedule catches up
@@ -229,7 +230,7 @@ internal/transport/cloud.TaskListBytesLimit # page: those records' encoded bytes
 internal/transport/cloud.taskReadLimit # read: the finished tasks one orch/ pass reads, the page the local console's stream reads (50); unfinished tasks are all read, and are bounded by TaskListLimit on the way out
 internal/transport/cloud.NewFake:chan(depth) # lane: the test fake's request queue
 internal/transport/cloud.(*Relay).start:chan(refusalLane) # lane: requests the full queue turned away, waiting for their cloud_ingress_busy answer; past it the sender is not told and cloud.relay_queue counts it dropped (limits N20, C3)
-internal/transport/cloud.CloudReadConcurrencyLimit # lane: Cloud reads answered at once beside the ordered command lane, 8; past it the read is answered 429 cloud_ingress_busy with retry_after at once, never waited for, so nothing fills and a stuck command cannot hold a read (limits N20)
+internal/transport/cloud.CloudReadConcurrencyLimit # lane: eight Cloud read workers beside the ordered command lane; excess reads wait in the registered cloud.read_queue FIFO, whose overflow is answered 429 cloud_ingress_busy without blocking command dispatch (limits N20)
 internal/transport/cloud.(*Link).runService:chan(depth) # lane: Cloud commands waiting for the one worker that answers them in arrival order, as deep as cloud.relay_queue; past it the command is answered 429 cloud_ingress_busy at once, so the loop sorting requests never waits and nothing fills (limits N20)
 internal/transport/http.(*Server).pastRoute.limit # page: past conversations in one answer
 internal/transport/http.(*Server).projectReaders:chan(4) # lane: project readers at a time

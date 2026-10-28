@@ -346,3 +346,36 @@ func TestAFailedReservationWriteLeavesTheRecordAsItWas(t *testing.T) {
 		}
 	}
 }
+
+// A readonly reservation is written before the content key is released, so it
+// is not yet a pairing: the handover may still fail. On this fork only a pin
+// admits a sender (there is no roster fallback for the reservation to stand in
+// front of), so a reservation alone admits nobody. Reserving a device that is
+// already pinned keeps its pin.
+func TestAPendingReservationAdmitsNobodyUntilThePairingCompletes(t *testing.T) {
+	dir := t.TempDir()
+	s := NewPinnedStore(dir)
+	active := freshPin(t, "active")
+	if err := s.Pin("account", active); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"active", "new"} {
+		if err := s.ReserveReadOnly("account", freshPin(t, id)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	restarted := NewPinnedStore(dir)
+	if _, ok, err := restarted.PublicKeyFor("new"); err != nil || ok {
+		t.Fatalf("a pending reservation admitted its device: %v %v", ok, err)
+	}
+	if _, ok, err := restarted.PublicKeyFor("active"); err != nil || !ok {
+		t.Fatalf("reserving a pinned device dropped its pin: %v %v", ok, err)
+	}
+	completed := freshPin(t, "new")
+	if err := restarted.Pin("account", completed); err != nil {
+		t.Fatal(err)
+	}
+	if key, ok, err := restarted.PublicKeyFor("new"); err != nil || !ok || base64.StdEncoding.EncodeToString(key) != completed.PublicKey {
+		t.Fatalf("the completed pairing's pin does not admit: %v %v", ok, err)
+	}
+}

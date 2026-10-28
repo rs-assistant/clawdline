@@ -131,6 +131,7 @@ rm -rf "$pinclone"
 echo "== provenance (stub gh)"
 cp "$good/manifest.json" "$work/manifest.copy"
 printf '[]\n' >"$good/manifest.sig.json" # provenance needs every asset present; its content is not read here
+printf 'placeholder\n' >"$good/manifest.sshsig" # likewise
 cat >"$work/gh" <<'STUB'
 #!/bin/bash
 # What `gh attestation verify --format json` prints for one verified asset,
@@ -190,12 +191,14 @@ STUB_MODE=wrong-digest expect_fail "an attestation of another digest fails" 'sub
 STUB_MODE=gh-refuses expect_fail "an asset gh finds no attestation for fails" 'has no attestation' tools/release/provenance.sh "$good"
 d="$work/no-sig"; cp -R "$good" "$d"; rm "$d/manifest.sig.json"
 expect_fail "a release missing an asset fails" 'manifest.sig.json is missing' tools/release/provenance.sh "$d"
+d="$work/no-sshsig"; cp -R "$good" "$d"; rm "$d/manifest.sshsig"
+expect_fail "a release missing its SSH signature fails" 'manifest.sshsig is missing' tools/release/provenance.sh "$d"
 STUB_MODE=wrong-workflow expect_fail "an attestation whose statement names another workflow fails" 'workflow .github/workflows/ci.yml' tools/release/provenance.sh "$good"
 STUB_MODE=prefix-signer expect_fail "a signer whose workflow path only starts with release.yml fails" 'has no attestation' tools/release/provenance.sh "$good"
 CLAWDLINE_PROVENANCE_REPO=someone-else/clawdline CLAWDLINE_PROVENANCE_WORKFLOW=.github/workflows/release.yml STUB_MODE=someone-else \
   expect_fail "the environment cannot point provenance at another repository" 'has no attestation' tools/release/provenance.sh "$good"
 unset CLAWDLINE_GH
-rm "$good/manifest.sig.json"
+rm "$good/manifest.sig.json" "$good/manifest.sshsig"
 
 echo "== DMG delivery provenance (stub gh)"
 dmgs="$work/dmg-provenance"; mkdir "$dmgs"

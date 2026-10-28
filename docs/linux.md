@@ -407,6 +407,22 @@ section with a `+` that leads nowhere.
   `/accepted` and `/inflight` curls failed with exit 7. The file fallbacks the briefing documents
   (`accepted.json`, `progress.json`) and the broker's own collection of `result.json` carried the
   task through, which is the design working as written.
+- **On a machine with other users, a credential is taken only from this user's own sockets.** A
+  browser sends the console's cookie to every `127.0.0.1` port, so another user's local service
+  the person visits has it. The daemon looks up each loopback connection's client socket in
+  `/proc/net/tcp` and `/proc/net/tcp6` and refuses any credential (cookie, bearer, orchestrator
+  token, task secret, a token handed to `/v1/auth/adopt`) from a socket another uid owns; the
+  console's own files and the open routes asked without a credential are still answered
+  (`internal/transport/http/peer.go`). When `/proc` cannot be read, every local credential is
+  refused with a sentence saying so, and the log says why. In the other direction the CLI refuses
+  to send a credential to a loopback port whose socket another user holds, because anybody can
+  bind 7727 while no daemon does (`cmd/clawdline/listenerowner.go`), and `clawdline open` puts a
+  one-time code on the browser's command line, not the device's token. None of this exists on
+  macOS or Windows.
+- **Five wrong pairing codes close pairing for a day, for everybody; `clawdline pair --reset`
+  opens it again.** Whoever can reach `/v1/auth/pair` can begin a pairing of their own and spend
+  the guesses. The reset takes this machine's own token, ends any open pairing, and writes
+  `pair.reset` with what it forgot to the security audit; five more wrong codes close it again.
 - **A codex child's sandbox needs the task root to be writable by the child's own user.** A task
   directory whose parent belongs to somebody else fails with
   `bwrap: Can't mkdir <task root>/.git: Permission denied` and the child cannot even read

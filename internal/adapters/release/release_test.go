@@ -159,7 +159,8 @@ func TestVersionsCompareAsReleasesDo(t *testing.T) {
 			t.Errorf("round trip %s → %s", order[i], v)
 		}
 	}
-	for _, bad := range []string{"", "0.10.0", "v0.10", "v01.2.3", "v1.2.3-", "devel+abc1234", "v1.2.x"} {
+	for _, bad := range []string{"", "0.10.0", "v0.10", "v01.2.3", "v1.2.3-", "devel+abc1234", "v1.2.x",
+		"v1.2.3-../../x", "v1.2.3-beta/1", `v1.2.3-beta\1`, "v1.2.3-beta..1", "v1.2.3-beta.", "v1.2.3-b%2F"} {
 		if _, err := ParseVersion(bad); code(err) != CodeVersionUnparseable {
 			t.Errorf("%q parsed", bad)
 		}

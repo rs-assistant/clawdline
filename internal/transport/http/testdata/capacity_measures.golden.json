@@ -479,6 +479,11 @@
     "Note": true
   },
   {
+    "Name": "cloud.lane_refusals",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.peer_body_bytes",
     "Known": true,
     "Note": true
@@ -520,6 +525,11 @@
     "Known": true
   },
   {
+    "Name": "cloud.read_queue",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.rekey_body",
     "Known": true,
     "Note": true
@@ -546,6 +556,21 @@
   },
   {
     "Name": "cloud.reload_stop_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.replay_journal_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.replay_journal_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.replay_journal_seconds",
     "Known": true,
     "Note": true
   },
@@ -1137,6 +1162,15 @@
     "Known": true
   },
   {
+    "Name": "devices.open_code_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "devices.open_codes_pending",
+    "Known": true
+  },
+  {
     "Name": "diagnostics.route_latency_samples",
     "Known": true,
     "Note": true
@@ -1542,6 +1576,11 @@
     "Note": true
   },
   {
+    "Name": "release.manifest_age_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "release.manifest_bytes",
     "Known": true,
     "Note": true
@@ -1695,6 +1734,16 @@
   },
   {
     "Name": "session.secret_handoff_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.secret_handoff_command_args",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.secret_handoff_command_bytes",
     "Known": true,
     "Note": true
   },

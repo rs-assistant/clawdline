@@ -15,7 +15,8 @@ import (
 
 // Release archives are gzipped tars with their contents at the root
 // (tools/release/build.sh `tar_into`). The current install.sh verifies the
-// signed archive before unpacking or running it with local Python and OpenSSL.
+// signed archive before unpacking or running it with local OpenSSL 3 or
+// ssh-keygen (cmd/clawdline installsh_release_unix_test.go).
 // setup independently proves that every unpacked file is the file the signed
 // manifest's archive holds, so what is activated is what was signed. Older
 // bootstraps did not provide the pre-execution check.

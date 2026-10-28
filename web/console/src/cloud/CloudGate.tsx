@@ -1,4 +1,7 @@
-import { accessProblemAfterRead } from "./state.js"
+import { BrowserPairingBlock } from "../pages/settings/BrowserPairingBlock.js"
+import { LocalMachineSetup } from "./LocalMachineSetup.js"
+import { accessProblemAfterRead, READ_PAIR_OFFER_AFTER_MS, readProblemOffersPairing } from "./state.js"
+import { toast } from "../overlays/toast.js"
 import { CloudReadProblem } from "./CloudReadProblem.js"
 import { dashboardFetch } from "./dashboard-reader.js"
 import { readMachineUsage } from "../machine/read.js"
@@ -104,6 +107,9 @@ import {
 } from "./state.js"
 import "./cloud.css"
 import { attentionWatch, type Attention } from "./admin/health/attention.js"
+
+/** How long a read problem must last before the banner names it. */
+const READ_PROBLEM_SHOW_AFTER_MS = 8_000
 
 /**
  * What stands in front of the console when the build says it is Clawdline
@@ -327,6 +333,22 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const [machineList, setMachineList] = useState<MachineListState>({ phase: "loading" })
   const machines = machineList.phase === "ready" ? machineList.machines : null
   const [problem, setProblem] = useState<AccessProblem | null>(null)
+  // The banner shows a read problem only once it has lasted. A daemon restart
+  // or a phone waking from the background loses a read or two and recovers on
+  // the next one; drawing those as "reading failed" flashed a failure at a
+  // device that was fine. The clock runs from the first failure of one
+  // machine and code: later failures of the same kind replace the problem
+  // object but must not start it again, or a machine failing every few
+  // seconds would never be shown. Any successful read clears the problem.
+  const problemKey = problem ? problem.machine + ":" + problem.code : ""
+  const [problemHeldMs, setProblemHeldMs] = useState(0)
+  useEffect(() => {
+    setProblemHeldMs(0)
+    if (!problemKey) return
+    const shown = setTimeout(() => setProblemHeldMs(READ_PROBLEM_SHOW_AFTER_MS), READ_PROBLEM_SHOW_AFTER_MS)
+    const pair = setTimeout(() => setProblemHeldMs(READ_PAIR_OFFER_AFTER_MS), READ_PAIR_OFFER_AFTER_MS)
+    return () => { clearTimeout(shown); clearTimeout(pair) }
+  }, [problemKey])
   const [chosen, setChosen] = useState<CloudMachine | null>(null)
   const [fleetScope, setFleetScope] = useState(() => location.hash === "#all-machines" || !!destinationFromFragment(location.hash))
   const fleetScopeRef = useRef(fleetScope)
@@ -1038,6 +1060,21 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     setPairState({ phase: "idle" })
     recoverPairing()
   }, [pairRequest, recoverPairing])
+
+  // A pairing from the machine's own QR or link needs no comparison
+  // afterwards. The invitation's secret travelled only in the fragment, the
+  // offer went back sealed with it, and the handover is sealed to this
+  // browser's ephemeral key inside that offer, so Cloud could neither read nor
+  // replace either side: the machine key that arrived is the machine's. The
+  // fingerprint screen would compare that key with itself. A pairing from a
+  // code this browser showed (`offer`) keeps the comparison.
+  useEffect(() => {
+    if (pairRequest?.mode !== "invitation" || pairState.phase !== "paired") return
+    const id = pairState.machineID
+    const name = machinesRef.current?.find((machine) => machine.id === id)?.label ?? names.get(id)?.name ?? id
+    closePairing()
+    toast(nextWord("cloudPairDoneToast", { machine: name }))
+  }, [pairRequest?.mode, pairState, closePairing, names])
 
   /**
    * A machine's pairing link, when this page was opened from one — at boot,
@@ -1910,13 +1947,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           },
           device: pairDevice(),
           onScan: readInvitation,
-          onMismatch: (id: string) => {
-            // The machine that answered is not the one on the person's screen:
-            // put the forget question for it in front of them.
-            const answered = machinesRef.current?.find((m) => m.id === id) ?? null
-            closePairing()
-            if (answered) askForget(answered)
-          },
+          viewerID: session.current?.deviceID ?? "",
+          // A comparison failure must never revoke the account's whole machine.
+          // Keep the machine-side viewer-revocation instruction in the panel.
+          onMismatch: () => {},
         }
       : null
   // Once drawn, the console stays: the copied modules bind to the document
@@ -1958,14 +1992,17 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   return (
     <>
       <IdentityHandoverDialog relay={screen.at === "pairing" ? "pairing_required" : "connected"} />
-      {problem && (screen.at === "console" || screen.at === "machines") && (
-        <CloudReadProblem key={problem.machine + ":" + problem.code}
-          message={nextWord("cloudReadUnknownFailure", {
-            machine: machinesRef.current?.find((row) => row.id === problem.machine)?.label ?? problem.machine,
-          })} code={problem.code} trace={problem.trace} retryLabel={nextWord("cloudRetry")}
+      {problem && problemHeldMs >= READ_PROBLEM_SHOW_AFTER_MS && (screen.at === "console" || screen.at === "machines") && (() => {
+        const row = machinesRef.current?.find((machine) => machine.id === problem.machine)
+        const name = row?.label ?? problem.machine
+        const pair = readProblemOffersPairing(problem.code, row?.freshness, problemHeldMs)
+        return <CloudReadProblem key={problem.machine + ":" + problem.code}
+          message={nextWord(pair ? "cloudReadNeedsPairing" : "cloudReadUnknownFailure", { machine: name })}
+          code={problem.code} trace={problem.trace} retryLabel={nextWord("cloudRetry")}
           dismissLabel={nextWord("updateBannerDismiss")}
+          pair={pair ? { label: nextWord("cloudReadPairAgain"), run: () => openPairing({ id: problem.machine, name }) } : undefined}
           onRetry={() => { line.current?.retry(); listMachines() }} />
-      )}
+      })()}
       {words && who && transport.kind === "cloud" ? <SurveyCoordinator key={who.account}
         account={{ id: who.account, apiOrigin: transport.config.apiOrigin }}
         eligible={!pairing && !asking && !naming && (screen.at === "machines" || screen.at === "console")}
@@ -2494,6 +2531,7 @@ function GateCard(props: {
           <>
             <p className="lede">{nextWord("cloudConnectLede")}</p>
             <p className="fine">{nextWord("cloudConnectFine")}</p>
+            <LocalMachineSetup onPair={onPair}><BrowserPairingBlock shown /></LocalMachineSetup>
             <button className="go" type="button" id="cloud-pair-start" onClick={() => onPair(null)}>
               {nextWord("cloudPairStart")}
             </button>
@@ -2732,6 +2770,7 @@ function GateCard(props: {
             {machineList.phase === "empty_authoritative" && (
               <>
                 <p className="fine">{nextWord("cloudConnectFine")}</p>
+            <LocalMachineSetup onPair={onPair}><BrowserPairingBlock shown /></LocalMachineSetup>
                 <button className="go" type="button" id="cloud-machines-pair" onClick={() => onPair(null)}>
                   {nextWord("cloudPairStart")}
                 </button>

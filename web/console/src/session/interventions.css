@@ -64,6 +64,10 @@
 .secret-handoff-form > textarea { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--background, #111); font: inherit; }
 .secret-handoff-form > textarea:focus-visible, .secret-handoff-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .secret-handoff-form p { margin: 0; color: var(--muted, #777); font-size: 12px; }
+.secret-handoff-destination { display: grid; gap: 4px; }
+.secret-handoff-destination > span { font-size: 13px; }
+.secret-handoff-destination > code { display: block; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--background, #111); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.secret-handoff-form .secret-handoff-destination.is-missing { color: var(--danger, #d9534f); font-size: 13px; }
 .secret-handoff-form button { display: inline-flex; align-items: center; gap: 7px; width: fit-content; border: 1px solid var(--accent); border-radius: 6px; padding: 8px 12px; background: transparent; color: var(--accent); font: inherit; font-weight: 650; cursor: pointer; }
 .secret-handoff-form button:disabled { opacity: .5; cursor: not-allowed; }
 .secret-handoff-received { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 12px; color: #3bbb80; font-weight: 650; animation: secret-handoff-confirm .25s ease-out both; }

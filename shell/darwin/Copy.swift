@@ -25,6 +25,7 @@ struct ShellCopy {
     var menuClose: String { word("menuClose") }
     var menuHome: String { word("menuHome") }
     var menuHelpDocumentation: String { word("menuHelpDocumentation") }
+    var menuHelpSetup: String { word("menuHelpSetup") }
     func menuAbout(_ app: String) -> String { word("menuAbout", [app]) }
     var menuServices: String { word("menuServices") }
     func menuHide(_ app: String) -> String { word("menuHide", [app]) }
@@ -36,6 +37,28 @@ struct ShellCopy {
     var menuMascot: String { word("menuMascot") }
     var menuLogin: String { word("menuLogin") }
     var menuEditConfig: String { word("menuEditConfig") }
+    var menuEdit: String { word("menuEdit") }
+    var menuUndo: String { word("menuUndo") }
+    var menuCut: String { word("menuCut") }
+    var menuCopy: String { word("menuCopy") }
+    var menuPaste: String { word("menuPaste") }
+    var menuSelectAll: String { word("menuSelectAll") }
+    var pairInvitationAsks: String { word("pairInvitationAsks") }
+    var pairInvitationBody: String { word("pairInvitationBody") }
+    var pairLinkDone: String { word("pairLinkDone") }
+    var pairLinkReturn: String { word("pairLinkReturn") }
+    var pairLinkFailed: String { word("pairLinkFailed") }
+    var pairLinkRetry: String { word("pairLinkRetry") }
+    func cloudConnectAsks(_ machine: String) -> String { word("cloudConnectAsks", [machine]) }
+    var cloudConnectBody: String { word("cloudConnectBody") }
+    var cloudConnectStart: String { word("cloudConnectStart") }
+    func pairMachineFingerprint(_ fingerprint: String) -> String { word("pairMachineFingerprint", [fingerprint]) }
+    func pairBrowserFingerprint(_ fingerprint: String) -> String { word("pairBrowserFingerprint", [fingerprint]) }
+    var pairWrongMachine: String { word("pairWrongMachine") }
+    var pairNeedsCloud: String { word("pairNeedsCloud") }
+    var pairCodeExpired: String { word("pairCodeExpired") }
+    var pairWrongAccount: String { word("pairWrongAccount") }
+    var pairUnavailable: String { word("pairUnavailable") }
     var menuReload: String { word("menuReload") }
     var menuQuit: String { word("menuQuit") }
     var menuNoTarget: String { word("menuNoTarget") }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/domain/work"
@@ -40,7 +41,8 @@ CREATE TABLE IF NOT EXISTS human_interventions (
  read_at INTEGER,
  resolved_at INTEGER,
  resolution TEXT NOT NULL DEFAULT '',
- version INTEGER NOT NULL DEFAULT 1
+ version INTEGER NOT NULL DEFAULT 1,
+ command TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS human_interventions_target ON human_interventions(target_conversation, resolved_at, created_at DESC);
 CREATE TABLE IF NOT EXISTS human_interventions_retention (
@@ -52,30 +54,40 @@ INSERT OR IGNORE INTO human_interventions_retention(singleton) VALUES (1);
 `
 
 func openHumanInterventions(db *sql.DB) error {
-	_, err := db.Exec(humanInterventionSchema)
-	if err != nil {
+	if _, err := db.Exec(humanInterventionSchema); err != nil {
 		return err
 	}
-	has, err := hasColumn(db, "human_interventions", "withdrawn")
-	if err != nil {
-		return err
+	// Two columns arrived after the table shipped. An older Note reads as not
+	// withdrawn and with no Secret Handoff command, and a Secret Handoff Note
+	// without a declared command can never be claimed: it fails closed.
+	for _, column := range []struct{ name, ddl string }{
+		{"withdrawn", `ALTER TABLE human_interventions ADD COLUMN withdrawn INTEGER NOT NULL DEFAULT 0`},
+		{"command", `ALTER TABLE human_interventions ADD COLUMN command TEXT NOT NULL DEFAULT '[]'`},
+	} {
+		has, err := hasColumn(db, "human_interventions", column.name)
+		if err != nil {
+			return err
+		}
+		if has {
+			continue
+		}
+		if _, err := db.Exec(column.ddl); err != nil {
+			return fmt.Errorf("human_interventions.%s: %w", column.name, err)
+		}
 	}
-	if !has {
-		_, err = db.Exec(`ALTER TABLE human_interventions ADD COLUMN withdrawn INTEGER NOT NULL DEFAULT 0`)
-	}
-	return err
+	return nil
 }
 
-const humanInterventionColumns = `id,source_conversation,source_label,target_conversation,target_session,kind,title,summary,action,reason,detail,options,document_url,created_at,read_at,resolved_at,resolution,version,withdrawn`
+const humanInterventionColumns = `id,source_conversation,source_label,target_conversation,target_session,kind,title,summary,action,reason,detail,options,document_url,created_at,read_at,resolved_at,resolution,version,withdrawn,command`
 
 func scanHumanIntervention(row interface{ Scan(...any) error }) (work.HumanIntervention, error) {
 	var out work.HumanIntervention
-	var options string
+	var options, command string
 	var created int64
 	var read, resolved sql.NullInt64
 	err := row.Scan(&out.ID, &out.SourceConversation, &out.SourceLabel, &out.TargetConversation, &out.TargetSession,
 		&out.Kind, &out.Title, &out.Summary, &out.Action, &out.Reason, &out.Detail, &options, &out.DocumentURL,
-		&created, &read, &resolved, &out.Resolution, &out.Version, &out.Withdrawn)
+		&created, &read, &resolved, &out.Resolution, &out.Version, &out.Withdrawn, &command)
 	if err != nil {
 		return out, err
 	}
@@ -90,6 +102,12 @@ func scanHumanIntervention(row interface{ Scan(...any) error }) (work.HumanInter
 	}
 	if err := json.Unmarshal([]byte(options), &out.Options); err != nil {
 		return out, err
+	}
+	if err := json.Unmarshal([]byte(command), &out.Command); err != nil {
+		return out, err
+	}
+	if len(out.Command) == 0 {
+		out.Command = nil
 	}
 	return out, nil
 }
@@ -125,9 +143,17 @@ func (t *WorkV2Tx) AddHumanIntervention(v work.HumanIntervention, at time.Time) 
 	if err != nil {
 		return err
 	}
-	_, err = t.tx.ExecContext(t.ctx, `INSERT INTO human_interventions (`+humanInterventionColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	argv := v.Command
+	if argv == nil {
+		argv = []string{}
+	}
+	command, err := json.Marshal(argv)
+	if err != nil {
+		return err
+	}
+	_, err = t.tx.ExecContext(t.ctx, `INSERT INTO human_interventions (`+humanInterventionColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		v.ID, v.SourceConversation, v.SourceLabel, v.TargetConversation, v.TargetSession, v.Kind, v.Title, v.Summary, v.Action, v.Reason,
-		v.Detail, string(options), v.DocumentURL, v.CreatedAt.Unix(), nil, nil, "", 1, false)
+		v.Detail, string(options), v.DocumentURL, v.CreatedAt.Unix(), nil, nil, "", 1, false, string(command))
 	if err == nil {
 		t.wrote++
 	}

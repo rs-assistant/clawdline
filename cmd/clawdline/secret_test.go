@@ -12,6 +12,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -36,6 +38,10 @@ func TestSecretRunFeedsStdinAndSuppressesConsumerOutput(t *testing.T) {
 	const secret = "SAFE_FIXTURE_FOR_STDIN"
 	const id = "10000000-0000-4000-8000-000000000003"
 	const conversation = "10000000-0000-4000-8000-000000000002"
+	helper, err := filepath.Abs(os.Args[0])
+	if err != nil {
+		t.Fatal(err)
+	}
 	var requests int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
@@ -43,12 +49,16 @@ func TestSecretRunFeedsStdinAndSuppressesConsumerOutput(t *testing.T) {
 			t.Errorf("unexpected claim: %s", r.URL.Path)
 		}
 		var claim struct {
-			CallbackPort   int    `json:"callback_port"`
-			Nonce          string `json:"nonce"`
-			ConversationID string `json:"conversation_id"`
+			CallbackPort   int      `json:"callback_port"`
+			Nonce          string   `json:"nonce"`
+			ConversationID string   `json:"conversation_id"`
+			Command        []string `json:"command"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&claim); err != nil || claim.ConversationID != conversation {
 			t.Errorf("invalid claim: %v", err)
+		}
+		if want := []string{helper, "-test.run=TestSecretHandoffConsumerHelper"}; !slices.Equal(claim.Command, want) {
+			t.Errorf("the claim presented %q, not the command it runs %q", claim.Command, want)
 		}
 		nonce, err := base64.RawURLEncoding.DecodeString(claim.Nonce)
 		if err != nil {
@@ -78,7 +88,7 @@ func TestSecretRunFeedsStdinAndSuppressesConsumerOutput(t *testing.T) {
 	t.Setenv("CLAWDLINE_SECRET_TEST_FILE", file)
 	b := &broker{base: server.URL, token: "machine-fixture", client: server.Client()}
 	var out, errs bytes.Buffer
-	code := runSecret(&out, &errs, b, id, []string{os.Args[0], "-test.run=TestSecretHandoffConsumerHelper"}, func(k string) string {
+	code := runSecret(&out, &errs, b, id, []string{helper, "-test.run=TestSecretHandoffConsumerHelper"}, func(k string) string {
 		if k == "CODEX_THREAD_ID" {
 			return conversation
 		}
@@ -90,5 +100,61 @@ func TestSecretRunFeedsStdinAndSuppressesConsumerOutput(t *testing.T) {
 	}
 	if strings.Contains(out.String()+errs.String(), secret) {
 		t.Fatal("consumer echoed the secret into the agent transcript")
+	}
+}
+
+// executableIn writes a program named name into dir that records that it ran.
+func executableIn(t *testing.T, dir, name, ran string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the PATH fixture is a POSIX shell script")
+	}
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte("#!/bin/sh\ntouch "+ran+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// The agent names the tool by a bare name, and PATH now finds a different
+// file than the one the Note declared. secret run presents the path it would
+// actually run, so the daemon's exact comparison sees the swap; when the
+// daemon refuses, nothing runs.
+func TestSecretRunPresentsThePathItWouldRun(t *testing.T) {
+	const id = "10000000-0000-4000-8000-000000000003"
+	const conversation = "10000000-0000-4000-8000-000000000002"
+	declaredDir, shadowDir := t.TempDir(), t.TempDir()
+	ran := filepath.Join(t.TempDir(), "ran")
+	executableIn(t, declaredDir, "credential-tool", ran)
+	shadow := executableIn(t, shadowDir, "credential-tool", ran)
+	t.Setenv("PATH", shadowDir+string(os.PathListSeparator)+declaredDir)
+	var presented []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var claim struct {
+			Command []string `json:"command"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&claim)
+		presented = claim.Command
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(w, `{"error":"secret_handoff_command_mismatch","detail":"This is not the command the Secret Handoff Note named."}`)
+	}))
+	defer server.Close()
+	b := &broker{base: server.URL, token: "machine-fixture", client: server.Client()}
+	var out, errs bytes.Buffer
+	code := runSecret(&out, &errs, b, id, []string{"credential-tool", "--with-token"}, func(k string) string {
+		if k == "CODEX_THREAD_ID" {
+			return conversation
+		}
+		return ""
+	})
+	if !slices.Equal(presented, []string{shadow, "--with-token"}) {
+		t.Fatalf("the claim presented %q, wanted the resolved %q", presented, []string{shadow, "--with-token"})
+	}
+	if code != 1 || !strings.Contains(errs.String(), "secret_handoff_command_mismatch") {
+		t.Fatalf("a refused claim: code=%d errors=%q", code, errs.String())
+	}
+	if _, err := os.Stat(ran); !os.IsNotExist(err) {
+		t.Fatal("the tool ran although the claim was refused")
 	}
 }

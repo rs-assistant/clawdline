@@ -178,6 +178,7 @@ jobs:
             ${{ runner.temp }}/release/*.dmg.delivery.json
             ${{ runner.temp }}/release/manifest.json
             ${{ runner.temp }}/release/manifest.sig.json
+            ${{ runner.temp }}/release/manifest.sshsig
             ${{ runner.temp }}/release/SHA256SUMS
 
       # The check the publication gate runs, run here first, so a draft
@@ -201,5 +202,6 @@ jobs:
             "${prerelease[@]}" "${notes_args[@]}" \
             "$RUNNER_TEMP"/release/*.tar.gz "$RUNNER_TEMP"/release/*.spdx.json "$RUNNER_TEMP/release/SHA256SUMS" \
             "$RUNNER_TEMP"/release/*.dmg "$RUNNER_TEMP"/release/*.dmg.delivery.json \
-            "$RUNNER_TEMP/release/manifest.json" "$RUNNER_TEMP/release/manifest.sig.json"
+            "$RUNNER_TEMP/release/manifest.json" "$RUNNER_TEMP/release/manifest.sig.json" \
+            "$RUNNER_TEMP/release/manifest.sshsig"
           echo "drafted $VERSION at $GITHUB_SHA; run the privacy gate in docs/releasing.md before publishing"

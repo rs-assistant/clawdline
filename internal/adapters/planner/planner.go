@@ -372,6 +372,11 @@ func (p Planner) runner() Run {
 	return run
 }
 
+// fallbackBins are where a CLI is looked for when PATH does not have it (a
+// daemon started outside a login shell). A test empties it so that a CLI
+// installed on the machine running the tests is never found.
+var fallbackBins = []string{"/opt/homebrew/bin", "/usr/local/bin"}
+
 func (p Planner) executable(name string) string {
 	look := p.LookPath
 	if look == nil {
@@ -380,7 +385,10 @@ func (p Planner) executable(name string) string {
 	if path, err := look(name); err == nil {
 		return path
 	}
-	candidates := []string{"/opt/homebrew/bin/" + name, "/usr/local/bin/" + name}
+	var candidates []string
+	for _, dir := range fallbackBins {
+		candidates = append(candidates, filepath.Join(dir, name))
+	}
 	if p.Home != "" {
 		candidates = append(candidates, filepath.Join(p.Home, ".local", "bin", name))
 		if name == "claude" {

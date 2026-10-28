@@ -274,6 +274,11 @@ func (s *Server) cloudPairingOfferRoute(w http.ResponseWriter, r *http.Request) 
 // is immediate: the account's own revocation needs a browser session this
 // daemon does not have, and would in any case reach this machine only at the
 // next roster refresh.
+//
+// A revocation that changed a pin also replaces this machine's content key,
+// so the answer is `cloudtransport.RevokeOutcome`: `secret_replaced` says it
+// happened and `repair` names every browser still paired here, each of which
+// must pair again.
 func (s *Server) cloudDeviceRoute(w http.ResponseWriter, r *http.Request) {
 	if !requireCloudLocal(w, r) {
 		return
@@ -298,12 +303,18 @@ func (s *Server) cloudDeviceRoute(w http.ResponseWriter, r *http.Request) {
 		writeAuthRefusal(w, http.StatusBadRequest, "bad_request", "Name the viewer to revoke.")
 		return
 	}
-	changed, err := pairing.Revoke(device)
+	outcome, err := pairing.Revoke(device)
+	if errors.Is(err, cloudtransport.ErrSecretNotReplaced) {
+		// The pin is refused, the key is not replaced: a half-done revocation
+		// is a failure, said with both halves, and never a 200.
+		writeRawAuthRefusal(w, http.StatusInternalServerError, "secret_not_replaced", err.Error())
+		return
+	}
 	if err != nil {
 		writeCloudPairingError(w, err)
 		return
 	}
-	writeJSON(w, map[string]any{"device": device, "revoked": changed})
+	writeJSON(w, outcome)
 }
 
 // cloudRotateRoute replaces this machine's signing key.

@@ -11,22 +11,15 @@ existing work folder. Each step ends with a check.
 | macOS 13+ (Apple silicon or Intel) or Linux (x86-64 or ARM64) | `uname -sm` |
 | *(optional)* tmux 3.0 or later — a release carries its own when you have none | `tmux -V` |
 | Claude Code or Codex | `claude --version` or `codex --version` |
-| Trusted Python 3 (standard library only) | `python3 --version` |
-| Trusted OpenSSL 3 or newer (Ed25519) | `openssl version` |
+| curl, and something that checks an Ed25519 signature: OpenSSL 3, or OpenSSH 8.1+ `ssh-keygen` (every Mac has one) | `curl --version`; `openssl version` or `ssh-keygen -Y 2>&1 \| head -1` |
 | *(optional)* a Claude Code status line that writes `~/.claude/statusline-cache/rate-limits.json` | `ls ~/.claude/statusline-cache/rate-limits.json` |
 
-You do not need Go, Node.js, Xcode, a Clawdline account or `sudo`. Python and OpenSSL must already
-be installed from a source you trust; the installer never downloads a verifier or installs them
-for you. macOS's bundled LibreSSL does not support this verification path. If you already use
-Homebrew, `brew install python openssl@3` supplies both. On Linux, install Python 3 and OpenSSL 3
-through your distribution's trusted package manager.
-
-The installer looks for OpenSSL on `PATH`, then in Homebrew's standard `openssl@3` locations.
-Set `CLAWDLINE_INSTALL_OPENSSL=/absolute/path/to/openssl` to choose a trusted local executable;
-an invalid explicit selection stops installation. A download host or environment variable cannot
-supply a replacement release public key. New installer verification messages support English and
-Taiwan Traditional Chinese (`CLAWDLINE_LANG=zh-Hant`). The installer checks the assistants itself
-and prints the exact command to install a missing one.
+You do not need Go, Node.js, Xcode, a Clawdline account or `sudo`. The signature checker must
+already be installed from a source you trust; the installer never downloads a verifier. macOS's
+bundled LibreSSL cannot check Ed25519, but its OpenSSH `ssh-keygen` can. Set
+`CLAWDLINE_INSTALL_OPENSSL=/absolute/path/to/openssl` to choose a trusted OpenSSL 3. A download
+host or environment variable cannot supply a replacement release public key. The installer checks
+the assistants itself and prints the exact command to install a missing one.
 
 You do not need tmux either. Every release carries tmux 3.6a. When your machine has tmux 3.0 or
 later, that one is used, because it is where your own sessions are. When it has none, or an older
@@ -42,31 +35,24 @@ Line's right edge reads `Plan limits unknown`. [usage.md](usage.md) says what to
 
 ```sh
 curl --proto '=https' --proto-redir '=https' -fL \
-  https://raw.githubusercontent.com/sainteye/clawdline/74fc07e5bc8c8d092f216478f26d99b7ed1b77ee/install.sh \
+  https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh \
   -o clawdline-install.sh
 ```
 
 Read the downloaded script, then run it:
 
 ```sh
-sh ./clawdline-install.sh --version v2.1.2
+sh ./clawdline-install.sh
 ```
 
-The installer checks local verification tools, downloads the release manifest and signatures,
-and uses local OpenSSL to verify Ed25519 against the release public keys pinned in the script.
-It follows the manifest only after this signature check. The archive must match the signed name,
-platform, version, size and SHA-256 before it is unpacked or executed. A failed check or missing
-tool stops installation; `SHA256SUMS` from the download host does not authorize any execution.
-It accepts HTTPS downloads and refuses HTTPS-to-HTTP redirects; plain HTTP is limited to explicit
-loopback fixtures or local mirrors.
-
-This protects against a download host replacing release assets without the signing key; it does
-not protect against a malicious installer script, compromised local tools or a stolen signing key.
-You must still trust the reviewed script and its public-key pins. Later updates use the release
-keys built into the installed program. [Release trust](../releasing.md#what-a-release-is)
-explains key rotation and publishing.
-
-After this pre-execution verification, `clawdline setup` checks the signed release again and:
+It downloads the latest release's manifest, checks its signature with the release key written in
+the script itself — with OpenSSL 3 when this machine has it, otherwise with `ssh-keygen`, never with
+anything it downloaded — then downloads the archive the signed manifest names, checks its sha256,
+and only then unpacks it and runs `clawdline setup` from it. Without `--version` it takes the newest
+release only when it was committed within the last 180 days, and it never replaces an installed
+release with an older one unless you pass `--allow-downgrade`. When neither OpenSSL 3 nor a
+suitable `ssh-keygen` is there, it stops and says what to install; it does not fall back to
+running the download unchecked. `clawdline setup`:
 
 - puts the release in `~/.local/share/clawdline-next/releases/<version>/` and links
   `~/.local/bin/clawdline` to it — if `~/.local/bin` is not on your `PATH`, it prints the one
@@ -89,10 +75,10 @@ autostart off or remove Clawdline, each with `--port` when you chose another por
 "Next" in `Clawdline Next.app`, `clawdline-next.service` and `~/.config/clawdline-next` is this
 generation's internal name; the product is Clawdline.
 
-Pass options to the downloaded script:
+Pass options through the one-line installer:
 
 ```sh
-sh ./clawdline-install.sh --version v2.1.2 --headless
+curl -fsSL https://clawdline.com/install.sh | sh -s -- --headless
 ```
 
 | Option | Does |
@@ -101,7 +87,8 @@ sh ./clawdline-install.sh --version v2.1.2 --headless
 | `--no-app` | macOS: the service only, no app |
 | `--no-autostart` | Start now, but not at login or boot |
 | `--channel beta` | Follow pre-releases too |
-| `--version vX.Y.Z` | Install that release instead of the latest |
+| `--version vX.Y.Z` | Install that release instead of the latest, however old it is |
+| `--allow-downgrade` | Install a release older than the one installed |
 | `--port N` | Listen on another port than 7727 (it gets its own service name) |
 | `--verbose` | Also print the paths and versions behind each check |
 | `--adopt` | Take over an installation made from a source checkout (below) |
@@ -116,15 +103,11 @@ answers with the version you installed.
 
 ### Review and pin an installation
 
-The steps above pin installer commit `74fc07e5bc8c8d092f216478f26d99b7ed1b77ee`
-and release `v2.1.2`. The release's signed manifest identifies program source commit
-`96ad9d5e9cd5658f803b27a205901b6f53099e88`. These are separate identities: the pinned script verifies the
-selected signed release before it starts. Reading the installer does not amount to auditing
-the release's program source or proving the binary reproducible.
+The steps above follow the script on `main` and the newest release. Reading the installer does
+not amount to auditing the release's program source or proving the binary reproducible.
 
-Calling the script without `--version` still selects the latest release; using a `main` URL
-still follows a moving script. Neither is the default installation example on this page.
-To select a reviewed release, use a reviewed installer with pre-execution verification and pass
+Calling the script without `--version` selects the newest release committed within 180 days;
+using a `main` URL follows a moving script. To select a reviewed release, use a reviewed installer with pre-execution verification and pass
 the release version explicitly. Replace `REVIEWED_INSTALLER_COMMIT` with that installer's full
 commit hash and `vX.Y.Z` with the published release you reviewed. The installer can verify
 existing signed releases; its source revision does not have to be the release's revision:
@@ -254,7 +237,7 @@ even when nothing else is left. Uninstall also removes the service's systemd dro
 
 ## Build from source instead
 
-For working on Clawdline itself — you need Go 1.25+, Node.js with npm, and tmux:
+For working on Clawdline itself — you need Go 1.26+, Node.js with npm, and tmux:
 
 ```sh
 git clone https://github.com/sainteye/clawdline.git && cd clawdline

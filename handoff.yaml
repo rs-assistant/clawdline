@@ -1,0 +1,20 @@
+# Open items only. Decisions, operating policy, dependency changes, the security
+# review record, the upstream merge record and the smoke and e2e results live in
+# AGENTS.md, section "This fork: rs-assistant/clawdline".
+
+pointers:
+  repository: https://github.com/rs-assistant/clawdline
+  branch: local-source-build
+  reviewed_base_commit: 418bac778938e1099d0c895ac2431abe66b75fef
+  reviewed_upstream_merged: d8961793  # 9e5a7ad1 on 2026-10-22, d8961793 on 2026-10-23
+
+next:
+  - Upstream main moves on. Before the next merge, review d8961793..<target>, rerun govulncheck
+    and npm audit, and merge the exact reviewed commit.
+  - The Mac test (AGENTS.md, "Mac test") left install.sh's signature check unrun on macOS (the
+    person does not use install.sh).
+  - CI runs on the draft pull request rs-assistant/clawdline#1 (do not merge it); read its result
+    after each push. Whether to pin the workflows' actions to commits is the person's choice.
+
+deferred:
+  - A LaunchAgent or systemd user unit for the daemon. The person said not yet (2026-10-22).

@@ -66,6 +66,8 @@ func (s *Server) authRoute(w http.ResponseWriter, r *http.Request) {
 		writeDeviceChange(w, g.auth.SetPairingPermission(decodeSegment(id), readOnly))
 	case r.Method == http.MethodGet && p == "/v1/auth/pairings":
 		g.pairings(w, r)
+	case post && p == "/v1/auth/pairings/reset":
+		g.resetPairing(w, r)
 	case p == "/v1/auth/devices" || strings.HasPrefix(p, "/v1/auth/devices/"):
 		g.devicesRoute(w, r, strings.TrimPrefix(strings.TrimPrefix(p, "/v1/auth/devices"), "/"))
 	default:
@@ -155,8 +157,26 @@ func (g *gate) confirmPairing(w http.ResponseWriter, r *http.Request) {
 // adopt turns a token a page was handed into the cookie it can keep. It exists
 // because EventSource cannot set a header. Nothing is granted: an unknown
 // token is refused as it would be anywhere else.
+//
+// Or a one-time code, which is what `clawdline open` puts in the address now
+// (open_code.go): traded once, within MaxOpenCodeSeconds, for the cookie of the
+// device it was minted for, if that device is still let in. The answer carries
+// no token then — the page that asked keeps only the cookie, which its scripts
+// cannot read.
 func (g *gate) adopt(w http.ResponseWriter, r *http.Request) {
-	token, ok := stringField(readBody(r), "token")
+	body := readBody(r)
+	if code, ok := stringField(body, "code"); ok {
+		token, ok := g.opens.redeem(code)
+		if !ok || !g.auth.Verify(token).Allowed {
+			writeAuthRefusal(w, http.StatusUnauthorized, "unauthorized",
+				"That address was opened already, or is more than five minutes old. Run clawdline open again.")
+			return
+		}
+		setSessionCookie(w, r, token)
+		writeAuthJSON(w, contract.SignedIn{OK: true})
+		return
+	}
+	token, ok := stringField(body, "token")
 	if !ok || !g.auth.Verify(token).Allowed {
 		writeAuthRefusal(w, http.StatusUnauthorized, "unauthorized", "That token is not one of ours.")
 		return
@@ -219,12 +239,16 @@ func (g *gate) logout(w http.ResponseWriter, r *http.Request) {
 // Tailscale Serve it did, and at the desk it did not; set always, the cookie would be
 // dropped on http://127.0.0.1 and nothing would work there.
 func signedIn(w http.ResponseWriter, r *http.Request, token string) {
+	setSessionCookie(w, r, token)
+	writeAuthJSON(w, contract.SignedIn{OK: true, Token: token})
+}
+
+func setSessionCookie(w http.ResponseWriter, r *http.Request, token string) {
 	cookie := sessionCookie + "=" + token + "; Path=/; Max-Age=" + cookieLifetime + "; HttpOnly; SameSite=Strict"
 	if r.Header.Get("X-Forwarded-Proto") == "https" {
 		cookie += "; Secure"
 	}
 	w.Header().Set("Set-Cookie", cookie)
-	writeAuthJSON(w, contract.SignedIn{OK: true, Token: token})
 }
 
 // requireLocal answers for a caller that is not this machine's own token.
@@ -302,6 +326,19 @@ func (g *gate) pairings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// resetPairing is `clawdline pair --reset`: the person at this machine opening
+// pairing that somebody else's wrong codes closed (auth.ResetPairing). This
+// machine's own token only — not a paired device, and not a Cloud viewer, whose
+// in-process request names the device actor and so is not Local.
+func (g *gate) resetPairing(w http.ResponseWriter, r *http.Request) {
+	if !requireLocal(w, r) {
+		return
+	}
+	wrong, requests := g.auth.ResetPairing()
+	log.Printf("auth: pairing was reopened from this machine; %d wrong codes and %d requests were forgotten", wrong, requests)
+	writeAuthJSON(w, contract.PairingReset{OK: true, WrongCodes: int64(wrong), Requests: int64(requests)})
+}
+
 // devicesRoute is the device list and what can be done to it, for this
 // machine's own token only. A paired device cannot list or revoke.
 func (g *gate) devicesRoute(w http.ResponseWriter, r *http.Request, rest string) {
@@ -376,6 +413,11 @@ func (g *gate) listDevices(w http.ResponseWriter) {
 // machine's token, because they are not the same thing — the local token may
 // administer, while a browser tab may read and send.
 func (g *gate) browserDevice(w http.ResponseWriter, r *http.Request) {
+	if !g.opens.room() {
+		writeAuthRefusal(w, http.StatusTooManyRequests, "rate_limited",
+			"Too many browser addresses are waiting to be opened. Open one, or wait five minutes.")
+		return
+	}
 	body := readBody(r)
 	readOnly := false
 	if permission, exists := body["permission"]; exists {
@@ -393,13 +435,30 @@ func (g *gate) browserDevice(w http.ResponseWriter, r *http.Request) {
 		writeStoreFailure(w, err)
 		return
 	}
+	// The address goes on a command line, which every user of the machine can
+	// read: it carries a one-time code, never the token (open_code.go).
+	code, err := g.opens.mint(token)
+	if err != nil {
+		// A device nobody can sign in with is not left behind.
+		if rerr := g.auth.Revoke(id); rerr != nil {
+			log.Printf("auth: a browser device whose address could not be made was not removed: %v", rerr)
+		}
+		if errors.Is(err, errOpenCodesFull) {
+			writeAuthRefusal(w, http.StatusTooManyRequests, "rate_limited",
+				"Too many browser addresses are waiting to be opened. Open one, or wait five minutes.")
+			return
+		}
+		log.Printf("auth: a browser address could not be made: %v", err)
+		writeAuthRefusal(w, http.StatusInternalServerError, "internal", "The browser address could not be made.")
+		return
+	}
 	// The fragment, not the query: a browser never sends a fragment to the
 	// server and never writes it into a log or a Referer. /v1/auth/open trades
 	// it for the cookie and takes it out of the address bar.
 	writeAuthJSON(w, contract.BrowserDevice{
 		ID:    id,
 		Token: token,
-		URL:   fmt.Sprintf("http://127.0.0.1:%d/v1/auth/open#t=%s", g.port, token),
+		URL:   fmt.Sprintf("http://127.0.0.1:%d/v1/auth/open#c=%s", g.port, code),
 	})
 }
 
@@ -441,10 +500,11 @@ func writeAuthJSON(w http.ResponseWriter, v any) {
 
 // openPage is where `clawdline open` lands. The console this daemon serves
 // does not read a `#t=` fragment yet — the Swift page does, in net/fetch.js
-// adoptToken — so this stop does exactly that and nothing else: take the token
-// out of the fragment, take the fragment out of the address bar before the
-// request goes out, trade the token for the cookie, and go to the console.
-// The regular expression and the order are adoptToken's.
+// adoptToken — so this stop does exactly that and nothing else: take the code
+// (`#c=`, what `clawdline open` sends now) or the token (`#t=`, an address made
+// before) out of the fragment, take the fragment out of the address bar before
+// the request goes out, trade it for the cookie, and go to the console. The
+// regular expression and the order are adoptToken's.
 func openPage(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -453,15 +513,17 @@ func openPage(w http.ResponseWriter) {
 <html><head><meta charset="utf-8"><meta name="color-scheme" content="dark light"><title>clawdline</title></head>
 <body><script>
 (function () {
-  var match = /(?:^|[#&])t=([^&]+)/.exec(location.hash || "");
-  var token = match ? decodeURIComponent(match[1]) : "";
+  var hash = location.hash || "";
+  var code = /(?:^|[#&])c=([^&]+)/.exec(hash);
+  var match = /(?:^|[#&])t=([^&]+)/.exec(hash);
+  var body = code ? { code: decodeURIComponent(code[1]) } : match ? { token: decodeURIComponent(match[1]) } : null;
   try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { location.hash = ""; }
   function home() { location.replace("/"); }
-  if (!token) { home(); return; }
+  if (!body) { home(); return; }
   fetch("/v1/auth/adopt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: token }),
+    body: JSON.stringify(body),
     credentials: "same-origin"
   }).then(home, home);
 })();
