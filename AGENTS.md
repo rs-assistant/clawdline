@@ -242,7 +242,10 @@ Still open:
   not by commit. At `0180a2ff` (only documentation
   changed since `38ea3a97`) the macOS job failed once in `TestDevicesRoutesRefuseABrowser`: a
   second `POST /v1/auth/devices/browser` got no headers within 5 s. It passed on re-run and 30 of
-  30 times on Linux; the cause is not found.
+  30 times on Linux; the cause is not found. At `5e22aed6` (documentation only again) the console
+  job failed once in `src/cloud/session-carrier.test.mjs` "fault injection: a read takes the
+  carrier while this page's own socket is between connections" (the read was refused); it passed
+  on re-run and 40 of 40 times in the container; the cause is not found.
 - `tools/release/supply-chain.test.sh`: from `cbc74e4` until 2026-10-27, eight provenance cases
   failed because their fixture had no `manifest.sshsig` (fixed, with a case for a missing one).
   "pins that moved in the checkout do not fail an older release's SBOM" fails in the Linux cloud
@@ -288,6 +291,16 @@ Mac test on 2026-10-28 (`b8aa325a`, Apple M2, `go test` reporting `goarch: arm64
   console then follows the browser's language list, which on macOS is the system's. No failure was
   traced to macOS itself.
 - `BenchmarkReplayJournalRecord`: about 4.4 ms a claim ("Still open" above).
+
+Intel Mac test on 2026-10-28 (`5e22aed6`, Intel Core i5-7267U, macOS 15.7.5, `bin/clawdline` a
+`x86_64` Mach-O built there with Go 1.27.3 `darwin/amd64`, Node 26.9.0, empty
+`CLAWDLINE_NEXT_DIR`, port 7791, Cloud off, `CLAWDLINE_NEXT_UPDATE_CHECK` unset), run by the
+person: the console loads and signs in, the one-time link works once, a Session shows, no setup
+wizard or Cloud sign-in appears, and `lsof` shows the daemon on `127.0.0.1:7791` only (the
+listener and two loopback connections), so the default-off update check holds there.
+`tools/test-go-ci.sh` passed every package (most results cached from an earlier run on that
+machine; `internal/app/orchestrator` took 457 s). `BenchmarkReplayJournalRecord`: 3.71, 3.86 and
+3.86 ms a claim over 200 each. Console e2e was not run there.
 
 Found sound: no telemetry, analytics or crash SDKs; local HTTP has CSRF, Origin and Host checks;
 no exploitable XSS; no `sh -c` injection; the release updater verifies the ed25519 signature
