@@ -11,9 +11,8 @@ pointers:
 next:
   - Upstream main moves on. Before the next merge, review d8961793..<target>, rerun govulncheck
     and npm audit, and merge the exact reviewed commit.
-  - The Mac test (AGENTS.md, "Mac test") left two things: BenchmarkReplayJournalRecord printed no
-    result (only matters with Cloud on), and install.sh's signature check has not run on macOS
-    (the person does not use install.sh).
+  - The Mac test (AGENTS.md, "Mac test") left install.sh's signature check unrun on macOS (the
+    person does not use install.sh).
   - CI runs on the draft pull request rs-assistant/clawdline#1 (do not merge it); read its result
     after each push. Whether to pin the workflows' actions to commits is the person's choice.
 

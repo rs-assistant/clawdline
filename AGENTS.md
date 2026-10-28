@@ -226,8 +226,11 @@ Still open:
   viewer and `clawdline cloud connect` keep an in-memory replay window. Since 2026-10-27 every
   replay-journal append is fsynced before its envelope is acted on (upstream did not sync); in
   the Linux container that took a claim from about 4 µs to about 165 µs
-  (`BenchmarkReplayJournalRecord`). On macOS `Sync` is `F_FULLFSYNC`, not measured; with Cloud
-  on, run the benchmark there before relying on Cloud terminal typing.
+  (`BenchmarkReplayJournalRecord`); on the person's Apple M2, where `Sync` is `F_FULLFSYNC`, about
+  4.4 ms (4.45, 4.42 and 4.37 ms over 2000 claims each, 2026-10-28). Claims are recorded under one
+  lock, so Cloud envelopes are capped near 225 a second: a keystroke waits about 4.4 ms more, a
+  paste or a burst of reads queues. Not measured with Cloud on; batching several claims into one
+  sync is the change to make if that ever matters.
 - GitHub Actions was off on the fork until the person enabled it on 2026-10-27 (GitHub-made
   actions only). The workflows were not registered (the default branch had no push since the
   fork), so a dispatch answered 404; `ci.yml` runs on the draft pull request
@@ -284,7 +287,7 @@ Mac test on 2026-10-28 (`b8aa325a`, Apple M2, `go test` reporting `goarch: arm64
   the test expects Taiwan Traditional Chinese: the fixtures seed the zh-Hant catalog, and the
   console then follows the browser's language list, which on macOS is the system's. No failure was
   traced to macOS itself.
-- `BenchmarkReplayJournalRecord` printed no result in what the person pasted; not measured yet.
+- `BenchmarkReplayJournalRecord`: about 4.4 ms a claim ("Still open" above).
 
 Found sound: no telemetry, analytics or crash SDKs; local HTTP has CSRF, Origin and Host checks;
 no exploitable XSS; no `sh -c` injection; the release updater verifies the ed25519 signature
