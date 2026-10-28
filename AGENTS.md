@@ -31,9 +31,7 @@ does not take upstream releases or self-updates. Open items for the next session
 ```sh
 (cd web && npm ci --ignore-scripts && npm run build)   # lockfile integrity, no install scripts
 go build -o bin/clawdline ./cmd/clawdline              # go.mod pins toolchain go1.27.3
-CLAWDLINE_NEXT_UPDATE_CHECK=off \
-CLAWDLINE_NEXT_WEB="$PWD/web/console/dist" \
-./bin/clawdline serve
+CLAWDLINE_NEXT_WEB="$PWD/web/console/dist" ./bin/clawdline serve
 ```
 
 - Do not use `install.sh` or `clawdline update`. A source build never starts the GitHub release
@@ -41,9 +39,13 @@ CLAWDLINE_NEXT_WEB="$PWD/web/console/dist" \
   upstream-built binaries and turn the release updater on, which the person rejected on
   2026-10-22, even though this branch's `install.sh` now verifies the signature before it runs
   anything.
-- `CLAWDLINE_NEXT_UPDATE_CHECK=off` is required: without it the daemon GETs
-  `app.clawdline.com/BUILD.json` every 30 min (`internal/adapters/updatecheck`, checked in `Run`
-  and `Refresh`).
+- The update check is off on this branch unless `CLAWDLINE_NEXT_UPDATE_CHECK=on` (since
+  2026-10-28; `internal/adapters/updatecheck` `Disabled`, read in `Run` and `Refresh`). On, the
+  daemon GETs `app.clawdline.com/BUILD.json` at start and every 30 min, with Go's default
+  User-Agent and no machine id, so the operator and Cloudflare see this machine's IP and timing.
+  Upstream checks unless the variable is `off`; a binary built from this branch before the change
+  still needs `CLAWDLINE_NEXT_UPDATE_CHECK=off`. The change came from the Mac test, where a
+  daemon started without the variable held a connection to `app.clawdline.com`.
 - After a dependency change, run
   `GOTOOLCHAIN=go1.27.3 go run golang.org/x/vuln/cmd/govulncheck@latest ./...` (without the
   variable, govulncheck builds itself with go1.26 and fails on this toolchain's sources) and
@@ -234,7 +236,7 @@ Still open:
   `macos-latest`: Darwin vet, build and Go tests (three tests excluded by name in
   `tools/test-go-ci.sh` for needing the host process table or iTerm2), the native shell pairing
   check and the release evidence with the macOS signature cases. The workflows use actions by tag,
-  not by commit. The daemon has still not been run on a Mac. At `0180a2ff` (only documentation
+  not by commit. At `0180a2ff` (only documentation
   changed since `38ea3a97`) the macOS job failed once in `TestDevicesRoutesRefuseABrowser`: a
   second `POST /v1/auth/devices/browser` got no headers within 5 s. It passed on re-run and 30 of
   30 times on Linux; the cause is not found.
@@ -259,7 +261,30 @@ Still open:
   Handoff test passed there, but many tests failed in the same way at `b6976cf` and `d946f01`
   (address, list-gestures, unify, squad, write-path, background-strip, restore, resume-role, and
   "Documents all nine catalogs"); the files whose results differed were flaky on both commits.
-  They have not been run on a Mac.
+  On 2026-10-28 at `b8aa325a` the container ran 224 tests: 122 passed, 77 failed, 25 skipped
+  ("Mac test" below for the Mac run).
+
+Mac test on 2026-10-28 (`b8aa325a`, Apple M2, `go test` reporting `goarch: arm64`, empty
+`CLAWDLINE_NEXT_DIR`, port 7791, Cloud off), run by the person:
+
+- The person reported every smoke check normal: the console loads and signs in with
+  `clawdline open --print`, the one-time link works once, a Session shows, and no setup wizard or
+  Cloud sign-in appears. `lsof` showed the daemon listening on `127.0.0.1:7791` only, plus one
+  connection to a Cloudflare address on port 443: `app.clawdline.com`, because the daemon had
+  been started without `CLAWDLINE_NEXT_UPDATE_CHECK=off`. The update check has been off by
+  default since.
+- `tools/test-go-ci.sh`: every package passed except `internal/adapters/planner`
+  `TestPlannerSaysWhenNeitherCLIExists`. It faked `LookPath` but not the fixed fallback paths
+  `/opt/homebrew/bin` and `/usr/local/bin`, and it did not replace `Run`, so it ran the `claude` or
+  `codex` the person has in `/usr/local/bin` with the prompt `anything`. Fixed on 2026-10-28:
+  `fallbackBins` is emptied by the test, and a run fails it (reproduced in the container with a
+  stub `/usr/local/bin/claude`).
+- Console e2e: 223 tests, 143 passed, 55 failed, 25 skipped. 40 of the 55 also failed in the
+  container at the same commit. Most of the 15 that failed only on the Mac showed Japanese where
+  the test expects Taiwan Traditional Chinese: the fixtures seed the zh-Hant catalog, and the
+  console then follows the browser's language list, which on macOS is the system's. No failure was
+  traced to macOS itself.
+- `BenchmarkReplayJournalRecord` printed no result in what the person pasted; not measured yet.
 
 Found sound: no telemetry, analytics or crash SDKs; local HTTP has CSRF, Origin and Host checks;
 no exploitable XSS; no `sh -c` injection; the release updater verifies the ed25519 signature
@@ -267,8 +292,8 @@ before parsing; token and key files are 0600.
 
 ### What leaves the machine
 
-- With a source build, Cloud off and the update check off, nothing goes to the Clawdline operator
-  or to GitHub. What remains, none of it to the operator: AI auto-naming sends conversation
+- With a source build and Cloud off (the update check is off unless turned on), nothing goes to
+  the Clawdline operator or to GitHub. What remains, none of it to the operator: AI auto-naming sends conversation
   snippets and paths to Anthropic or OpenAI through the local `claude` or `codex` CLI; browser
   push subscriptions go to Apple or Google push services, end-to-end encrypted; documentation and
   plan links open `clawdline.com` or `app.clawdline.com`, which then see the IP but no referrer.

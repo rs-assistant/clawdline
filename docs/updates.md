@@ -400,8 +400,8 @@ which release this machine should run.
 
 - **Latest** is the `BUILD.json` the hosted console serves: `<DefaultAppOrigin>/BUILD.json`, where
   `DefaultAppOrigin` is `https://app.clawdline.com` (`internal/adapters/cloud/settings.go`). Set
-  `CLAWDLINE_NEXT_UPDATE_URL` to ask another `BUILD.json`; set `CLAWDLINE_NEXT_UPDATE_CHECK=off`
-  to turn the check off.
+  `CLAWDLINE_NEXT_UPDATE_URL` to ask another `BUILD.json`. On the `rs-assistant/clawdline` fork
+  the check is off unless `CLAWDLINE_NEXT_UPDATE_CHECK=on`; upstream turns it off with `=off`.
 - **Running** is the `BUILD.json` in the web dist this daemon serves (`CLAWDLINE_NEXT_WEB`). When
   there is none, it is the binary's own full `vcs.revision`, with no commit time.
 

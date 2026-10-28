@@ -114,7 +114,16 @@ func hasEmptyTools(args []string) bool {
 }
 
 func TestPlannerSaysWhenNeitherCLIExists(t *testing.T) {
-	p := Planner{Home: t.TempDir(), LookPath: func(string) (string, error) { return "", errors.New("missing") }}
+	// A claude or codex in /usr/local/bin on the machine running this test
+	// would otherwise be found and run for real.
+	saved := fallbackBins
+	fallbackBins = nil
+	t.Cleanup(func() { fallbackBins = saved })
+	p := Planner{Home: t.TempDir(), LookPath: func(string) (string, error) { return "", errors.New("missing") },
+		Run: func(_ context.Context, executable string, _ []string, _, _ string, _ []string) ([]byte, error) {
+			t.Fatalf("a missing CLI was run: %s", executable)
+			return nil, nil
+		}}
 	_, err := p.Draft(context.Background(), "anything", nil, nil)
 	if !errors.Is(err, ErrNoPlanner) {
 		t.Fatalf("error = %v", err)

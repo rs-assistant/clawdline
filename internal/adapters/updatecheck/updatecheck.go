@@ -56,9 +56,12 @@ func SourceURL() string {
 	return strings.TrimRight(cloud.DefaultAppOrigin, "/") + "/BUILD.json"
 }
 
-// Disabled says the check was turned off with CLAWDLINE_NEXT_UPDATE_CHECK=off.
+// Disabled says the check is off. On this fork, which builds from reviewed
+// source and takes no upstream updates, it is off unless
+// CLAWDLINE_NEXT_UPDATE_CHECK=on: a daemon started without the variable asks
+// app.clawdline.com nothing. Upstream checks unless the variable says off.
 func Disabled() bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv(CheckEnv)), "off")
+	return !strings.EqualFold(strings.TrimSpace(os.Getenv(CheckEnv)), "on")
 }
 
 // buildFile is BUILD.json. committed_at is absent in files written before
@@ -257,7 +260,7 @@ func (c *Checker) Status() contract.UpdateStatus {
 	}
 	out := contract.UpdateStatus{Running: running, SourceURL: c.URL}
 	if c.Disabled {
-		out.State, out.Reason = contract.UpdateStateUnknown, "the update check is off ("+CheckEnv+"=off)"
+		out.State, out.Reason = contract.UpdateStateUnknown, "the update check is off (set "+CheckEnv+"=on to turn it on)"
 		return out
 	}
 	c.mu.Lock()
